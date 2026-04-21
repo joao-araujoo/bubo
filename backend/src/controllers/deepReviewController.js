@@ -28,9 +28,14 @@ Respond ONLY in this exact JSON format:
   "encouragement": "<1 short sentence in the voice of a wise owl mascot>"
 }`;
 
+const MOCK_MIN_DEPTH = 60;
+const MOCK_MAX_DEPTH = 95;
+const MOCK_WORDS_PER_DEPTH_POINT = 10;
+const MIN_REVIEW_WORDS = 100;
+
 const getMockResponse = (reviewText) => {
   const wordCount = reviewText.trim().split(/\s+/).length;
-  if (wordCount < 100) {
+  if (wordCount < MIN_REVIEW_WORDS) {
     return {
       state: 'GUIDING',
       cognitiveDepth: 0,
@@ -38,7 +43,7 @@ const getMockResponse = (reviewText) => {
       encouragement: 'Every great thinker started with curiosity — dig deeper, young owl!'
     };
   }
-  const depth = Math.min(95, Math.max(60, 60 + Math.floor(wordCount / 10)));
+  const depth = Math.min(MOCK_MAX_DEPTH, Math.max(MOCK_MIN_DEPTH, MOCK_MIN_DEPTH + Math.floor(wordCount / MOCK_WORDS_PER_DEPTH_POINT)));
   return {
     state: 'APPROVED',
     cognitiveDepth: depth,
