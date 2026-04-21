@@ -61,7 +61,7 @@ exports.submitReview = async (req, res) => {
     let aiResult;
 
     const apiKey = process.env.OPENAI_API_KEY;
-    if (apiKey && apiKey !== 'your_openai_api_key_here') {
+    if (apiKey && apiKey.startsWith('sk-')) {
       const openai = new OpenAI({ apiKey });
       const userMessage = `Book: "${book.title}" by ${book.author}\nPages Read: ${pageFrom}-${pageTo}\n\nReader's Synthesis:\n${reviewText}`;
       const completion = await openai.chat.completions.create({

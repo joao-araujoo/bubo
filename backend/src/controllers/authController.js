@@ -3,7 +3,9 @@ const { validationResult } = require('express-validator');
 const User = require('../models/User');
 
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'dev_secret', { expiresIn: '7d' });
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET environment variable is not set');
+  return jwt.sign({ userId }, secret, { expiresIn: '7d' });
 };
 
 exports.register = async (req, res) => {
