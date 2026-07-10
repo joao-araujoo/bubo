@@ -5,6 +5,7 @@ import BuboMark from '../brand/BuboMark';
 import NotificationBell from '../social/NotificationBell';
 import Button from '../ui/Button';
 import ThemeToggle from '../theme/ThemeToggle';
+import MobileMoreMenu from './MobileMoreMenu';
 import { useAuthStore } from '../../stores/useAuthStore';
 
 const pageTitles = {
@@ -42,12 +43,12 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface)/0.94)] backdrop-blur-xl">
-      <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none">
-          <BuboMark size={42} />
+      <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center gap-2 px-3 sm:gap-3 sm:px-6 lg:px-8">
+        <Link to="/" className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]">
+          <BuboMark size={40} />
           <span className="min-w-0">
-            <span className="block truncate text-sm font-extrabold leading-tight text-[rgb(var(--bubo-color-text))] sm:text-base">{title}</span>
-            <span className="block text-[0.62rem] font-extrabold uppercase tracking-[0.28em] text-[rgb(var(--bubo-color-primary))]">Read deeply</span>
+            <span className="block max-w-[6.25rem] truncate text-sm font-extrabold leading-tight text-[rgb(var(--bubo-color-text))] sm:max-w-none sm:text-base">{title}</span>
+            <span className="block text-[0.58rem] font-extrabold uppercase tracking-[0.24em] text-[rgb(var(--bubo-color-primary))] sm:text-[0.62rem] sm:tracking-[0.28em]">Read deeply</span>
           </span>
         </Link>
 
@@ -59,7 +60,7 @@ export default function Navbar() {
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `inline-flex min-h-10 items-center gap-2 rounded-[var(--bubo-radius-md)] px-3 text-sm font-semibold transition ${
+                  `inline-flex min-h-10 items-center gap-2 rounded-[var(--bubo-radius-md)] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))] ${
                     isActive
                       ? 'bg-[rgb(var(--bubo-color-primary)/0.12)] text-[rgb(var(--bubo-color-primary))]'
                       : 'text-[rgb(var(--bubo-color-text-muted))] hover:bg-[rgb(var(--bubo-color-surface-muted))] hover:text-[rgb(var(--bubo-color-text))]'
@@ -73,19 +74,26 @@ export default function Navbar() {
           </nav>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <div className="hidden sm:block"><ThemeToggle /></div>
           {token ? (
             <>
+              <MobileMoreMenu />
               <NotificationBell />
-              <Button size="md" leftIcon={<Sparkles size={17} aria-hidden="true" />} onClick={openDeepReview}>
+              <Button
+                size="md"
+                aria-label="Fazer Deep Review"
+                leftIcon={<Sparkles size={17} aria-hidden="true" />}
+                onClick={openDeepReview}
+                className="w-11 px-0 sm:w-auto sm:px-4 [&>span]:hidden sm:[&>span]:inline"
+              >
                 Validar
               </Button>
             </>
           ) : (
             <Link
               to="/auth"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-primary))] px-4 text-sm font-semibold text-[rgb(var(--bubo-color-primary-contrast))] shadow-[var(--bubo-shadow-sm)] transition hover:bg-[rgb(var(--bubo-color-primary-hover))]"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-primary))] px-4 text-sm font-semibold text-[rgb(var(--bubo-color-primary-contrast))] shadow-[var(--bubo-shadow-sm)] transition hover:bg-[rgb(var(--bubo-color-primary-hover))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]"
             >
               Entrar
             </Link>
