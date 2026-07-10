@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import AchievementsPage from './pages/AchievementsPage';
 import AuthPage from './pages/AuthPage';
+import ClubDetailPage from './pages/ClubDetailPage';
+import ClubsPage from './pages/ClubsPage';
 import DiscoverPage from './pages/DiscoverPage';
 import FeedPage from './pages/FeedPage';
 import HomePage from './pages/HomePage';
@@ -24,6 +26,8 @@ export default function App() {
         <Route path="library" element={<PrivateRoute><LibraryPage /></PrivateRoute>} />
         <Route path="feed" element={<PrivateRoute><FeedPage /></PrivateRoute>} />
         <Route path="discover" element={<PrivateRoute><DiscoverPage /></PrivateRoute>} />
+        <Route path="clubs" element={<PrivateRoute><ClubsPage /></PrivateRoute>} />
+        <Route path="clubs/:id" element={<PrivateRoute><ClubDetailPage /></PrivateRoute>} />
         <Route path="achievements" element={<PrivateRoute><AchievementsPage /></PrivateRoute>} />
         <Route path="profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
