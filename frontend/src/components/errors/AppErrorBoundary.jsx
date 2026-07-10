@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, RefreshCw, TriangleAlert } from 'lucide-react';
+import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
 import BuboMark from '../brand/BuboMark';
 import Button from '../ui/Button';
 
@@ -42,7 +42,7 @@ export default class AppErrorBoundary extends React.Component {
           <div className="mx-auto flex w-fit items-center gap-3">
             <BuboMark size={52} />
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[rgb(var(--bubo-color-warning)/0.12)] text-[rgb(var(--bubo-color-warning))]">
-              <TriangleAlert size={22} aria-hidden="true" />
+              <AlertTriangle size={22} aria-hidden="true" />
             </span>
           </div>
 
