@@ -1,12 +1,13 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/layout/Layout';
+import AchievementsPage from './pages/AchievementsPage';
+import AuthPage from './pages/AuthPage';
+import DiscoverPage from './pages/DiscoverPage';
+import FeedPage from './pages/FeedPage';
 import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
-import FeedPage from './pages/FeedPage';
-import AchievementsPage from './pages/AchievementsPage';
 import ProfilePage from './pages/ProfilePage';
-import AuthPage from './pages/AuthPage';
 import { useAuthStore } from './stores/useAuthStore';
 
 function PrivateRoute({ children }) {
@@ -22,8 +23,10 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="library" element={<PrivateRoute><LibraryPage /></PrivateRoute>} />
         <Route path="feed" element={<PrivateRoute><FeedPage /></PrivateRoute>} />
+        <Route path="discover" element={<PrivateRoute><DiscoverPage /></PrivateRoute>} />
         <Route path="achievements" element={<PrivateRoute><AchievementsPage /></PrivateRoute>} />
         <Route path="profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );
