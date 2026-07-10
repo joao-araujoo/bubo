@@ -13,7 +13,7 @@ import CognitiveDepthMeter from './CognitiveDepthMeter';
 
 const MIN_REVIEW_WORDS = 100;
 
-export default function DeepReviewModal({ isOpen, userBook, onClose }) {
+export default function DeepReviewModal({ isOpen, userBook, onClose, onCompleted }) {
   const [owlState, setOwlState] = useState('idle');
   const [pageFrom, setPageFrom] = useState('');
   const [pageTo, setPageTo] = useState('');
@@ -87,6 +87,12 @@ export default function DeepReviewModal({ isOpen, userBook, onClose }) {
         setOwlState('approved');
         updateBookPage(userBook._id, to);
         toast.success(`Deep Review aprovada com ${aiResult.cognitiveDepth}% de profundidade.`);
+        Promise.resolve(onCompleted?.({
+          review: data.review,
+          aiResult,
+          userBookId: userBook._id,
+          currentPage: to,
+        })).catch(() => {});
       } else {
         setOwlState('guiding');
         toast('O Bubo encontrou caminhos para aprofundar sua reflexão.', { icon: '🦉' });
