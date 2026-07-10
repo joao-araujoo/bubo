@@ -1,0 +1,41 @@
+{
+  "name": "Bubo — Read Deeply",
+  "short_name": "Bubo",
+  "description": "Leitura profunda, memória validada e comunidade literária.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8f7fb",
+  "theme_color": "#7c3aed",
+  "categories": ["books", "education", "social"],
+  "icons": [
+    {
+      "src": "/owl.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Biblioteca",
+      "short_name": "Biblioteca",
+      "url": "/library",
+      "icons": [{ "src": "/owl.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Feed",
+      "short_name": "Feed",
+      "url": "/feed",
+      "icons": [{ "src": "/owl.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Coach",
+      "short_name": "Coach",
+      "url": "/coach",
+      "icons": [{ "src": "/owl.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

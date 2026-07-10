@@ -18,15 +18,15 @@ exports.register = async (req, res) => {
   try {
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      const field = existingUser.email === email ? 'Email' : 'Username';
-      return res.status(400).json({ message: `${field} already in use` });
+      const field = existingUser.email === email ? 'E-mail' : 'Nome de usuário';
+      return res.status(400).json({ message: `${field} já está em uso.` });
     }
     const user = new User({ username, email, password });
     await user.save();
     const token = generateToken(user._id);
     res.status(201).json({ token, user });
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: 'Não foi possível criar a conta agora.' });
   }
 };
 
@@ -37,15 +37,15 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!user) return res.status(400).json({ message: 'E-mail ou senha inválidos.' });
 
     const isMatch = await user.comparePassword(password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!isMatch) return res.status(400).json({ message: 'E-mail ou senha inválidos.' });
 
     const token = generateToken(user._id);
     res.json({ token, user });
   } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
+    res.status(500).json({ message: 'Não foi possível entrar agora.' });
   }
 };
 
@@ -57,12 +57,19 @@ exports.updateProfile = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { username, avatar, bio, readingGoal } = req.body;
+  const {
+    username,
+    avatar,
+    bio,
+    readingGoal,
+    readingPreferences,
+    onboardingCompleted
+  } = req.body;
 
   try {
     if (username && username !== req.user.username) {
       const existing = await User.findOne({ username, _id: { $ne: req.user._id } });
-      if (existing) return res.status(400).json({ message: 'Username already in use' });
+      if (existing) return res.status(400).json({ message: 'Nome de usuário já está em uso.' });
     }
 
     const updates = {};
@@ -70,6 +77,18 @@ exports.updateProfile = async (req, res) => {
     if (avatar !== undefined) updates.avatar = avatar;
     if (bio !== undefined) updates.bio = bio;
     if (readingGoal !== undefined) updates.readingGoal = readingGoal;
+    if (readingPreferences !== undefined) {
+      updates.readingPreferences = {
+        primaryGoal: readingPreferences.primaryGoal,
+        pace: readingPreferences.pace,
+        favoriteGenres: readingPreferences.favoriteGenres || [],
+        weeklyReviewTarget: readingPreferences.weeklyReviewTarget
+      };
+    }
+    if (onboardingCompleted !== undefined) {
+      updates.onboardingCompleted = Boolean(onboardingCompleted);
+      updates.onboardingCompletedAt = onboardingCompleted ? new Date() : null;
+    }
 
     const user = await User.findByIdAndUpdate(
       req.user._id,
@@ -79,7 +98,7 @@ exports.updateProfile = async (req, res) => {
 
     res.json({ user });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update profile', error: err.message });
+    res.status(500).json({ message: 'Não foi possível atualizar seu perfil.' });
   }
 };
 
@@ -167,6 +186,6 @@ exports.getDashboard = async (req, res) => {
       recentReviews
     });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to get dashboard', error: err.message });
+    res.status(500).json({ message: 'Não foi possível carregar seu painel.' });
   }
 };
