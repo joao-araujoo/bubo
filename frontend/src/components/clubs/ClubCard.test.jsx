@@ -40,7 +40,7 @@ describe('ClubCard', () => {
     renderCard();
 
     expect(screen.getByRole('heading', { name: 'Expedição por Arrakis' })).toBeInTheDocument();
-    expect(screen.getByText('Duna')).toBeInTheDocument();
+    expect(screen.getAllByText('Duna')).toHaveLength(2);
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument();
   });
