@@ -9,6 +9,7 @@ const bookRoutes = require('./routes/books');
 const deepReviewRoutes = require('./routes/deepReview');
 const socialRoutes = require('./routes/social');
 const achievementRoutes = require('./routes/achievements');
+const clubRoutes = require('./routes/clubs');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/books', bookRoutes);
 app.use('/api/deep-review', deepReviewRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/achievements', achievementRoutes);
+app.use('/api/clubs', clubRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
