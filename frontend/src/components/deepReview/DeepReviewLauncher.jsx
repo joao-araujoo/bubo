@@ -1,10 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useAchievementStore } from '../../stores/useAchievementStore';
+import { useDashboardStore } from '../../stores/useDashboardStore';
 import { useLibraryStore } from '../../stores/useLibraryStore';
+import { useSocialStore } from '../../stores/useSocialStore';
 import DeepReviewModal from './DeepReviewModal';
 
 export default function DeepReviewLauncher() {
   const { books, fetchLibrary } = useLibraryStore();
+  const { fetchDashboard } = useDashboardStore();
+  const { fetchAchievements } = useAchievementStore();
+  const { fetchFeed } = useSocialStore();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
@@ -14,7 +20,7 @@ export default function DeepReviewLauncher() {
   );
 
   useEffect(() => {
-    fetchLibrary();
+    fetchLibrary().catch(() => {});
   }, [fetchLibrary]);
 
   useEffect(() => {
@@ -32,11 +38,21 @@ export default function DeepReviewLauncher() {
     return () => window.removeEventListener('bubo:open-deep-review', openReview);
   }, [defaultBook]);
 
+  const refreshConnectedData = async () => {
+    await Promise.allSettled([
+      fetchLibrary({ force: true }),
+      fetchDashboard(),
+      fetchAchievements(),
+      fetchFeed(),
+    ]);
+  };
+
   return (
     <DeepReviewModal
       isOpen={isOpen}
       userBook={selectedBook}
       onClose={() => setIsOpen(false)}
+      onCompleted={refreshConnectedData}
     />
   );
 }
