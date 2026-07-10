@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   frontend:
-    name: Frontend build
+    name: Frontend quality gate
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,29 +29,65 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Lint source code
+        id: frontend-lint
+        continue-on-error: true
+        shell: bash
+        run: npm run lint > lint.log 2>&1
+
+      - name: Run automated tests
+        id: frontend-test
+        continue-on-error: true
+        shell: bash
+        run: npm run test > test.log 2>&1
+
       - name: Build application
         id: frontend-build
         continue-on-error: true
         shell: bash
         run: npm run build > build.log 2>&1
 
-      - name: Report build failure
-        if: steps.frontend-build.outcome == 'failure' && github.event_name == 'pull_request'
+      - name: Report quality gate failure
+        if: >-
+          github.event_name == 'pull_request' &&
+          (steps.frontend-lint.outcome == 'failure' ||
+           steps.frontend-test.outcome == 'failure' ||
+           steps.frontend-build.outcome == 'failure')
         uses: actions/github-script@v7
+        env:
+          LINT_OUTCOME: ${{ steps.frontend-lint.outcome }}
+          TEST_OUTCOME: ${{ steps.frontend-test.outcome }}
+          BUILD_OUTCOME: ${{ steps.frontend-build.outcome }}
         with:
           script: |
             const fs = require('fs');
-            const output = fs.readFileSync('frontend/build.log', 'utf8');
-            const lines = output.trim().split('\n').slice(-60).join('\n');
+
+            const checks = [
+              ['Lint', process.env.LINT_OUTCOME, 'frontend/lint.log'],
+              ['Tests', process.env.TEST_OUTCOME, 'frontend/test.log'],
+              ['Build', process.env.BUILD_OUTCOME, 'frontend/build.log'],
+            ];
+
+            const sections = checks
+              .filter(([, outcome]) => outcome === 'failure')
+              .map(([name, , path]) => {
+                const output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : 'Log unavailable.';
+                const lines = output.trim().split('\n').slice(-80).join('\n');
+                return `### ${name}\n\n\`\`\`text\n${lines}\n\`\`\``;
+              });
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `<!-- bubo-ci-build-error -->\n## Frontend build failed\n\n\`\`\`text\n${lines}\n\`\`\``
+              body: `<!-- bubo-ci-quality-error -->\n## Frontend quality gate failed\n\n${sections.join('\n\n')}`,
             });
 
-      - name: Enforce frontend build
-        if: steps.frontend-build.outcome == 'failure'
+      - name: Enforce frontend quality gate
+        if: >-
+          steps.frontend-lint.outcome == 'failure' ||
+          steps.frontend-test.outcome == 'failure' ||
+          steps.frontend-build.outcome == 'failure'
         run: exit 1
 
   backend:
