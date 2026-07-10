@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
@@ -23,7 +24,13 @@ export default [
         },
       },
     },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
     plugins: {
+      react,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
     },
@@ -34,9 +41,11 @@ export default [
         {
           argsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
+          varsIgnorePattern: '^(React|_)',
         },
       ],
+      'react/jsx-uses-vars': 'error',
+      'react/jsx-uses-react': 'off',
       'react-refresh/only-export-components': 'off',
     },
   },
