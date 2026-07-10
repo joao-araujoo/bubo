@@ -16,5 +16,12 @@ router.post('/login', [
 ], authController.login);
 
 router.get('/profile', authMiddleware, authController.getProfile);
+router.patch('/profile', authMiddleware, [
+  body('username').optional().trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters'),
+  body('avatar').optional({ checkFalsy: true }).isURL().withMessage('Avatar must be a valid URL'),
+  body('bio').optional().trim().isLength({ max: 240 }).withMessage('Bio must have at most 240 characters'),
+  body('readingGoal').optional().isInt({ min: 1, max: 365 }).withMessage('Reading goal must be between 1 and 365')
+], authController.updateProfile);
+router.get('/dashboard', authMiddleware, authController.getDashboard);
 
 module.exports = router;

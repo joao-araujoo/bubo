@@ -6,29 +6,37 @@
   :root {
     color-scheme: light;
 
-    --bubo-color-background: 248 247 244;
+    --bubo-color-background: 248 245 252;
     --bubo-color-surface: 255 255 255;
-    --bubo-color-surface-muted: 241 239 234;
-    --bubo-color-border: 218 214 205;
-    --bubo-color-text: 35 32 29;
-    --bubo-color-text-muted: 103 97 88;
-    --bubo-color-primary: 104 67 142;
-    --bubo-color-primary-hover: 88 54 124;
+    --bubo-color-surface-muted: 241 235 248;
+    --bubo-color-border: 217 221 231;
+    --bubo-color-text: 23 26 35;
+    --bubo-color-text-muted: 100 111 133;
+    --bubo-color-primary: 139 44 245;
+    --bubo-color-primary-hover: 117 31 216;
     --bubo-color-primary-contrast: 255 255 255;
-    --bubo-color-accent: 45 122 105;
-    --bubo-color-danger: 185 56 56;
-    --bubo-color-success: 45 122 77;
-    --bubo-color-warning: 174 105 26;
-    --bubo-color-focus: 104 67 142;
+    --bubo-color-accent: 14 165 164;
+    --bubo-color-danger: 239 68 68;
+    --bubo-color-success: 34 197 94;
+    --bubo-color-warning: 245 158 11;
+    --bubo-color-focus: 139 44 245;
+
+    --bubo-space-xs: 0.25rem;
+    --bubo-space-sm: 0.5rem;
+    --bubo-space-md: 0.75rem;
+    --bubo-space-lg: 1rem;
+    --bubo-space-xl: 1.5rem;
+    --bubo-space-2xl: 2rem;
 
     --bubo-radius-sm: 0.5rem;
     --bubo-radius-md: 0.75rem;
     --bubo-radius-lg: 1rem;
+    --bubo-radius-xl: 1.5rem;
     --bubo-radius-full: 9999px;
 
-    --bubo-shadow-sm: 0 1px 2px rgb(35 32 29 / 0.06);
-    --bubo-shadow-md: 0 8px 24px rgb(35 32 29 / 0.1);
-    --bubo-shadow-lg: 0 20px 48px rgb(35 32 29 / 0.14);
+    --bubo-shadow-sm: 0 1px 2px rgb(23 26 35 / 0.06);
+    --bubo-shadow-md: 0 8px 24px rgb(23 26 35 / 0.1);
+    --bubo-shadow-lg: 0 20px 48px rgb(23 26 35 / 0.14);
 
     --bubo-duration-fast: 120ms;
     --bubo-duration-normal: 200ms;
@@ -37,20 +45,20 @@
   [data-theme='dark'] {
     color-scheme: dark;
 
-    --bubo-color-background: 22 21 20;
-    --bubo-color-surface: 31 29 28;
-    --bubo-color-surface-muted: 42 39 37;
-    --bubo-color-border: 65 61 57;
-    --bubo-color-text: 245 242 237;
-    --bubo-color-text-muted: 178 170 160;
-    --bubo-color-primary: 166 124 207;
-    --bubo-color-primary-hover: 184 143 224;
-    --bubo-color-primary-contrast: 24 20 28;
-    --bubo-color-accent: 91 174 153;
-    --bubo-color-danger: 232 112 112;
-    --bubo-color-success: 102 190 128;
-    --bubo-color-warning: 225 160 78;
-    --bubo-color-focus: 184 143 224;
+    --bubo-color-background: 15 17 23;
+    --bubo-color-surface: 23 26 35;
+    --bubo-color-surface-muted: 35 39 53;
+    --bubo-color-border: 55 65 81;
+    --bubo-color-text: 248 250 252;
+    --bubo-color-text-muted: 190 197 211;
+    --bubo-color-primary: 168 85 247;
+    --bubo-color-primary-hover: 139 44 245;
+    --bubo-color-primary-contrast: 15 17 23;
+    --bubo-color-accent: 14 165 164;
+    --bubo-color-danger: 239 68 68;
+    --bubo-color-success: 34 197 94;
+    --bubo-color-warning: 245 158 11;
+    --bubo-color-focus: 168 85 247;
 
     --bubo-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2);
     --bubo-shadow-md: 0 8px 24px rgb(0 0 0 / 0.28);
