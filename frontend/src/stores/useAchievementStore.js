@@ -22,5 +22,7 @@ export const useAchievementStore = create((set) => ({
       set({ error: message, isLoading: false });
       throw new Error(message);
     }
-  }
+  },
+
+  resetAchievements: () => set({ achievements: [], metrics: {}, isLoading: false, error: null })
 }));
