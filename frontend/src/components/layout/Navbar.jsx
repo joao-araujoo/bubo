@@ -73,9 +73,12 @@ export default function Navbar() {
               Validar
             </Button>
           ) : (
-            <Button as="span" className="px-0">
-              <Link to="/auth" className="flex min-h-11 items-center px-4">Entrar</Link>
-            </Button>
+            <Link
+              to="/auth"
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-primary))] px-4 text-sm font-semibold text-[rgb(var(--bubo-color-primary-contrast))] shadow-[var(--bubo-shadow-sm)] transition hover:bg-[rgb(var(--bubo-color-primary-hover))]"
+            >
+              Entrar
+            </Link>
           )}
         </div>
       </div>
