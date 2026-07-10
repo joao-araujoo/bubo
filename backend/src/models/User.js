@@ -5,7 +5,14 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 30 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, minlength: 6 },
-  avatar: { type: String, default: '' },
+  avatar: { type: String, default: '', trim: true, maxlength: 1000 },
+  bio: {
+    type: String,
+    default: 'Lendo para lembrar, escrever melhor e conectar ideias.',
+    trim: true,
+    maxlength: 240
+  },
+  readingGoal: { type: Number, default: 20, min: 1, max: 365 },
   achievements: [{ type: String }],
   createdAt: { type: Date, default: Date.now }
 });
