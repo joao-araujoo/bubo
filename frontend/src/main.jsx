@@ -10,7 +10,11 @@ import './index.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, staleTime: 30000 },
+    queries: {
+      retry: 1,
+      staleTime: 30000,
+      refetchOnWindowFocus: false,
+    },
   },
 });
 
@@ -22,12 +26,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <BrowserRouter>
             <App />
             <Toaster
-              position="top-right"
+              position="top-center"
+              containerStyle={{ top: 'max(1rem, env(safe-area-inset-top))' }}
               toastOptions={{
+                duration: 4200,
                 style: {
+                  maxWidth: 'min(28rem, calc(100vw - 2rem))',
                   background: 'rgb(var(--bubo-color-surface))',
                   color: 'rgb(var(--bubo-color-text))',
                   border: '1px solid rgb(var(--bubo-color-border))',
+                  boxShadow: 'var(--bubo-shadow-lg)',
                 },
                 success: {
                   iconTheme: {
@@ -49,3 +57,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </ThemeProvider>
   </React.StrictMode>,
 );
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // A aplicação continua funcional sem suporte offline.
+    });
+  });
+}
