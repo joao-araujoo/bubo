@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   frontend:
@@ -29,10 +30,29 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Build application
+        id: frontend-build
+        continue-on-error: true
         shell: bash
-        run: |
-          set -o pipefail
-          npm run build 2>&1 | tail -80
+        run: npm run build > build.log 2>&1
+
+      - name: Report build failure
+        if: steps.frontend-build.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('frontend/build.log', 'utf8');
+            const lines = output.trim().split('\n').slice(-60).join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `<!-- bubo-ci-build-error -->\n## Frontend build failed\n\n\`\`\`text\n${lines}\n\`\`\``
+            });
+
+      - name: Enforce frontend build
+        if: steps.frontend-build.outcome == 'failure'
+        run: exit 1
 
   backend:
     name: Backend module check
