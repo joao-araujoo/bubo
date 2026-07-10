@@ -1,237 +1,189 @@
-import React, { useState, useEffect } from 'react';
-import { X, Send, Save, BookOpen, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { BookOpen, CheckCircle2, ChevronRight, Save, Send, Sparkles, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import BookCover from '../books/BookCover';
 import BuboMascot from '../owl/BuboMascot';
-import CognitiveDepthMeter from './CognitiveDepthMeter';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Textarea from '../ui/Textarea';
 import api from '../../services/api';
 import { useLibraryStore } from '../../stores/useLibraryStore';
-import toast from 'react-hot-toast';
+import CognitiveDepthMeter from './CognitiveDepthMeter';
+
+const MIN_REVIEW_WORDS = 100;
 
 export default function DeepReviewModal({ isOpen, userBook, onClose }) {
   const [owlState, setOwlState] = useState('idle');
-  const [newPage, setNewPage] = useState('');
+  const [pageFrom, setPageFrom] = useState('');
+  const [pageTo, setPageTo] = useState('');
   const [reviewText, setReviewText] = useState('');
+  const [mainInsight, setMainInsight] = useState('');
   const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { updateBookPage } = useLibraryStore();
 
   const book = userBook?.bookId;
-  const currentPage = userBook?.currentPage || 0;
-  const wordCount = reviewText.trim().split(/\s+/).filter(Boolean).length;
+  const currentPage = Number(userBook?.currentPage || 0);
+  const combinedReview = useMemo(
+    () => `${reviewText.trim()}${mainInsight.trim() ? `\n\nInsight principal: ${mainInsight.trim()}` : ''}`,
+    [mainInsight, reviewText],
+  );
+  const wordCount = combinedReview.split(/\s+/).filter(Boolean).length;
 
   useEffect(() => {
-    if (isOpen) {
-      setOwlState('idle');
-      setNewPage('');
-      setReviewText('');
-      setResult(null);
-    }
-  }, [isOpen, userBook]);
+    if (!isOpen) return;
+    setOwlState('idle');
+    setPageFrom(String(currentPage + 1));
+    setPageTo('');
+    setReviewText('');
+    setMainInsight('');
+    setResult(null);
+  }, [currentPage, isOpen, userBook]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !isSubmitting) onClose();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [isOpen, isSubmitting, onClose]);
+
+  const validate = () => {
+    const from = Number.parseInt(pageFrom, 10);
+    const to = Number.parseInt(pageTo, 10);
+    if (!from || from <= currentPage) return `A página inicial deve ser maior que ${currentPage}.`;
+    if (!to || to < from) return 'A página final deve ser igual ou maior que a inicial.';
+    if (book?.totalPages && to > book.totalPages) return `A página final não pode ultrapassar ${book.totalPages}.`;
+    if (wordCount < MIN_REVIEW_WORDS) return `Escreva pelo menos ${MIN_REVIEW_WORDS} palavras para uma avaliação confiável.`;
+    return null;
+  };
 
   const handleSubmit = async () => {
-    const pageNum = parseInt(newPage);
-    if (!pageNum || pageNum <= currentPage) {
-      toast.error(`Page must be greater than current page (${currentPage})`);
+    const validationError = validate();
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
-    if (wordCount < 10) {
-      toast.error('Please write a more detailed synthesis');
-      return;
-    }
+
+    const from = Number.parseInt(pageFrom, 10);
+    const to = Number.parseInt(pageTo, 10);
     setIsSubmitting(true);
     setOwlState('thinking');
     setResult(null);
+
     try {
       const { data } = await api.post('/deep-review/submit', {
         userBookId: userBook._id,
-        pageFrom: currentPage,
-        pageTo: pageNum,
-        reviewText
+        pageFrom: from,
+        pageTo: to,
+        reviewText: combinedReview,
       });
       const aiResult = data.aiResult;
       setResult(aiResult);
+
       if (aiResult.state === 'APPROVED') {
         setOwlState('approved');
-        updateBookPage(userBook._id, pageNum);
-        toast.success(`Approved! ${aiResult.cognitiveDepth}% Cognitive Depth`);
+        updateBookPage(userBook._id, to);
+        toast.success(`Deep Review aprovada com ${aiResult.cognitiveDepth}% de profundidade.`);
       } else {
         setOwlState('guiding');
-        toast('Keep thinking deeper — Bubo believes in you!', { icon: '🦉' });
+        toast('O Bubo encontrou caminhos para aprofundar sua reflexão.', { icon: '🦉' });
       }
-    } catch (err) {
+    } catch (error) {
       setOwlState('idle');
-      toast.error(err.response?.data?.message || 'Submission failed');
+      toast.error(error.response?.data?.message || 'Não foi possível validar a Deep Review.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleSaveProgress = () => {
-    toast.success('Progress saved!');
+    toast.success('Progresso salvo no seu acervo.');
     onClose();
   };
 
-  if (!isOpen || !userBook) return null;
+  if (!userBook) return null;
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={(e) => e.target === e.currentTarget && onClose()}
-      >
+      {isOpen && (
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          className="w-full max-w-4xl bg-[#1E1E1E] rounded-2xl border border-[#BDBDBD]/10 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onMouseDown={(event) => event.target === event.currentTarget && !isSubmitting && onClose()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[#BDBDBD]/10 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <BookOpen size={20} className="text-[#8A2BE2]" />
+          <motion.section
+            initial={{ opacity: 0, y: 28, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deep-review-title"
+            className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[1.5rem] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] shadow-[var(--bubo-shadow-lg)] sm:rounded-[1.5rem]"
+          >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[rgb(var(--bubo-color-border))] px-5 py-5 sm:px-7">
               <div>
-                <h2 className="text-lg font-bold text-white">Deep Review</h2>
-                <p className="text-sm text-[#BDBDBD]">{book?.title}</p>
+                <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.2em] text-[rgb(var(--bubo-color-primary))]"><Sparkles size={14} /> IA socrática</p>
+                <h2 id="deep-review-title" className="mt-1 text-2xl font-black tracking-[-0.025em]">Deep Review</h2>
+                <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">O Bubo valida síntese, conexões e especificidade antes de salvar seu progresso.</p>
               </div>
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgb(var(--bubo-color-border))] text-[rgb(var(--bubo-color-text-muted))] transition hover:bg-[rgb(var(--bubo-color-surface-muted))] hover:text-[rgb(var(--bubo-color-text))] disabled:opacity-50" aria-label="Fechar Deep Review"><X size={20} /></button>
+            </header>
+
+            <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[1fr_20rem] lg:overflow-hidden">
+              <div className="space-y-5 p-5 sm:p-7 lg:overflow-y-auto">
+                <div className="flex items-center gap-4 rounded-[var(--bubo-radius-lg)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface-muted))] p-3">
+                  <div className="w-14 shrink-0"><BookCover title={book?.title} author={book?.author} src={book?.coverImage} /></div>
+                  <div className="min-w-0"><p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[rgb(var(--bubo-color-primary))]">Livro selecionado</p><h3 className="mt-1 truncate font-extrabold">{book?.title || 'Livro sem título'}</h3><p className="truncate text-sm text-[rgb(var(--bubo-color-text-muted))]">{book?.author || 'Autor não informado'} · página atual {currentPage}</p></div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input label="Página inicial" type="number" min={currentPage + 1} max={book?.totalPages || undefined} value={pageFrom} onChange={(event) => setPageFrom(event.target.value)} required />
+                  <Input label="Página final" type="number" min={Number(pageFrom) || currentPage + 1} max={book?.totalPages || undefined} value={pageTo} onChange={(event) => setPageTo(event.target.value)} required />
+                </div>
+
+                <Textarea label="Síntese reflexiva" value={reviewText} onChange={(event) => setReviewText(event.target.value)} rows={8} required placeholder="Explique o que aconteceu, quais ideias importam, quais conexões você fez e o que ficou em aberto." description="Evite apenas recontar o enredo. Relacione acontecimentos, temas e interpretações." />
+                <Textarea label="Insight principal" value={mainInsight} onChange={(event) => setMainInsight(event.target.value)} rows={3} placeholder="Qual ideia desse trecho você quer lembrar daqui a um mês?" />
+
+                <div className="flex flex-col gap-3 rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-surface-muted))] p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <span className={wordCount >= MIN_REVIEW_WORDS ? 'font-bold text-[rgb(var(--bubo-color-success))]' : 'text-[rgb(var(--bubo-color-text-muted))]'}>{wordCount} palavras {wordCount >= MIN_REVIEW_WORDS ? '· pronto para validar' : `· faltam ${MIN_REVIEW_WORDS - wordCount}`}</span>
+                  <Button onClick={handleSubmit} isLoading={isSubmitting} disabled={!pageTo || !reviewText.trim()} leftIcon={<Send size={17} />}>Validar com o Bubo</Button>
+                </div>
+              </div>
+
+              <aside className="border-t border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface-muted))] p-5 sm:p-7 lg:overflow-y-auto lg:border-l lg:border-t-0">
+                <div className="mx-auto flex max-w-xs flex-col items-center text-center">
+                  <BuboMascot state={owlState} size={132} />
+                  {owlState === 'idle' && <><h3 className="mt-3 font-extrabold">Escreva com suas palavras</h3><p className="mt-2 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">O objetivo não é parecer acadêmico, mas demonstrar que você conectou as ideias do trecho.</p></>}
+                  {owlState === 'thinking' && <><h3 className="mt-3 font-extrabold text-[rgb(var(--bubo-color-primary))]">Analisando sua reflexão…</h3><p className="mt-2 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">O Bubo está avaliando especificidade, relações e profundidade cognitiva.</p></>}
+
+                  {result && (
+                    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`mt-5 w-full rounded-[var(--bubo-radius-lg)] border p-4 text-left ${result.state === 'APPROVED' ? 'border-[rgb(var(--bubo-color-success)/0.3)] bg-[rgb(var(--bubo-color-success)/0.08)]' : 'border-[rgb(var(--bubo-color-warning)/0.35)] bg-[rgb(var(--bubo-color-warning)/0.09)]'}`}>
+                      {result.state === 'APPROVED' ? (
+                        <>
+                          <div className="flex items-center gap-2 font-extrabold text-[rgb(var(--bubo-color-success))]"><CheckCircle2 size={18} /> Aprovada</div>
+                          <div className="my-4 flex justify-center"><CognitiveDepthMeter score={result.cognitiveDepth} size={104} /></div>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 font-extrabold text-[rgb(var(--bubo-color-warning))]"><BookOpen size={18} /> Vamos aprofundar</div>
+                      )}
+                      <p className="mt-3 text-sm leading-6">{result.feedback}</p>
+                      <p className="mt-3 text-sm italic text-[rgb(var(--bubo-color-text-muted))]">{result.encouragement}</p>
+                      {result.state !== 'APPROVED' && <div className="mt-4 flex items-center gap-1 text-xs text-[rgb(var(--bubo-color-text-muted))]"><ChevronRight size={14} /> Revise a síntese e envie novamente.</div>}
+                      {result.state === 'APPROVED' && <Button className="mt-5 w-full" onClick={handleSaveProgress} leftIcon={<Save size={17} />}>Salvar progresso</Button>}
+                    </motion.div>
+                  )}
+                </div>
+              </aside>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 transition-colors">
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* Left Panel */}
-            <div className="flex-1 p-6 overflow-y-auto border-r border-[#BDBDBD]/10 space-y-5">
-              <div className="flex items-center gap-3 p-4 bg-[#121212] rounded-xl">
-                {book?.coverImage && (
-                  <img src={book.coverImage} alt={book.title} className="w-12 h-16 object-cover rounded-lg" />
-                )}
-                <div>
-                  <p className="font-medium text-white text-sm">{book?.title}</p>
-                  <p className="text-xs text-[#BDBDBD]">{book?.author}</p>
-                  <p className="text-xs text-[#00FFFF] mt-1">Currently on page {currentPage}</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#BDBDBD] mb-2">
-                  New Page Number
-                </label>
-                <input
-                  type="number"
-                  placeholder={`Enter page (must be > ${currentPage})`}
-                  value={newPage}
-                  onChange={(e) => setNewPage(e.target.value)}
-                  min={currentPage + 1}
-                  max={book?.totalPages || 9999}
-                  className="w-full px-4 py-3 bg-[#121212] border border-[#BDBDBD]/20 rounded-xl text-white placeholder-[#BDBDBD]/40 focus:outline-none focus:border-[#8A2BE2] transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#BDBDBD] mb-2">
-                  Your Synthesis
-                </label>
-                <textarea
-                  placeholder="Write your deep reflection on what you've read... What themes emerged? What connections did you make? What questions arose? How does this change your thinking? (minimum 100 words recommended)"
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  rows={8}
-                  className="w-full px-4 py-3 bg-[#121212] border border-[#BDBDBD]/20 rounded-xl text-white placeholder-[#BDBDBD]/40 focus:outline-none focus:border-[#8A2BE2] transition-colors resize-none text-sm"
-                />
-                <div className="flex justify-between mt-1">
-                  <span className={`text-xs ${wordCount >= 100 ? 'text-[#00FFFF]' : 'text-[#BDBDBD]'}`}>
-                    {wordCount} words {wordCount < 100 ? `(${100 - wordCount} more for best results)` : '✓'}
-                  </span>
-                  <span className="text-xs text-[#BDBDBD]">{reviewText.length} chars</span>
-                </div>
-              </div>
-
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !newPage || !reviewText}
-                className="w-full py-3 px-6 bg-[#8A2BE2] hover:bg-[#9D3DFF] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>Bubo is thinking...</>
-                ) : (
-                  <>
-                    <Send size={16} />
-                    Submit for Validation
-                  </>
-                )}
-              </button>
-
-              {result?.state === 'APPROVED' && (
-                <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={handleSaveProgress}
-                  className="w-full py-3 px-6 bg-[#00FFFF] hover:bg-[#00E5E5] text-[#121212] rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  <Save size={16} />
-                  Save Progress
-                </motion.button>
-              )}
-            </div>
-
-            {/* Right Panel */}
-            <div className="w-80 p-6 flex flex-col items-center gap-6 overflow-y-auto">
-              <BuboMascot state={owlState} size={140} />
-
-              {owlState === 'idle' && (
-                <div className="text-center">
-                  <p className="text-[#BDBDBD] text-sm">Write your synthesis and submit for validation</p>
-                </div>
-              )}
-
-              {owlState === 'thinking' && (
-                <div className="text-center space-y-2">
-                  <p className="text-[#8A2BE2] font-medium text-sm">Analyzing your reflection...</p>
-                  <p className="text-[#BDBDBD] text-xs">Bubo is evaluating your cognitive depth</p>
-                </div>
-              )}
-
-              <AnimatePresence>
-                {result && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="w-full space-y-4"
-                  >
-                    {result.state === 'APPROVED' ? (
-                      <div className="p-4 bg-[#00FFFF]/10 border border-[#00FFFF]/30 rounded-xl space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#00FFFF] font-bold text-sm">✓ APPROVED</span>
-                        </div>
-                        <CognitiveDepthMeter score={result.cognitiveDepth} size={100} />
-                        <p className="text-sm text-white">{result.feedback}</p>
-                        <p className="text-xs text-[#00FFFF] italic">{result.encouragement}</p>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-[#FF9800]/10 border border-[#FF9800]/30 rounded-xl space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#FF9800] font-bold text-sm">🦉 GUIDING</span>
-                        </div>
-                        <p className="text-sm text-white">{result.feedback}</p>
-                        <p className="text-xs text-[#FF9800] italic">{result.encouragement}</p>
-                        <div className="flex items-center gap-1 text-xs text-[#BDBDBD]">
-                          <ChevronRight size={12} />
-                          <span>Revise your synthesis above and try again</span>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
+          </motion.section>
         </motion.div>
-      </motion.div>
+      )}
     </AnimatePresence>
   );
 }
