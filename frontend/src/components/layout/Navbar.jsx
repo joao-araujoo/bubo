@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Compass, Home, MessageSquare, Sparkles, Trophy, UserRound, UsersRound } from 'lucide-react';
+import { BookOpen, Brain, Compass, Home, MessageSquare, Sparkles, Trophy, UserRound, UsersRound } from 'lucide-react';
 import BuboMark from '../brand/BuboMark';
 import NotificationBell from '../social/NotificationBell';
 import Button from '../ui/Button';
@@ -13,6 +13,7 @@ const pageTitles = {
   '/feed': 'Feed',
   '/discover': 'Descobrir',
   '/clubs': 'Clubes',
+  '/coach': 'Coach',
   '/achievements': 'Conquistas',
   '/profile': 'Perfil',
 };
@@ -23,6 +24,7 @@ const desktopLinks = [
   { to: '/feed', label: 'Feed', Icon: MessageSquare },
   { to: '/discover', label: 'Descobrir', Icon: Compass },
   { to: '/clubs', label: 'Clubes', Icon: UsersRound },
+  { to: '/coach', label: 'Coach', Icon: Brain },
   { to: '/achievements', label: 'Conquistas', Icon: Trophy },
   { to: '/profile', label: 'Perfil', Icon: UserRound },
 ];
@@ -65,7 +67,7 @@ export default function Navbar() {
                 }
               >
                 <Icon size={17} strokeWidth={1.9} aria-hidden="true" />
-                {label}
+                <span className="hidden xl:inline">{label}</span>
               </NavLink>
             ))}
           </nav>

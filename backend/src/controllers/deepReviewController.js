@@ -1,92 +1,88 @@
-const OpenAI = require('openai');
 const UserBook = require('../models/UserBook');
 const DeepReview = require('../models/DeepReview');
-const Book = require('../models/Book');
 const SocialActivity = require('../models/SocialActivity');
 const achievementController = require('./achievementController');
+const {
+  evaluateDeepReview,
+  getReadingCoachStatus
+} = require('../services/ai/readingCoach');
 
-const SYSTEM_PROMPT = `You are Bubo, a strict Socratic tutor and cognitive depth evaluator for a deep reading platform. 
-Your ONLY job is to evaluate the quality of a reader's written synthesis of pages they just read.
+const MAX_REVIEW_LENGTH = 12000;
+const CRITERIA_LABELS = {
+  comprehension: 'Compreensão',
+  specificity: 'Especificidade',
+  connections: 'Conexões',
+  reflection: 'Reflexão'
+};
 
-You will receive: Book Title, Author, Pages Read (range), and the User's Text.
+const average = (values) => {
+  if (!values.length) return 0;
+  return Math.round(values.reduce((sum, value) => sum + Number(value || 0), 0) / values.length);
+};
 
-EVALUATION CRITERIA - be STRICT:
-- GUIDING state: text is too short (<100 words), superficial, merely summarizes plot without reflection, lacks personal insight, or shows no critical thinking. Return this when the reader hasn't truly engaged with the material.
-- APPROVED state: text demonstrates genuine reflection, analysis, connection to broader ideas, personal insight, critical questions raised, or synthesis of themes. Must be substantive (>100 words with quality content).
-
-COGNITIVE DEPTH SCORE (0-100) - only calculated for APPROVED:
-- 60-70: Basic reflection, some personal connection
-- 71-80: Good analysis, identifies themes, raises questions  
-- 81-90: Strong critical thinking, multiple connections, original insights
-- 91-100: Exceptional synthesis, profound reflection, philosophical depth
-
-Respond ONLY in this exact JSON format:
-{
-  "state": "APPROVED" | "GUIDING",
-  "cognitiveDepth": <number 0-100, 0 if GUIDING>,
-  "feedback": "<2-3 sentences of specific, actionable feedback referencing the book content>",
-  "encouragement": "<1 short sentence in the voice of a wise owl mascot>"
-}`;
-
-const MOCK_MIN_DEPTH = 60;
-const MOCK_MAX_DEPTH = 95;
-const MOCK_WORDS_PER_DEPTH_POINT = 10;
-const MIN_REVIEW_WORDS = 100;
-
-const getMockResponse = (reviewText) => {
-  const wordCount = reviewText.trim().split(/\s+/).length;
-  if (wordCount < MIN_REVIEW_WORDS) {
-    return {
-      state: 'GUIDING',
-      cognitiveDepth: 0,
-      feedback: 'Your synthesis is too brief to demonstrate genuine engagement with the material. Try to explore the themes, connect ideas to your own experience, or raise critical questions about what you read.',
-      encouragement: 'Every great thinker started with curiosity — dig deeper, young owl!'
-    };
+const validatePages = ({ pageFrom, pageTo, currentPage, totalPages }) => {
+  if (!Number.isInteger(pageFrom) || !Number.isInteger(pageTo)) {
+    return 'As páginas precisam ser números inteiros.';
   }
-  const depth = Math.min(MOCK_MAX_DEPTH, Math.max(MOCK_MIN_DEPTH, MOCK_MIN_DEPTH + Math.floor(wordCount / MOCK_WORDS_PER_DEPTH_POINT)));
-  return {
-    state: 'APPROVED',
-    cognitiveDepth: depth,
-    feedback: 'Your synthesis shows thoughtful engagement with the material. You have identified key themes and connected them to broader ideas. Consider pushing further into the philosophical implications of what you have read.',
-    encouragement: 'Excellent reflection — your mind soars like an owl in the night!'
-  };
+  if (pageFrom < 1 || pageTo < pageFrom) {
+    return 'O intervalo de páginas é inválido.';
+  }
+  if (pageFrom <= currentPage) {
+    return `A página inicial deve ser maior que a página atual (${currentPage}).`;
+  }
+  if (totalPages && pageTo > totalPages) {
+    return `A página final não pode ultrapassar ${totalPages}.`;
+  }
+  return null;
+};
+
+exports.getCoachStatus = async (req, res) => {
+  res.json({ coach: getReadingCoachStatus() });
 };
 
 exports.submitReview = async (req, res) => {
-  const { userBookId, pageFrom, pageTo, reviewText } = req.body;
-  if (!userBookId || !pageFrom || !pageTo || !reviewText) {
-    return res.status(400).json({ message: 'Missing required fields' });
+  const userBookId = req.body.userBookId;
+  const pageFrom = Number.parseInt(req.body.pageFrom, 10);
+  const pageTo = Number.parseInt(req.body.pageTo, 10);
+  const reviewText = String(req.body.reviewText || '').trim();
+
+  if (!userBookId || !reviewText) {
+    return res.status(400).json({ message: 'Preencha o livro, o intervalo de páginas e a síntese.' });
+  }
+  if (reviewText.length > MAX_REVIEW_LENGTH) {
+    return res.status(400).json({ message: `A síntese deve ter no máximo ${MAX_REVIEW_LENGTH} caracteres.` });
   }
 
   try {
-    const userBook = await UserBook.findOne({ _id: userBookId, userId: req.user._id }).populate('bookId');
-    if (!userBook) return res.status(404).json({ message: 'UserBook not found' });
+    const userBook = await UserBook.findOne({
+      _id: userBookId,
+      userId: req.user._id
+    }).populate('bookId');
+    if (!userBook) return res.status(404).json({ message: 'Livro não encontrado no seu acervo.' });
 
     const book = userBook.bookId;
-    let aiResult;
+    const pageError = validatePages({
+      pageFrom,
+      pageTo,
+      currentPage: Number(userBook.currentPage || 0),
+      totalPages: Number(book.totalPages || 0)
+    });
+    if (pageError) return res.status(400).json({ message: pageError });
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (apiKey && apiKey.startsWith('sk-')) {
-      const openai = new OpenAI({ apiKey });
-      const userMessage = `Book: "${book.title}" by ${book.author}\nPages Read: ${pageFrom}-${pageTo}\n\nReader's Synthesis:\n${reviewText}`;
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' }
-      });
-      aiResult = JSON.parse(completion.choices[0].message.content);
-    } else {
-      aiResult = getMockResponse(reviewText);
-    }
-
+    const { result: aiResult, meta } = await evaluateDeepReview({
+      book,
+      pageFrom,
+      pageTo,
+      reviewText
+    });
     const status = aiResult.state === 'APPROVED' ? 'approved' : 'guiding';
-    const cognitiveDepth = aiResult.state === 'APPROVED' ? (aiResult.cognitiveDepth || 0) : 0;
+    const cognitiveDepth = status === 'approved' ? aiResult.cognitiveDepth : 0;
+    const persistedAiResponse = {
+      ...aiResult,
+      meta
+    };
 
-    const deepReview = new DeepReview({
+    const deepReview = await DeepReview.create({
       userId: req.user._id,
       userBookId,
       pageFrom,
@@ -94,42 +90,200 @@ exports.submitReview = async (req, res) => {
       reviewText,
       cognitiveDepth,
       status,
-      aiResponse: aiResult
+      aiProvider: meta.provider,
+      aiModel: meta.model,
+      evaluationVersion: meta.evaluationVersion,
+      wordCount: aiResult.wordCount,
+      aiResponse: persistedAiResponse
     });
-    await deepReview.save();
 
     if (status === 'approved') {
       await UserBook.findByIdAndUpdate(userBookId, {
-        currentPage: pageTo,
-        updatedAt: Date.now(),
-        $push: { deepReviews: { pageFrom, pageTo, reviewText, cognitiveDepth, status, aiResponse: aiResult } }
+        $max: { currentPage: pageTo },
+        $set: { updatedAt: new Date() },
+        $push: {
+          deepReviews: {
+            pageFrom,
+            pageTo,
+            reviewText,
+            cognitiveDepth,
+            status,
+            aiResponse: persistedAiResponse
+          }
+        }
       });
 
+      const pagesValidated = pageTo - pageFrom + 1;
       await SocialActivity.create({
         userId: req.user._id,
         type: 'review_approved',
         bookId: book._id,
-        pages: pageTo - pageFrom,
+        pages: pagesValidated,
         cognitiveDepth,
-        message: `validated ${pageTo - pageFrom} pages of "${book.title}" with ${cognitiveDepth}% Cognitive Depth`
+        message: `Validou ${pagesValidated} páginas de “${book.title}” com ${cognitiveDepth}% de profundidade cognitiva.`,
+        insight: aiResult.retentionPrompt || ''
       });
 
       await achievementController.checkAndUnlockAchievements(req.user._id);
     }
 
-    res.json({ deepReview, aiResult });
+    const responseResult = {
+      ...aiResult,
+      meta
+    };
+    res.json({
+      review: deepReview,
+      deepReview,
+      aiResult: responseResult
+    });
   } catch (err) {
     console.error('Deep review error:', err);
-    res.status(500).json({ message: 'Failed to submit review', error: err.message });
+    if (err.code === 'AI_PROVIDER_UNAVAILABLE') {
+      return res.status(503).json({ message: err.message, code: err.code });
+    }
+    res.status(500).json({ message: 'Não foi possível validar a Deep Review agora.' });
   }
 };
 
 exports.getReviewHistory = async (req, res) => {
   const { userBookId } = req.params;
   try {
-    const reviews = await DeepReview.find({ userId: req.user._id, userBookId }).sort({ createdAt: -1 });
+    const userBook = await UserBook.exists({
+      _id: userBookId,
+      userId: req.user._id
+    });
+    if (!userBook) return res.status(404).json({ message: 'Livro não encontrado no seu acervo.' });
+
+    const reviews = await DeepReview.find({
+      userId: req.user._id,
+      userBookId
+    }).sort({ createdAt: -1 });
     res.json({ reviews });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to get review history', error: err.message });
+    res.status(500).json({ message: 'Não foi possível carregar o histórico de reviews.' });
+  }
+};
+
+exports.getCognitiveProfile = async (req, res) => {
+  try {
+    const reviews = await DeepReview.find({ userId: req.user._id })
+      .populate({
+        path: 'userBookId',
+        select: 'bookId currentPage',
+        populate: { path: 'bookId', select: 'title author' }
+      })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const approved = reviews.filter((review) => review.status === 'approved');
+    const depthValues = approved.map((review) => review.cognitiveDepth || 0);
+    const criteriaValues = {
+      comprehension: [],
+      specificity: [],
+      connections: [],
+      reflection: []
+    };
+
+    approved.forEach((review) => {
+      const criteria = review.aiResponse?.criteria || {};
+      Object.keys(criteriaValues).forEach((key) => {
+        if (Number.isFinite(Number(criteria[key]))) criteriaValues[key].push(Number(criteria[key]));
+      });
+    });
+
+    const criteria = Object.fromEntries(
+      Object.entries(criteriaValues).map(([key, values]) => [key, average(values)])
+    );
+    const rankedCriteria = Object.entries(criteria)
+      .filter(([, value]) => value > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    const recentDepth = depthValues.slice(-3);
+    const previousDepth = depthValues.slice(-6, -3);
+    const recentAverage = average(recentDepth);
+    const previousAverage = average(previousDepth);
+    const delta = previousDepth.length > 0 ? recentAverage - previousAverage : 0;
+    const trend = depthValues.length < 3
+      ? 'collecting'
+      : delta >= 4
+        ? 'improving'
+        : delta <= -4
+          ? 'declining'
+          : 'stable';
+
+    const booksMap = new Map();
+    approved.forEach((review) => {
+      const book = review.userBookId?.bookId;
+      const key = String(book?._id || review.userBookId?._id || 'unknown');
+      const current = booksMap.get(key) || {
+        bookId: book?._id || null,
+        title: book?.title || 'Livro não identificado',
+        author: book?.author || '',
+        depths: [],
+        reviews: 0,
+        lastReviewAt: null,
+        retentionPrompts: []
+      };
+      current.depths.push(review.cognitiveDepth || 0);
+      current.reviews += 1;
+      current.lastReviewAt = review.createdAt;
+      if (review.aiResponse?.retentionPrompt) {
+        current.retentionPrompts.push(review.aiResponse.retentionPrompt);
+      }
+      booksMap.set(key, current);
+    });
+
+    const books = [...booksMap.values()]
+      .map((item) => ({
+        bookId: item.bookId,
+        title: item.title,
+        author: item.author,
+        reviews: item.reviews,
+        averageDepth: average(item.depths),
+        lastReviewAt: item.lastReviewAt,
+        retentionPrompt: item.retentionPrompts.at(-1) || ''
+      }))
+      .sort((a, b) => new Date(b.lastReviewAt) - new Date(a.lastReviewAt));
+
+    const weakest = [...rankedCriteria].sort((a, b) => a[1] - b[1])[0];
+    const recommendationByKey = {
+      comprehension: 'Depois de ler, explique o trecho em três frases sem consultar o livro.',
+      specificity: 'Inclua pelo menos uma evidência concreta do trecho em sua próxima Deep Review.',
+      connections: 'Relacione a próxima leitura a outra parte do livro ou a um conhecimento anterior.',
+      reflection: 'Termine a próxima síntese com uma tensão, interpretação ou pergunta própria.'
+    };
+
+    res.json({
+      coach: getReadingCoachStatus(),
+      summary: {
+        totalReviews: reviews.length,
+        approvedReviews: approved.length,
+        guidingReviews: reviews.length - approved.length,
+        averageDepth: average(depthValues),
+        highestDepth: depthValues.length > 0 ? Math.max(...depthValues) : 0,
+        recentAverage,
+        trend,
+        trendDelta: delta
+      },
+      dimensions: Object.fromEntries(
+        Object.entries(criteria).map(([key, value]) => [key, {
+          label: CRITERIA_LABELS[key],
+          score: value
+        }])
+      ),
+      strongestDimension: rankedCriteria[0]
+        ? { key: rankedCriteria[0][0], label: CRITERIA_LABELS[rankedCriteria[0][0]], score: rankedCriteria[0][1] }
+        : null,
+      growthDimension: weakest
+        ? { key: weakest[0], label: CRITERIA_LABELS[weakest[0]], score: weakest[1] }
+        : null,
+      recommendation: weakest
+        ? recommendationByKey[weakest[0]]
+        : 'Faça sua primeira Deep Review para o Bubo começar a mapear seu padrão cognitivo.',
+      books
+    });
+  } catch (err) {
+    console.error('Cognitive profile error:', err);
+    res.status(500).json({ message: 'Não foi possível calcular seu perfil cognitivo.' });
   }
 };
