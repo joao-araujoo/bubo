@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Compass, Home, MessageSquare, Sparkles, Trophy, UserRound } from 'lucide-react';
+import { BookOpen, Compass, Home, MessageSquare, Sparkles, Trophy, UserRound, UsersRound } from 'lucide-react';
 import BuboMark from '../brand/BuboMark';
+import NotificationBell from '../social/NotificationBell';
 import Button from '../ui/Button';
 import ThemeToggle from '../theme/ThemeToggle';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -11,6 +12,7 @@ const pageTitles = {
   '/library': 'Biblioteca',
   '/feed': 'Feed',
   '/discover': 'Descobrir',
+  '/clubs': 'Clubes',
   '/achievements': 'Conquistas',
   '/profile': 'Perfil',
 };
@@ -20,6 +22,7 @@ const desktopLinks = [
   { to: '/library', label: 'Biblioteca', Icon: BookOpen },
   { to: '/feed', label: 'Feed', Icon: MessageSquare },
   { to: '/discover', label: 'Descobrir', Icon: Compass },
+  { to: '/clubs', label: 'Clubes', Icon: UsersRound },
   { to: '/achievements', label: 'Conquistas', Icon: Trophy },
   { to: '/profile', label: 'Perfil', Icon: UserRound },
 ];
@@ -27,7 +30,9 @@ const desktopLinks = [
 export default function Navbar() {
   const location = useLocation();
   const { token } = useAuthStore();
-  const title = pageTitles[location.pathname] ?? 'Bubo';
+  const title = location.pathname.startsWith('/clubs/')
+    ? 'Clube de leitura'
+    : pageTitles[location.pathname] ?? 'Bubo';
 
   const openDeepReview = () => {
     window.dispatchEvent(new CustomEvent('bubo:open-deep-review'));
@@ -69,9 +74,12 @@ export default function Navbar() {
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
           {token ? (
-            <Button size="md" leftIcon={<Sparkles size={17} aria-hidden="true" />} onClick={openDeepReview}>
-              Validar
-            </Button>
+            <>
+              <NotificationBell />
+              <Button size="md" leftIcon={<Sparkles size={17} aria-hidden="true" />} onClick={openDeepReview}>
+                Validar
+              </Button>
+            </>
           ) : (
             <Link
               to="/auth"
