@@ -53,6 +53,36 @@ exports.getProfile = async (req, res) => {
   res.json({ user: req.user });
 };
 
+exports.updateProfile = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { username, avatar, bio, readingGoal } = req.body;
+
+  try {
+    if (username && username !== req.user.username) {
+      const existing = await User.findOne({ username, _id: { $ne: req.user._id } });
+      if (existing) return res.status(400).json({ message: 'Username already in use' });
+    }
+
+    const updates = {};
+    if (username !== undefined) updates.username = username;
+    if (avatar !== undefined) updates.avatar = avatar;
+    if (bio !== undefined) updates.bio = bio;
+    if (readingGoal !== undefined) updates.readingGoal = readingGoal;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update profile', error: err.message });
+  }
+};
+
 exports.getDashboard = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -78,6 +108,7 @@ exports.getDashboard = async (req, res) => {
     const averageDepth = approvedReviews.length > 0 ? Math.round(depthTotal / approvedReviews.length) : 0;
     const maxDepth = approvedReviews.reduce((maximum, review) => Math.max(maximum, Number(review.cognitiveDepth) || 0), 0);
     const xp = (approvedReviews.length * 100) + (booksRead * 250) + pagesRegistered;
+    const annualGoal = Number(req.user.readingGoal) || 20;
 
     const recentReviews = reviews.slice(0, 10).map((review) => ({
       _id: review._id,
@@ -105,7 +136,7 @@ exports.getDashboard = async (req, res) => {
         averageDepth,
         maxDepth,
         xp,
-        annualGoal: 20
+        annualGoal
       },
       challenges: [
         {
@@ -113,7 +144,7 @@ exports.getDashboard = async (req, res) => {
           title: 'Meta anual',
           description: 'Concluir livros mantendo histórico reflexivo.',
           current: booksRead,
-          target: 20,
+          target: annualGoal,
           xp: 350
         },
         {
