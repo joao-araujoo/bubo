@@ -40,5 +40,7 @@ export const useSocialStore = create((set) => ({
       set({ error: message, isPublishing: false });
       throw new Error(message);
     }
-  }
+  },
+
+  resetSocial: () => set({ activities: [], isLoading: false, isPublishing: false, error: null })
 }));
