@@ -91,7 +91,7 @@ jobs:
         run: exit 1
 
   backend:
-    name: Backend module check
+    name: Backend quality gate
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -110,5 +110,53 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run backend tests
+        id: backend-test
+        continue-on-error: true
+        shell: bash
+        run: npm test > test.log 2>&1
+
       - name: Load application modules
-        run: node -e "require('./src/app'); console.log('Backend modules loaded successfully')"
+        id: backend-modules
+        continue-on-error: true
+        shell: bash
+        run: node -e "require('./src/app'); console.log('Backend modules loaded successfully')" > modules.log 2>&1
+
+      - name: Report backend quality failure
+        if: >-
+          github.event_name == 'pull_request' &&
+          (steps.backend-test.outcome == 'failure' ||
+           steps.backend-modules.outcome == 'failure')
+        uses: actions/github-script@v7
+        env:
+          TEST_OUTCOME: ${{ steps.backend-test.outcome }}
+          MODULE_OUTCOME: ${{ steps.backend-modules.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            const checks = [
+              ['Tests', process.env.TEST_OUTCOME, 'backend/test.log'],
+              ['Module loading', process.env.MODULE_OUTCOME, 'backend/modules.log'],
+            ];
+
+            const sections = checks
+              .filter(([, outcome]) => outcome === 'failure')
+              .map(([name, , path]) => {
+                const output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : 'Log unavailable.';
+                const lines = output.trim().split('\n').slice(-80).join('\n');
+                return `### ${name}\n\n\`\`\`text\n${lines}\n\`\`\``;
+              });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `<!-- bubo-ci-backend-error -->\n## Backend quality gate failed\n\n${sections.join('\n\n')}`,
+            });
+
+      - name: Enforce backend quality gate
+        if: >-
+          steps.backend-test.outcome == 'failure' ||
+          steps.backend-modules.outcome == 'failure'
+        run: exit 1
