@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Compass, Home, MessageSquareText, Sparkles, Trophy, UserRound } from 'lucide-react';
+import { BookOpen, Compass, Home, MessageSquare, Sparkles, Trophy, UserRound } from 'lucide-react';
 import BuboMark from '../brand/BuboMark';
 import Button from '../ui/Button';
 import ThemeToggle from '../theme/ThemeToggle';
@@ -18,7 +18,7 @@ const pageTitles = {
 const desktopLinks = [
   { to: '/', label: 'Início', Icon: Home, end: true },
   { to: '/library', label: 'Biblioteca', Icon: BookOpen },
-  { to: '/feed', label: 'Feed', Icon: MessageSquareText },
+  { to: '/feed', label: 'Feed', Icon: MessageSquare },
   { to: '/discover', label: 'Descobrir', Icon: Compass },
   { to: '/achievements', label: 'Conquistas', Icon: Trophy },
   { to: '/profile', label: 'Perfil', Icon: UserRound },
