@@ -1,0 +1,18 @@
+{
+  "name": "bubo",
+  "version": "2.8.0",
+  "private": true,
+  "description": "Bubo — leitura profunda, memória validada e comunidade literária.",
+  "scripts": {
+    "docker:up": "docker compose up --build",
+    "docker:demo": "docker compose --profile demo up --build",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down --volumes --remove-orphans",
+    "setup": "npm install --prefix backend && npm install --prefix frontend",
+    "check": "npm run test --prefix backend && npm run lint --prefix frontend && npm run test --prefix frontend && npm run build --prefix frontend"
+  },
+  "engines": {
+    "node": ">=24",
+    "npm": ">=10"
+  }
+}
