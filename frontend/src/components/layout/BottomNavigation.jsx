@@ -1,11 +1,11 @@
 import React from 'react';
-import { BookOpen, Compass, Home, MessageSquareText, UserRound } from 'lucide-react';
+import { BookOpen, Compass, Home, MessageSquare, UserRound } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const items = [
   { to: '/', label: 'Início', Icon: Home, end: true },
   { to: '/library', label: 'Biblioteca', Icon: BookOpen },
-  { to: '/feed', label: 'Feed', Icon: MessageSquareText },
+  { to: '/feed', label: 'Feed', Icon: MessageSquare },
   { to: '/discover', label: 'Descobrir', Icon: Compass },
   { to: '/profile', label: 'Perfil', Icon: UserRound },
 ];
