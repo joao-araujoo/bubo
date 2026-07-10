@@ -1,5 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
+import DeepReviewLauncher from '../deepReview/DeepReviewLauncher';
 import BottomNavigation from './BottomNavigation';
 import Navbar from './Navbar';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -13,7 +14,12 @@ export default function Layout() {
       <main className={`mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8 ${token ? 'pb-24 md:pb-8' : 'pb-8'}`}>
         <Outlet />
       </main>
-      {token && <BottomNavigation />}
+      {token && (
+        <>
+          <BottomNavigation />
+          <DeepReviewLauncher />
+        </>
+      )}
     </div>
   );
 }
