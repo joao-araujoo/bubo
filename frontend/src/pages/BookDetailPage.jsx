@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BookOpen,
-  Calendar,
   Clock,
   Pencil,
   Plus,
@@ -14,6 +13,7 @@ import {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BookCover from '../components/books/BookCover';
+import BookReadingTimeline, { formatReadingDate, formatReadingDuration } from '../components/books/BookReadingTimeline';
 import LibraryBookModal from '../components/books/LibraryBookModal';
 import ReadingSessionModal from '../components/books/ReadingSessionModal';
 import Button from '../components/ui/Button';
@@ -24,27 +24,6 @@ import Skeleton from '../components/ui/Skeleton';
 import api from '../services/api';
 import { useLibraryStore } from '../stores/useLibraryStore';
 import { formatNumber, getBookStatusLabel } from '../utils/formatters';
-
-const focusLabels = {
-  'not-informed': 'Concentração não informada',
-  low: 'Concentração baixa',
-  medium: 'Concentração média',
-  high: 'Concentração alta',
-};
-
-const formatDate = (value) => {
-  if (!value) return 'Data não informada';
-  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
-};
-
-const formatDuration = (minutes) => {
-  const total = Number(minutes) || 0;
-  if (total <= 0) return 'Duração não informada';
-  if (total < 60) return `${total} min`;
-  const hours = Math.floor(total / 60);
-  const remaining = total % 60;
-  return remaining ? `${hours}h ${remaining}min` : `${hours}h`;
-};
 
 const normalizeUserBook = (userBook) => {
   if (!userBook) return userBook;
@@ -63,10 +42,9 @@ export default function BookDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { books, fetchLibrary } = useLibraryStore();
+  const { books, fetchLibrary, updateBookStatus } = useLibraryStore();
   const [isSessionOpen, setIsSessionOpen] = useState(false);
   const [isManageOpen, setIsManageOpen] = useState(false);
-  const [timelineFilter, setTimelineFilter] = useState('all');
   const [sessionToDelete, setSessionToDelete] = useState(null);
 
   const detailQuery = useQuery({
@@ -96,22 +74,6 @@ export default function BookDetailPage() {
   const totalPages = Number(userBook?.effectiveTotalPages) || 0;
   const summary = detail?.summary || {};
 
-  const timeline = useMemo(() => {
-    const sessions = (detail?.sessions || []).map((session) => ({
-      ...session,
-      timelineType: 'session',
-      timelineDate: session.readAt || session.createdAt,
-    }));
-    const reviews = (detail?.reviews || []).map((review) => ({
-      ...review,
-      timelineType: 'review',
-      timelineDate: review.createdAt,
-    }));
-    return [...sessions, ...reviews]
-      .filter((item) => timelineFilter === 'all' || item.timelineType === timelineFilter)
-      .sort((a, b) => new Date(b.timelineDate) - new Date(a.timelineDate));
-  }, [detail?.reviews, detail?.sessions, timelineFilter]);
-
   const refreshAfterChange = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['library-book', id] }),
@@ -129,9 +91,25 @@ export default function BookDetailPage() {
     await refreshAfterChange();
   };
 
-  const openDeepReview = () => {
+  const openDeepReview = async () => {
     if (!userBook) return;
-    window.dispatchEvent(new CustomEvent('bubo:open-deep-review', { detail: { userBook } }));
+    if (userBook.status === 'read' && totalPages > 0 && currentPage >= totalPages) {
+      toast.error('Esta leitura está concluída. Reabra como “Lendo” para iniciar uma releitura.');
+      setIsManageOpen(true);
+      return;
+    }
+
+    let reviewBook = userBook;
+    if (userBook.status !== 'reading') {
+      try {
+        reviewBook = normalizeUserBook(await updateBookStatus(userBook._id, { status: 'reading' }));
+        await queryClient.invalidateQueries({ queryKey: ['library-book', id] });
+      } catch (error) {
+        toast.error(error.message);
+        return;
+      }
+    }
+    window.dispatchEvent(new CustomEvent('bubo:open-deep-review', { detail: { userBook: reviewBook } }));
   };
 
   if (detailQuery.isLoading) {
@@ -173,9 +151,7 @@ export default function BookDetailPage() {
 
           <div className="min-w-0 self-center">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full bg-[rgb(var(--bubo-color-primary)/0.1)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] text-[rgb(var(--bubo-color-primary))]">
-                {getBookStatusLabel(userBook.status)}
-              </span>
+              <span className="inline-flex rounded-full bg-[rgb(var(--bubo-color-primary)/0.1)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] text-[rgb(var(--bubo-color-primary))]">{getBookStatusLabel(userBook.status)}</span>
               {book.publishedDate && <span className="text-sm text-[rgb(var(--bubo-color-text-muted))]">{String(book.publishedDate).slice(0, 4)}</span>}
             </div>
             <h1 className="mt-4 text-3xl font-black tracking-[-0.045em] sm:text-5xl">{book.title || 'Livro sem título'}</h1>
@@ -188,9 +164,7 @@ export default function BookDetailPage() {
                   <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[rgb(var(--bubo-color-primary))]">Progresso da leitura</p>
                   <p className="mt-1 text-3xl font-black">{summary.progressPercent || 0}%</p>
                 </div>
-                <p className="text-sm font-semibold text-[rgb(var(--bubo-color-text-muted))]">
-                  Página {currentPage}{totalPages > 0 ? ` de ${totalPages}` : ''}
-                </p>
+                <p className="text-sm font-semibold text-[rgb(var(--bubo-color-text-muted))]">Página {currentPage}{totalPages > 0 ? ` de ${totalPages}` : ''}</p>
               </div>
               <ProgressBar className="mt-4" value={currentPage} max={totalPages || Math.max(currentPage, 1)} />
             </div>
@@ -206,7 +180,7 @@ export default function BookDetailPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={BookOpen} label="Sessões" value={formatNumber(summary.sessionCount || 0)} />
-        <Metric icon={Clock} label="Tempo registrado" value={formatDuration(summary.durationMinutes)} />
+        <Metric icon={Clock} label="Tempo registrado" value={formatReadingDuration(summary.durationMinutes)} />
         <Metric icon={Target} label="Páginas em sessões" value={formatNumber(summary.pagesReadInSessions || 0)} />
         <Metric icon={Sparkles} label="Profundidade média" value={summary.averageDepth ? `${summary.averageDepth}/100` : 'Sem avaliação'} />
       </section>
@@ -220,68 +194,16 @@ export default function BookDetailPage() {
           <dl className="space-y-3 text-sm">
             {book.publisher && <Metadata label="Editora" value={book.publisher} />}
             {book.isbn && <Metadata label="ISBN" value={book.isbn} />}
-            {userBook.startedAt && <Metadata label="Início da leitura" value={formatDate(userBook.startedAt)} />}
-            {userBook.completedAt && <Metadata label="Conclusão" value={formatDate(userBook.completedAt)} />}
+            {userBook.startedAt && <Metadata label="Início da leitura" value={formatReadingDate(userBook.startedAt)} />}
+            {userBook.completedAt && <Metadata label="Conclusão" value={formatReadingDate(userBook.completedAt)} />}
           </dl>
         </section>
       )}
 
-      <section className="rounded-[var(--bubo-radius-xl)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] p-5 shadow-[var(--bubo-shadow-sm)] sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[rgb(var(--bubo-color-primary))]">Linha do tempo</p>
-            <h2 className="mt-1 text-2xl font-black tracking-[-0.03em]">Sua trajetória neste livro</h2>
-            <p className="mt-1 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">Sessões e Deep Reviews aparecem juntas para preservar o contexto da leitura.</p>
-          </div>
-          <div className="flex gap-2 overflow-x-auto" role="tablist" aria-label="Filtrar histórico">
-            {[
-              ['all', 'Tudo'],
-              ['session', 'Sessões'],
-              ['review', 'Deep Reviews'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={timelineFilter === value}
-                onClick={() => setTimelineFilter(value)}
-                className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))] ${timelineFilter === value ? 'border-[rgb(var(--bubo-color-primary))] bg-[rgb(var(--bubo-color-primary))] text-white' : 'border-[rgb(var(--bubo-color-border))] text-[rgb(var(--bubo-color-text-muted))] hover:text-[rgb(var(--bubo-color-text))]'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+      <BookReadingTimeline reviews={detail.reviews} sessions={detail.sessions} onDeleteSession={setSessionToDelete} />
 
-        {timeline.length === 0 ? (
-          <div className="mt-6 rounded-[var(--bubo-radius-xl)] border border-dashed border-[rgb(var(--bubo-color-border))] p-8 text-center">
-            <BookOpen size={28} className="mx-auto text-[rgb(var(--bubo-color-primary))]" aria-hidden="true" />
-            <h3 className="mt-3 font-black">Nenhum registro neste filtro</h3>
-            <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">Registre uma sessão ou faça uma Deep Review para construir seu histórico.</p>
-          </div>
-        ) : (
-          <div className="relative mt-7 space-y-4 before:absolute before:bottom-4 before:left-5 before:top-4 before:w-px before:bg-[rgb(var(--bubo-color-border))]">
-            {timeline.map((item) => item.timelineType === 'session' ? (
-              <SessionEntry key={`session-${item._id}`} session={item} onDelete={() => setSessionToDelete(item)} />
-            ) : (
-              <ReviewEntry key={`review-${item._id}`} review={item} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <ReadingSessionModal
-        isOpen={isSessionOpen}
-        onClose={() => setIsSessionOpen(false)}
-        userBook={userBook}
-        onSaved={refreshAfterChange}
-      />
-
-      <LibraryBookModal
-        isOpen={isManageOpen}
-        onClose={closeManage}
-        userBook={userBook}
-      />
+      <ReadingSessionModal isOpen={isSessionOpen} onClose={() => setIsSessionOpen(false)} userBook={userBook} onSaved={refreshAfterChange} />
+      <LibraryBookModal isOpen={isManageOpen} onClose={closeManage} userBook={userBook} />
 
       <Modal
         isOpen={Boolean(sessionToDelete)}
@@ -298,9 +220,7 @@ export default function BookDetailPage() {
           </div>
         )}
       >
-        <p className="text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
-          Sessão das páginas {sessionToDelete?.pageFrom} a {sessionToDelete?.pageTo}, registrada em {formatDate(sessionToDelete?.readAt)}.
-        </p>
+        <p className="text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">Sessão das páginas {sessionToDelete?.pageFrom} a {sessionToDelete?.pageTo}, registrada em {formatReadingDate(sessionToDelete?.readAt)}.</p>
       </Modal>
     </div>
   );
@@ -322,46 +242,5 @@ function Metadata({ label, value }) {
       <dt className="text-[rgb(var(--bubo-color-text-muted))]">{label}</dt>
       <dd className="max-w-[11rem] text-right font-bold">{value}</dd>
     </div>
-  );
-}
-
-function SessionEntry({ onDelete, session }) {
-  return (
-    <article className="relative ml-10 rounded-[var(--bubo-radius-xl)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] p-4 sm:p-5">
-      <span className="absolute -left-[2.55rem] top-4 grid h-10 w-10 place-items-center rounded-full border-4 border-[rgb(var(--bubo-color-surface))] bg-[rgb(var(--bubo-color-primary))] text-white"><BookOpen size={16} aria-hidden="true" /></span>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.11em] text-[rgb(var(--bubo-color-primary))]">Sessão de leitura</p>
-          <h3 className="mt-1 font-black">Páginas {session.pageFrom}–{session.pageTo}</h3>
-          <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">{formatDate(session.readAt)} · {session.pagesRead} páginas · {formatDuration(session.durationMinutes)}</p>
-        </div>
-        <button type="button" onClick={onDelete} className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[rgb(var(--bubo-color-text-muted))] transition hover:bg-[rgb(var(--bubo-color-danger)/0.08)] hover:text-[rgb(var(--bubo-color-danger))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]" aria-label="Remover sessão">
-          <Trash2 size={17} aria-hidden="true" />
-        </button>
-      </div>
-      <p className="mt-3 text-sm font-semibold text-[rgb(var(--bubo-color-text-muted))]">{focusLabels[session.focus] || focusLabels['not-informed']}</p>
-      {session.note && <p className="mt-3 whitespace-pre-wrap rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-surface-muted)/0.65)] p-4 text-sm leading-6">{session.note}</p>}
-    </article>
-  );
-}
-
-function ReviewEntry({ review }) {
-  const approved = review.status === 'approved';
-  return (
-    <article className="relative ml-10 rounded-[var(--bubo-radius-xl)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] p-4 sm:p-5">
-      <span className="absolute -left-[2.55rem] top-4 grid h-10 w-10 place-items-center rounded-full border-4 border-[rgb(var(--bubo-color-surface))] bg-[rgb(var(--bubo-color-accent))] text-white"><Sparkles size={16} aria-hidden="true" /></span>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.11em] text-[rgb(var(--bubo-color-primary))]">Deep Review</p>
-          <h3 className="mt-1 font-black">Páginas {review.pageFrom}–{review.pageTo}</h3>
-          <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">{formatDate(review.createdAt)} · {formatNumber(review.wordCount || 0)} palavras</p>
-        </div>
-        <span className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${approved ? 'bg-[rgb(var(--bubo-color-success)/0.1)] text-[rgb(var(--bubo-color-success))]' : 'bg-[rgb(var(--bubo-color-warning)/0.12)] text-[rgb(var(--bubo-color-warning))]'}`}>
-          {approved ? `${review.cognitiveDepth}/100` : 'Em orientação'}
-        </span>
-      </div>
-      <p className="mt-4 line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">{review.reviewText}</p>
-      {review.aiResponse?.summary && <p className="mt-3 rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-primary)/0.06)] p-4 text-sm leading-6">{review.aiResponse.summary}</p>}
-    </article>
   );
 }
