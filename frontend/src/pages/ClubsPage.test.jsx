@@ -61,7 +61,7 @@ describe('ClubsPage', () => {
     });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Criar clube' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Criar clube' })[0]);
 
     expect(screen.getByRole('dialog', { name: 'Criar clube de leitura' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Nome do clube/i)).toBeInTheDocument();
