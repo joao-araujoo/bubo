@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { sanitizeValue } = require('../utils/logger');
 const { getRequestContext } = require('./requestContext');
 
 let configuration = {
@@ -30,7 +31,7 @@ const configureErrorReporter = (config = {}) => {
   });
 };
 
-const buildPayload = (error, context = {}) => ({
+const buildPayload = (error, context = {}) => sanitizeValue({
   timestamp: new Date().toISOString(),
   service: configuration.service,
   environment: configuration.environment,
@@ -96,6 +97,7 @@ const flushErrorReports = async (timeoutMs = 3000) => {
 };
 
 module.exports = {
+  buildPayload,
   captureException,
   configureErrorReporter,
   flushErrorReports,
