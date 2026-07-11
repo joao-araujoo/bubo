@@ -24,6 +24,7 @@ export default function Layout() {
   const { refreshProfile, token, user } = useAuthStore();
   const currentTitle = useMemo(() => {
     if (location.pathname.startsWith('/clubs/')) return 'Clube de leitura';
+    if (location.pathname.startsWith('/library/')) return 'Sua leitura';
     return routeTitles[location.pathname] || 'Bubo';
   }, [location.pathname]);
 
