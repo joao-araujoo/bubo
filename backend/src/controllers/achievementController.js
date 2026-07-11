@@ -4,14 +4,14 @@ const UserBook = require('../models/UserBook');
 const SocialActivity = require('../models/SocialActivity');
 
 const ACHIEVEMENTS = [
-  { id: 'first_review', name: 'First Steps', description: 'Complete your first Deep Review', icon: '🦉', threshold: 1, type: 'reviews', rarity: 'common' },
-  { id: 'ten_reviews', name: 'Deep Diver', description: 'Complete 10 Deep Reviews', icon: '🎯', threshold: 10, type: 'reviews', rarity: 'rare' },
-  { id: 'fifty_reviews', name: 'Philosopher', description: 'Complete 50 Deep Reviews', icon: '🧠', threshold: 50, type: 'reviews', rarity: 'legendary' },
-  { id: 'first_book', name: 'Bookworm', description: 'Finish your first book', icon: '📚', threshold: 1, type: 'books_completed', rarity: 'common' },
-  { id: 'five_books', name: 'Bibliophile', description: 'Finish 5 books', icon: '🏛️', threshold: 5, type: 'books_completed', rarity: 'epic' },
-  { id: 'high_depth', name: 'Cognitive Elite', description: 'Achieve 90%+ Cognitive Depth score', icon: '⚡', threshold: 90, type: 'max_depth', rarity: 'epic' },
-  { id: 'streak_7', name: 'Consistent Reader', description: '7-day reading streak', icon: '🔥', threshold: 7, type: 'streak', rarity: 'rare' },
-  { id: 'hundred_pages', name: 'Century', description: 'Read 100 pages total', icon: '💯', threshold: 100, type: 'total_pages', rarity: 'rare' }
+  { id: 'first_review', name: 'Primeiro passo', description: 'Conclua sua primeira Deep Review.', iconKey: 'sparkles', threshold: 1, type: 'reviews', rarity: 'common' },
+  { id: 'ten_reviews', name: 'Leitura profunda', description: 'Conclua 10 Deep Reviews.', iconKey: 'target', threshold: 10, type: 'reviews', rarity: 'rare' },
+  { id: 'fifty_reviews', name: 'Leitor reflexivo', description: 'Conclua 50 Deep Reviews.', iconKey: 'brain', threshold: 50, type: 'reviews', rarity: 'legendary' },
+  { id: 'first_book', name: 'Primeiro livro', description: 'Finalize seu primeiro livro.', iconKey: 'book_open', threshold: 1, type: 'books_completed', rarity: 'common' },
+  { id: 'five_books', name: 'Biblioteca viva', description: 'Finalize 5 livros.', iconKey: 'library', threshold: 5, type: 'books_completed', rarity: 'epic' },
+  { id: 'high_depth', name: 'Síntese premium', description: 'Alcance 90 ou mais de profundidade cognitiva.', iconKey: 'medal', threshold: 90, type: 'max_depth', rarity: 'epic' },
+  { id: 'streak_7', name: 'Semana ativa', description: 'Mantenha uma sequência de leitura por 7 dias.', iconKey: 'flame', threshold: 7, type: 'streak', rarity: 'rare' },
+  { id: 'hundred_pages', name: 'Cem páginas', description: 'Registre 100 páginas validadas.', iconKey: 'book_open', threshold: 100, type: 'total_pages', rarity: 'rare' },
 ];
 
 const getMetrics = async (userId) => {
@@ -22,8 +22,8 @@ const getMetrics = async (userId) => {
     DeepReview.aggregate([
       { $match: { userId } },
       { $match: { status: 'approved' } },
-      { $group: { _id: null, total: { $sum: { $subtract: ['$pageTo', '$pageFrom'] } } } }
-    ])
+      { $group: { _id: null, total: { $sum: { $subtract: ['$pageTo', '$pageFrom'] } } } },
+    ]),
   ]);
 
   return {
@@ -31,7 +31,7 @@ const getMetrics = async (userId) => {
     books_completed: completedBooks,
     max_depth: maxDepthDoc?.cognitiveDepth || 0,
     streak: 0,
-    total_pages: totalPagesResult[0]?.total || 0
+    total_pages: totalPagesResult[0]?.total || 0,
   };
 };
 
@@ -42,7 +42,7 @@ exports.getUserAchievements = async (req, res) => {
     await exports.checkAndUnlockAchievements(req.user._id);
     const [user, metrics] = await Promise.all([
       User.findById(req.user._id),
-      getMetrics(req.user._id)
+      getMetrics(req.user._id),
     ]);
 
     const unlocked = new Set(user?.achievements || []);
@@ -52,13 +52,13 @@ exports.getUserAchievements = async (req, res) => {
         ...achievement,
         current,
         progress: Math.min(100, Math.round((current / achievement.threshold) * 100)),
-        unlocked: unlocked.has(achievement.id)
+        unlocked: unlocked.has(achievement.id),
       };
     });
 
     res.json({ achievements, metrics });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to get achievements', error: err.message });
+    res.status(500).json({ message: 'Não foi possível carregar as conquistas.', error: err.message });
   }
 };
 
@@ -66,7 +66,7 @@ exports.checkAndUnlockAchievements = async (userId) => {
   try {
     const [user, metrics] = await Promise.all([
       User.findById(userId),
-      getMetrics(userId)
+      getMetrics(userId),
     ]);
 
     if (!user) return [];
@@ -90,7 +90,7 @@ exports.checkAndUnlockAchievements = async (userId) => {
         return {
           userId,
           type: 'achievement_unlocked',
-          message: `unlocked the "${achievement.name}" achievement ${achievement.icon}`
+          message: `Desbloqueou a conquista “${achievement.name}”.`,
         };
       }));
     }
