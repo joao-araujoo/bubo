@@ -35,7 +35,9 @@ export default function Navbar() {
   const { token } = useAuthStore();
   const title = location.pathname.startsWith('/clubs/')
     ? 'Clube de leitura'
-    : pageTitles[location.pathname] ?? 'Bubo';
+    : location.pathname.startsWith('/library/')
+      ? 'Sua leitura'
+      : pageTitles[location.pathname] ?? 'Bubo';
 
   const openDeepReview = () => {
     window.dispatchEvent(new CustomEvent('bubo:open-deep-review'));
