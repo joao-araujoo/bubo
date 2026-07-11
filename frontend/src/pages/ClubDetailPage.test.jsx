@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ClubDetailPage from './ClubDetailPage';
@@ -121,11 +121,12 @@ describe('ClubDetailPage', () => {
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sair do clube' }));
-    expect(screen.getByRole('dialog', { name: 'Sair deste clube?' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Sair deste clube?' });
+    expect(dialog).toBeInTheDocument();
     expect(leaveClub).not.toHaveBeenCalled();
     expect(confirmSpy).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sair do clube' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sair do clube' }));
 
     await waitFor(() => expect(leaveClub).toHaveBeenCalledWith('club-1'));
     expect(await screen.findByRole('heading', { name: 'Lista de clubes' })).toBeInTheDocument();
@@ -147,6 +148,6 @@ describe('ClubDetailPage', () => {
 
     expect(screen.getByRole('dialog', { name: 'Convite do clube' })).toBeInTheDocument();
     expect(screen.getAllByText('ABCD1234').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText('Link de convite')).toHaveValue(expect.stringContaining('/clubs/club-1?invite=ABCD1234'));
+    expect(screen.getByLabelText('Link de convite').value).toContain('/clubs/club-1?invite=ABCD1234');
   });
 });
