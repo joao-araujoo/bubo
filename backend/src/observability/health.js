@@ -10,20 +10,36 @@ const buildLiveness = ({ requestId, runtime }) => ({
   requestId,
 });
 
-const buildReadiness = ({ requestId, runtime, databaseReady }) => {
-  const ready = Boolean(databaseReady && runtime?.acceptingTraffic && !runtime?.shuttingDown);
+const buildReadiness = ({ requestId, runtime, databaseReady, redis = {} }) => {
+  const processReady = Boolean(runtime?.acceptingTraffic && !runtime?.shuttingDown);
+  const redisEnabled = Boolean(redis.enabled);
+  const redisReady = Boolean(redis.ready);
+  const redisRequired = Boolean(redis.required);
+  const ready = Boolean(databaseReady && processReady && (!redisRequired || redisReady));
   const database = databaseReady ? 'connected' : 'disconnected';
+  const redisStatus = !redisEnabled ? 'disabled' : redisReady ? 'connected' : 'degraded';
+  const fullyHealthy = ready && (!redisEnabled || redisReady);
 
   return {
-    status: ready ? 'ok' : 'degraded',
+    status: fullyHealthy ? 'ok' : 'degraded',
     ready,
     service: 'bubo-api',
     database,
+    redis: redisStatus,
     uptimeSeconds: runtime?.uptimeSeconds ?? Math.round(process.uptime()),
     memoryMb: memoryMb(),
     checks: {
-      process: runtime?.acceptingTraffic && !runtime?.shuttingDown ? 'ready' : 'not-ready',
+      process: processReady ? 'ready' : 'not-ready',
       database,
+      redis: redisStatus,
+    },
+    dependencies: {
+      redis: {
+        enabled: redisEnabled,
+        required: redisRequired,
+        ready: redisReady,
+        status: redis.status || redisStatus,
+      },
     },
     runtime,
     timestamp: new Date().toISOString(),

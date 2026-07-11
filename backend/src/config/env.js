@@ -13,18 +13,29 @@ const booleanValue = (value, fallback = false) => {
 
 const normalizeEnvironment = (env = process.env) => {
   const nodeEnv = env.NODE_ENV || 'development';
+  const instanceCount = numberWithin(env.INSTANCE_COUNT, 1, 1, 1000);
+  const redisUrl = String(env.REDIS_URL || '').trim();
 
   return {
     nodeEnv,
     port: Number(env.PORT) || 3001,
     serviceName: env.SERVICE_NAME || 'bubo-api',
     release: env.APP_RELEASE || env.GITHUB_SHA || 'development',
+    instanceCount,
     mongoUri: env.MONGODB_URI || 'mongodb://localhost:27017/bubo',
     mongoMaxPoolSize: numberWithin(env.MONGO_MAX_POOL_SIZE, 50, 5, 500),
     mongoMinPoolSize: numberWithin(env.MONGO_MIN_POOL_SIZE, 5, 0, 100),
     mongoMaxIdleTimeMS: numberWithin(env.MONGO_MAX_IDLE_TIME_MS, 60000, 1000, 600000),
     mongoServerSelectionTimeoutMS: numberWithin(env.MONGO_SERVER_SELECTION_TIMEOUT_MS, 10000, 1000, 60000),
     mongoSocketTimeoutMS: numberWithin(env.MONGO_SOCKET_TIMEOUT_MS, 45000, 5000, 300000),
+    redisUrl,
+    redisEnabled: Boolean(redisUrl),
+    redisRequired: booleanValue(env.REDIS_REQUIRED, instanceCount > 1),
+    redisKeyPrefix: String(env.REDIS_KEY_PREFIX || `bubo:${nodeEnv}`).trim(),
+    redisConnectTimeoutMs: numberWithin(env.REDIS_CONNECT_TIMEOUT_MS, 5000, 500, 30000),
+    redisCommandTimeoutMs: numberWithin(env.REDIS_COMMAND_TIMEOUT_MS, 1500, 100, 10000),
+    redisReconnectDelayMs: numberWithin(env.REDIS_RECONNECT_DELAY_MS, 30000, 1000, 300000),
+    redisCacheTtlMs: numberWithin(env.REDIS_CACHE_TTL_MS, 60 * 60 * 1000, 1000, 24 * 60 * 60 * 1000),
     jwtSecret: env.JWT_SECRET || '',
     clientOrigins: String(env.CLIENT_URL || 'http://localhost:5173')
       .split(',')
@@ -52,6 +63,15 @@ const isValidHttpUrl = (value) => {
   }
 };
 
+const isValidRedisUrl = (value) => {
+  try {
+    const parsed = new URL(value);
+    return ['redis:', 'rediss:'].includes(parsed.protocol) && Boolean(parsed.hostname);
+  } catch {
+    return false;
+  }
+};
+
 const validateEnvironment = (config) => {
   const errors = [];
 
@@ -67,6 +87,15 @@ const validateEnvironment = (config) => {
   }
   if (config.mongoMinPoolSize > config.mongoMaxPoolSize) {
     errors.push('MONGO_MIN_POOL_SIZE cannot be greater than MONGO_MAX_POOL_SIZE');
+  }
+  if (config.redisUrl && !isValidRedisUrl(config.redisUrl)) {
+    errors.push('REDIS_URL must use redis:// or rediss:// and include a hostname');
+  }
+  if (config.redisRequired && !config.redisUrl) {
+    errors.push('REDIS_URL is required when REDIS_REQUIRED is true or INSTANCE_COUNT is greater than one');
+  }
+  if (!/^[A-Za-z0-9:_-]{3,80}$/.test(config.redisKeyPrefix)) {
+    errors.push('REDIS_KEY_PREFIX must contain 3-80 letters, numbers, colons, underscores or hyphens');
   }
   if (config.nodeEnv === 'production' && config.metricsEnabled && config.metricsToken.length < 24) {
     errors.push('METRICS_TOKEN must contain at least 24 characters when metrics are enabled in production');
@@ -98,6 +127,7 @@ const getEnvironment = (env = process.env, options = {}) => {
 module.exports = {
   booleanValue,
   getEnvironment,
+  isValidRedisUrl,
   normalizeEnvironment,
   validateEnvironment,
 };

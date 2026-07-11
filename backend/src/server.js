@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const app = require('./app');
 const { getEnvironment } = require('./config/env');
 const {
+  connectRedis,
+  disconnectRedis,
+  getRedisState,
+} = require('./infrastructure/redis/redisManager');
+const {
   captureException,
   configureErrorReporter,
   flushErrorReports,
@@ -36,6 +41,7 @@ const shutdown = async (signal, exitCode = 0) => {
       });
     }
     await flushErrorReports(2500);
+    await disconnectRedis();
     await mongoose.disconnect();
     stopMetrics();
     logger.info('shutdown_completed', { signal });
@@ -68,6 +74,9 @@ const start = async () => {
     minPoolSize: config.mongoMinPoolSize,
   });
 
+  const redisState = await connectRedis();
+  logger.info('redis_startup_state', redisState);
+
   httpServer = app.listen(config.port, () => {
     markAcceptingTraffic();
     logger.info('server_started', {
@@ -75,6 +84,8 @@ const start = async () => {
       environment: config.nodeEnv,
       service: config.serviceName,
       release: config.release,
+      instanceCount: config.instanceCount,
+      redis: getRedisState(),
       metricsEnabled: config.metricsEnabled,
       errorReportingEnabled: Boolean(config.errorReportingUrl),
       allowedOrigins: config.clientOrigins,
@@ -102,6 +113,6 @@ process.on('uncaughtException', (error) => {
 
 start().catch(async (error) => {
   logger.error('startup_failed', { error });
-  await captureException(error, { phase: 'startup' });
+  await captureException(error, { phase: 'startup', redis: getRedisState() });
   process.exit(1);
 });

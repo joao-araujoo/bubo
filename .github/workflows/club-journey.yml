@@ -2,6 +2,7 @@ name: Club journey
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'backend/src/controllers/clubController.js'
       - 'backend/src/models/ClubDiscussion.js'
@@ -28,12 +29,17 @@ on:
       - 'frontend/src/stores/useClubStore.js'
       - '.github/workflows/club-journey.yml'
 
+concurrency:
+  group: club-journey-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   club-journey:
     name: Reading club journey
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       BUBO_PORT: 8080
@@ -57,7 +63,7 @@ jobs:
         run: docker compose build backend frontend
 
       - name: Start Bubo
-        run: docker compose up -d mongo backend frontend
+        run: docker compose up -d mongo redis backend frontend
 
       - name: Wait for API health
         shell: bash

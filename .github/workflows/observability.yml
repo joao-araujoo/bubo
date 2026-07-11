@@ -2,6 +2,7 @@ name: Observability
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'backend/src/app.js'
       - 'backend/src/server.js'
@@ -30,12 +31,17 @@ on:
       - 'docker-compose.yml'
       - '.github/workflows/observability.yml'
 
+concurrency:
+  group: observability-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   observability:
     name: Runtime observability journey
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       BUBO_PORT: 8080
@@ -62,14 +68,14 @@ jobs:
         run: docker compose build backend frontend
 
       - name: Start Bubo
-        run: docker compose up -d mongo backend frontend
+        run: docker compose up -d mongo redis backend frontend
 
       - name: Wait for readiness
         shell: bash
         run: |
           for attempt in $(seq 1 60); do
             if curl -fsS http://localhost:3001/api/health/ready >/tmp/readiness.json 2>/dev/null; then
-              jq -e '.status == "ok" and .ready == true and .checks.database == "connected"' /tmp/readiness.json
+              jq -e '.status == "ok" and .ready == true and .checks.database == "connected" and .checks.redis == "connected"' /tmp/readiness.json
               exit 0
             fi
             sleep 2
@@ -107,13 +113,13 @@ jobs:
             http://localhost:3001/api/metrics \
             | jq -e \
               --arg release "$APP_RELEASE" \
-              '.service == "bubo-api-ci" and .release == $release and .database == "connected" and .http.totalRequests >= 4 and .http.statusClasses["4xx"] >= 2 and .process.memoryMb.rss > 0 and .process.eventLoopDelayMs.p99 >= 0'
+              '.service == "bubo-api-ci" and .release == $release and .database == "connected" and .redis.ready == true and .http.totalRequests >= 4 and .http.statusClasses["4xx"] >= 2 and .process.memoryMb.rss > 0 and .process.eventLoopDelayMs.p99 >= 0'
 
       - name: Verify compatibility health through frontend
         shell: bash
         run: |
           curl -fsS http://localhost:8080/api/health \
-            | jq -e '.status == "ok" and .ready == true'
+            | jq -e '.status == "ok" and .ready == true and .database == "connected" and .redis == "connected"'
 
       - name: Show container logs on failure
         if: failure()

@@ -40,7 +40,7 @@ Ao investigar um incidente, comece buscando o `requestId` informado pelo usuári
 GET /api/health/live
 ```
 
-Responde `200` enquanto o processo Node está executando. Não depende do MongoDB. Use para detectar processo travado ou container morto.
+Responde `200` enquanto o processo Node está executando. Não depende do MongoDB nem do Redis. Use para detectar processo travado ou container morto.
 
 ### Readiness
 
@@ -53,9 +53,10 @@ Responde `200` somente quando:
 - o servidor terminou a inicialização;
 - o processo ainda aceita tráfego;
 - o MongoDB está conectado;
+- Redis obrigatório está conectado;
 - o shutdown não começou.
 
-Durante indisponibilidade ou desligamento, responde `503`. Balanceadores e orquestradores devem remover a instância do tráfego nesse estado.
+Redis opcional indisponível mantém `ready=true`, mas o estado geral fica `degraded`. Redis obrigatório indisponível retorna `503`, permitindo que balanceadores removam a instância do tráfego.
 
 ### Compatibilidade
 
@@ -63,7 +64,7 @@ Durante indisponibilidade ou desligamento, responde `503`. Balanceadores e orque
 GET /api/health
 ```
 
-Mantém o contrato histórico e retorna o mesmo resultado da readiness.
+Mantém o contrato histórico e retorna o mesmo resultado da readiness, incluindo os campos legados `database`, `uptimeSeconds` e `memoryMb`.
 
 ## Métricas
 
@@ -82,10 +83,13 @@ Ele inclui:
 - métricas por método e rota normalizada;
 - memória do processo;
 - atraso médio, p95, p99 e máximo do event loop;
-- estado do MongoDB e do ciclo de vida do processo;
-- versão da aplicação.
+- estado do MongoDB;
+- estado, comandos, falhas, reconexões e latência do Redis;
+- ciclo de vida e versão da aplicação.
 
 IDs MongoDB, UUIDs e segmentos numéricos são convertidos para `:id`, evitando uma série diferente por recurso.
+
+O destino Redis exposto nas métricas contém somente protocolo, host, porta e database. Usuário, senha e URL completa nunca são publicados.
 
 ### Desenvolvimento
 
@@ -144,7 +148,13 @@ O logger remove recursivamente campos relacionados a:
 - API key;
 - credenciais.
 
-Objetos circulares, profundos ou strings excessivamente grandes também são limitados.
+A sanitização textual também remove:
+
+- usuário e senha embutidos em URLs autenticadas, incluindo `redis://`, `rediss://`, `mongodb://` e HTTP;
+- tokens Bearer;
+- credenciais Basic.
+
+Isso vale para mensagens e stacks de erro, inclusive no payload enviado ao coletor externo. Objetos circulares, profundos ou strings excessivamente grandes também são limitados.
 
 Mesmo com sanitização automática, não envie corpo integral de requisições, textos de Deep Review ou dados pessoais para o logger.
 
@@ -172,8 +182,11 @@ Este adaptador pode apontar para uma função serverless, gateway interno ou col
 Crie alertas para:
 
 - readiness em `503` por mais de dois ciclos;
-- aumento de respostas 5xx;
-- p95 ou p99 de latência acima do objetivo;
+- Redis obrigatório desconectado;
+- reconexões Redis repetidas;
+- falhas ou latência Redis acima do objetivo;
+- aumento de respostas 5xx ou 429;
+- p95 ou p99 de latência HTTP acima do objetivo;
 - event loop p99 persistentemente alto;
 - memória RSS próxima do limite do container;
 - reinícios repetidos;
@@ -185,11 +198,12 @@ Crie alertas para:
 1. obtenha horário, ação e `requestId`;
 2. filtre logs pelo `requestId`;
 3. identifique o primeiro evento de erro, não apenas o último efeito;
-4. confira release, status do MongoDB, memória e event loop;
-5. reproduza em ambiente seguro quando necessário;
-6. registre causa, correção, impacto e prevenção;
-7. adicione teste automatizado antes de encerrar.
+4. confira release, MongoDB, Redis, memória e event loop;
+5. verifique se Redis está configurado como opcional ou obrigatório;
+6. reproduza em ambiente seguro quando necessário;
+7. registre causa, correção, impacto e prevenção;
+8. adicione teste automatizado antes de encerrar.
 
 ## Limitações atuais
 
-As métricas são mantidas por processo. Em múltiplas réplicas, cada instância expõe seu próprio snapshot. A próxima fase introduzirá Redis, rate limit distribuído e coleta agregada.
+As métricas HTTP e de processo são mantidas por instância. Redis compartilha cache e rate limits, mas cada réplica ainda expõe seu próprio snapshot operacional. Um coletor externo deve agregar os snapshots para visão global.

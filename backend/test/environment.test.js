@@ -35,6 +35,9 @@ test('normalizeEnvironment parses origins and numeric protection limits', () => 
   assert.equal(config.trustProxy, true);
   assert.equal(config.release, 'commit-123');
   assert.equal(config.metricsEnabled, false);
+  assert.equal(config.instanceCount, 1);
+  assert.equal(config.redisEnabled, false);
+  assert.equal(config.redisRequired, false);
 });
 
 test('development enables local metrics by default', () => {
@@ -44,6 +47,50 @@ test('development enables local metrics by default', () => {
   });
 
   assert.equal(config.metricsEnabled, true);
+});
+
+test('multiple instances require redis automatically', () => {
+  const config = normalizeEnvironment({
+    ...validBase,
+    INSTANCE_COUNT: '3',
+  });
+  const errors = validateEnvironment(config);
+
+  assert.equal(config.redisRequired, true);
+  assert.ok(errors.some((message) => message.includes('REDIS_URL')));
+});
+
+test('redis configuration accepts authenticated redis and rediss urls', () => {
+  const redis = getEnvironment({
+    ...validBase,
+    INSTANCE_COUNT: '2',
+    REDIS_URL: 'redis://reader:private-password@redis.internal:6379/2',
+    REDIS_KEY_PREFIX: 'bubo:production',
+  });
+  const rediss = getEnvironment({
+    ...validBase,
+    REDIS_REQUIRED: 'true',
+    REDIS_URL: 'rediss://cache.example:6380/0',
+  });
+
+  assert.equal(redis.redisEnabled, true);
+  assert.equal(redis.redisRequired, true);
+  assert.equal(redis.redisKeyPrefix, 'bubo:production');
+  assert.equal(rediss.redisEnabled, true);
+});
+
+test('redis configuration rejects invalid protocols and unsafe prefixes', () => {
+  const invalidUrl = validateEnvironment(normalizeEnvironment({
+    ...validBase,
+    REDIS_URL: 'http://cache.example',
+  }));
+  const invalidPrefix = validateEnvironment(normalizeEnvironment({
+    ...validBase,
+    REDIS_KEY_PREFIX: 'bubo production with spaces',
+  }));
+
+  assert.ok(invalidUrl.some((message) => message.includes('REDIS_URL')));
+  assert.ok(invalidPrefix.some((message) => message.includes('REDIS_KEY_PREFIX')));
 });
 
 test('validateEnvironment rejects weak JWT secrets', () => {
@@ -98,6 +145,8 @@ test('getEnvironment accepts a production-ready configuration', () => {
   const config = getEnvironment({
     ...validBase,
     NODE_ENV: 'production',
+    INSTANCE_COUNT: '2',
+    REDIS_URL: 'rediss://cache.example:6380/0',
     METRICS_ENABLED: 'true',
     METRICS_TOKEN: 'production-metrics-token-long-enough',
     ERROR_REPORTING_URL: 'https://errors.example/collect',
@@ -106,5 +155,6 @@ test('getEnvironment accepts a production-ready configuration', () => {
 
   assert.equal(config.nodeEnv, 'production');
   assert.equal(config.metricsEnabled, true);
+  assert.equal(config.redisRequired, true);
   assert.equal(config.errors.length, 0);
 });

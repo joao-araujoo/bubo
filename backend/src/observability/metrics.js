@@ -71,7 +71,13 @@ const toMilliseconds = (nanoseconds) => {
   return Number.isFinite(numeric) ? Math.round((numeric / 1e6) * 100) / 100 : 0;
 };
 
-const getMetricsSnapshot = ({ database, runtime, service = 'bubo-api', release = 'development' } = {}) => {
+const getMetricsSnapshot = ({
+  database,
+  redis,
+  runtime,
+  service = 'bubo-api',
+  release = 'development',
+} = {}) => {
   const memory = process.memoryUsage();
   const routes = Object.fromEntries(
     [...state.routes.entries()].map(([key, value]) => [key, {
@@ -87,6 +93,7 @@ const getMetricsSnapshot = ({ database, runtime, service = 'bubo-api', release =
     windowStartedAt: state.startedAt.toISOString(),
     runtime,
     database,
+    redis,
     http: {
       activeRequests: state.activeRequests,
       totalRequests: state.totalRequests,

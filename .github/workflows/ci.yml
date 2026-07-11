@@ -2,17 +2,22 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   frontend:
     name: Frontend quality gate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,78 +35,20 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Enforce UI policy
-        id: frontend-policy
-        continue-on-error: true
-        shell: bash
-        run: npm run check:ui-policy > policy.log 2>&1
+        run: npm run check:ui-policy
 
       - name: Lint source code
-        id: frontend-lint
-        continue-on-error: true
-        shell: bash
-        run: npm run lint > lint.log 2>&1
+        run: npm run lint
 
       - name: Run automated tests
-        id: frontend-test
-        continue-on-error: true
-        shell: bash
-        run: npm run test > test.log 2>&1
+        run: npm run test
 
       - name: Build application
-        id: frontend-build
-        continue-on-error: true
-        shell: bash
-        run: npm run build > build.log 2>&1
-
-      - name: Report quality gate failure
-        if: >-
-          github.event_name == 'pull_request' &&
-          (steps.frontend-policy.outcome == 'failure' ||
-           steps.frontend-lint.outcome == 'failure' ||
-           steps.frontend-test.outcome == 'failure' ||
-           steps.frontend-build.outcome == 'failure')
-        uses: actions/github-script@v7
-        env:
-          POLICY_OUTCOME: ${{ steps.frontend-policy.outcome }}
-          LINT_OUTCOME: ${{ steps.frontend-lint.outcome }}
-          TEST_OUTCOME: ${{ steps.frontend-test.outcome }}
-          BUILD_OUTCOME: ${{ steps.frontend-build.outcome }}
-        with:
-          script: |
-            const fs = require('fs');
-
-            const checks = [
-              ['UI policy', process.env.POLICY_OUTCOME, 'frontend/policy.log'],
-              ['Lint', process.env.LINT_OUTCOME, 'frontend/lint.log'],
-              ['Tests', process.env.TEST_OUTCOME, 'frontend/test.log'],
-              ['Build', process.env.BUILD_OUTCOME, 'frontend/build.log'],
-            ];
-
-            const sections = checks
-              .filter(([, outcome]) => outcome === 'failure')
-              .map(([name, , path]) => {
-                const output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : 'Log unavailable.';
-                const lines = output.trim().split('\n').slice(-80).join('\n');
-                return `### ${name}\n\n\`\`\`text\n${lines}\n\`\`\``;
-              });
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `<!-- bubo-ci-quality-error -->\n## Frontend quality gate failed\n\n${sections.join('\n\n')}`,
-            });
-
-      - name: Enforce frontend quality gate
-        if: >-
-          steps.frontend-policy.outcome == 'failure' ||
-          steps.frontend-lint.outcome == 'failure' ||
-          steps.frontend-test.outcome == 'failure' ||
-          steps.frontend-build.outcome == 'failure'
-        run: exit 1
+        run: npm run build
 
   backend:
     name: Backend quality gate
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -118,61 +65,17 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Run backend tests
-        id: backend-test
-        continue-on-error: true
-        shell: bash
-        run: npm test > test.log 2>&1
+        run: npm test
 
       - name: Load application modules
-        id: backend-modules
-        continue-on-error: true
-        shell: bash
-        run: node -e "require('./src/app'); console.log('Backend modules loaded successfully')" > modules.log 2>&1
-
-      - name: Report backend quality failure
-        if: >-
-          github.event_name == 'pull_request' &&
-          (steps.backend-test.outcome == 'failure' ||
-           steps.backend-modules.outcome == 'failure')
-        uses: actions/github-script@v7
-        env:
-          TEST_OUTCOME: ${{ steps.backend-test.outcome }}
-          MODULE_OUTCOME: ${{ steps.backend-modules.outcome }}
-        with:
-          script: |
-            const fs = require('fs');
-
-            const checks = [
-              ['Tests', process.env.TEST_OUTCOME, 'backend/test.log'],
-              ['Module loading', process.env.MODULE_OUTCOME, 'backend/modules.log'],
-            ];
-
-            const sections = checks
-              .filter(([, outcome]) => outcome === 'failure')
-              .map(([name, , path]) => {
-                const output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : 'Log unavailable.';
-                const lines = output.trim().split('\n').slice(-80).join('\n');
-                return `### ${name}\n\n\`\`\`text\n${lines}\n\`\`\``;
-              });
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `<!-- bubo-ci-backend-error -->\n## Backend quality gate failed\n\n${sections.join('\n\n')}`,
-            });
-
-      - name: Enforce backend quality gate
-        if: >-
-          steps.backend-test.outcome == 'failure' ||
-          steps.backend-modules.outcome == 'failure'
-        run: exit 1
+        run: node -e "require('./src/app'); console.log('Backend modules loaded successfully')"
 
   clone-ready:
     name: Clone-ready smoke test
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     needs: [frontend, backend]
     env:
@@ -196,16 +99,18 @@ jobs:
       - name: Build production images
         run: docker compose build backend frontend
 
-      - name: Start database, API and frontend
-        run: docker compose up -d mongo backend frontend
+      - name: Start database, Redis, API and frontend
+        run: docker compose up -d mongo redis backend frontend
 
       - name: Wait for the complete stack
         shell: bash
         run: |
           for attempt in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
-              echo "Bubo stack is healthy."
-              exit 0
+            if curl -fsS http://localhost:8080/api/health >/tmp/health.json 2>/dev/null; then
+              if jq -e '.status == "ok" and .database == "connected" and .redis == "connected"' /tmp/health.json >/dev/null; then
+                echo "Bubo stack is healthy."
+                exit 0
+              fi
             fi
             sleep 2
           done
@@ -322,12 +227,13 @@ jobs:
         shell: bash
         run: |
           curl -fsS http://localhost:8080/ | grep -q '<div id="root"></div>'
-          curl -fsS http://localhost:8080/api/health | jq -e '.status == "ok" and .database == "connected"'
+          curl -fsS http://localhost:8080/api/health \
+            | jq -e '.status == "ok" and .database == "connected" and .redis == "connected"'
 
       - name: Show container logs on failure
         if: failure()
-        run: docker compose logs --no-color
+        run: docker compose logs --no-color || true
 
       - name: Stop smoke-test stack
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose down --volumes --remove-orphans || true

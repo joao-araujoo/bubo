@@ -14,7 +14,10 @@ const {
   runWithRequestContext,
   updateRequestContext,
 } = require('../src/observability/requestContext');
-const { sanitizeValue } = require('../src/utils/logger');
+const {
+  redactSensitiveText,
+  sanitizeValue,
+} = require('../src/utils/logger');
 
 test('request context accepts safe ids and rejects unsafe values', () => {
   assert.equal(createRequestId('request-12345678'), 'request-12345678');
@@ -41,6 +44,7 @@ test('structured sanitization removes secrets recursively and handles circular o
   const value = {
     email: 'reader@example.com',
     password: 'do-not-log',
+    diagnostic: 'Failed redis://reader:private-password@cache.internal:6379 and Bearer abc.def.ghi',
     headers: {
       authorization: 'Bearer secret-token',
       'x-request-id': 'request-12345678',
@@ -54,26 +58,47 @@ test('structured sanitization removes secrets recursively and handles circular o
   assert.equal(sanitized.headers.authorization, '[REDACTED]');
   assert.equal(sanitized.headers['x-request-id'], 'request-12345678');
   assert.equal(sanitized.circular, '[CIRCULAR]');
+  assert.equal(sanitized.diagnostic.includes('private-password'), false);
+  assert.equal(sanitized.diagnostic.includes('abc.def.ghi'), false);
+  assert.equal(sanitized.diagnostic.includes('redis://[REDACTED]@cache.internal:6379'), true);
+});
+
+test('text redaction covers authenticated urls and authorization schemes', () => {
+  const redacted = redactSensitiveText(
+    'mongodb://user:pass@mongo:27017 redis://reader:secret@redis:6379 Bearer token.value Basic dXNlcjpwYXNz',
+  );
+
+  assert.equal(redacted.includes('user:pass'), false);
+  assert.equal(redacted.includes('reader:secret'), false);
+  assert.equal(redacted.includes('token.value'), false);
+  assert.equal(redacted.includes('dXNlcjpwYXNz'), false);
+  assert.match(redacted, /mongodb:\/\/\[REDACTED\]@mongo:27017/);
+  assert.match(redacted, /Bearer \[REDACTED\]/);
+  assert.match(redacted, /Basic \[REDACTED\]/);
 });
 
 test('external error payloads inherit context without leaking credentials', async () => {
   await runWithRequestContext({ requestId: 'request-report-1234', userId: 'user-8' }, async () => {
-    const payload = buildPayload(new Error('Database unavailable'), {
-      authorization: 'Bearer hidden',
-      password: 'hidden',
-      operation: 'create-review',
-    });
+    const payload = buildPayload(
+      new Error('Redis failed at redis://reader:hidden@cache.internal:6379'),
+      {
+        authorization: 'Bearer hidden',
+        password: 'hidden',
+        operation: 'create-review',
+      },
+    );
 
     assert.equal(payload.request.requestId, 'request-report-1234');
     assert.equal(payload.request.userId, 'user-8');
     assert.equal(payload.context.authorization, '[REDACTED]');
     assert.equal(payload.context.password, '[REDACTED]');
     assert.equal(payload.context.operation, 'create-review');
-    assert.equal(payload.error.message, 'Database unavailable');
+    assert.equal(payload.error.message.includes('hidden'), false);
+    assert.equal(payload.error.message.includes('redis://[REDACTED]@cache.internal:6379'), true);
   });
 });
 
-test('http metrics normalize identifiers and aggregate bounded latency data', () => {
+test('http metrics normalize identifiers and include shared dependency state', () => {
   resetMetrics();
   assert.equal(
     normalizePath('/api/books/library/507f1f77bcf86cd799439011/sessions/42?draft=true'),
@@ -88,8 +113,17 @@ test('http metrics normalize identifiers and aggregate bounded latency data', ()
     durationMs: 120,
   });
 
+  const redis = {
+    enabled: true,
+    required: false,
+    ready: true,
+    status: 'ready',
+    commands: 8,
+    failures: 0,
+  };
   const snapshot = getMetricsSnapshot({
     database: 'connected',
+    redis,
     runtime: { acceptingTraffic: true },
     service: 'bubo-api-test',
     release: 'test-release',
@@ -97,6 +131,7 @@ test('http metrics normalize identifiers and aggregate bounded latency data', ()
 
   assert.equal(snapshot.service, 'bubo-api-test');
   assert.equal(snapshot.release, 'test-release');
+  assert.deepEqual(snapshot.redis, redis);
   assert.equal(snapshot.http.totalRequests, 1);
   assert.equal(snapshot.http.statusClasses['2xx'], 1);
   assert.equal(snapshot.http.latencyBuckets[100], 0);
@@ -106,23 +141,45 @@ test('http metrics normalize identifiers and aggregate bounded latency data', ()
   resetMetrics();
 });
 
-test('health contracts distinguish process liveness from service readiness', () => {
+test('health contracts distinguish optional and required redis availability', () => {
   const runtime = {
     acceptingTraffic: true,
     shuttingDown: false,
     uptimeSeconds: 12,
   };
   const liveness = buildLiveness({ requestId: 'request-live-1234', runtime });
-  const ready = buildReadiness({ requestId: 'request-ready-1234', runtime, databaseReady: true });
-  const degraded = buildReadiness({
-    requestId: 'request-degraded-1234',
-    runtime: { ...runtime, acceptingTraffic: false },
+  const withoutRedis = buildReadiness({
+    requestId: 'request-ready-1234',
+    runtime,
     databaseReady: true,
+    redis: { enabled: false, required: false, ready: false, status: 'disabled' },
+  });
+  const optionalRedisDown = buildReadiness({
+    requestId: 'request-optional-1234',
+    runtime,
+    databaseReady: true,
+    redis: { enabled: true, required: false, ready: false, status: 'degraded' },
+  });
+  const requiredRedisDown = buildReadiness({
+    requestId: 'request-required-1234',
+    runtime,
+    databaseReady: true,
+    redis: { enabled: true, required: true, ready: false, status: 'degraded' },
+  });
+  const requiredRedisReady = buildReadiness({
+    requestId: 'request-redis-ready-1234',
+    runtime,
+    databaseReady: true,
+    redis: { enabled: true, required: true, ready: true, status: 'ready' },
   });
 
   assert.equal(liveness.status, 'ok');
-  assert.equal(ready.ready, true);
-  assert.equal(ready.checks.database, 'connected');
-  assert.equal(degraded.ready, false);
-  assert.equal(degraded.checks.process, 'not-ready');
+  assert.equal(withoutRedis.ready, true);
+  assert.equal(withoutRedis.redis, 'disabled');
+  assert.equal(optionalRedisDown.ready, true);
+  assert.equal(optionalRedisDown.status, 'degraded');
+  assert.equal(requiredRedisDown.ready, false);
+  assert.equal(requiredRedisDown.dependencies.redis.required, true);
+  assert.equal(requiredRedisReady.ready, true);
+  assert.equal(requiredRedisReady.status, 'ok');
 });
