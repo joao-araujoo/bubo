@@ -3,6 +3,7 @@ const DeepReview = require('../models/DeepReview');
 const ReadingSession = require('../models/ReadingSession');
 const SocialActivity = require('../models/SocialActivity');
 const UserBook = require('../models/UserBook');
+const logger = require('../utils/logger');
 const { normalizeReadingSessionInput } = require('../services/reading/readingSessionRules');
 
 const MAX_SESSIONS = 50;
@@ -34,7 +35,7 @@ exports.getBookDetail = async (req, res) => {
       });
     }
 
-    const [sessions, reviews, sessionStats] = await Promise.all([
+    const [sessions, reviews, sessionStatsRows, reviewStatsRows] = await Promise.all([
       ReadingSession.find({ userId: req.user._id, userBookId: userBook._id })
         .sort({ readAt: -1, createdAt: -1 })
         .limit(MAX_SESSIONS)
@@ -56,12 +57,24 @@ exports.getBookDetail = async (req, res) => {
           },
         },
       ]),
+      DeepReview.aggregate([
+        { $match: { userId: req.user._id, userBookId: userBook._id } },
+        {
+          $group: {
+            _id: null,
+            reviewCount: { $sum: 1 },
+            approvedReviewCount: { $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] } },
+            approvedDepthTotal: { $sum: { $cond: [{ $eq: ['$status', 'approved'] }, '$cognitiveDepth', 0] } },
+          },
+        },
+      ]),
     ]);
 
     const totalPages = effectiveTotalPages(userBook);
     const currentPage = Math.max(0, Number(userBook.currentPage) || 0);
-    const stats = sessionStats[0] || {};
-    const approvedReviews = reviews.filter((review) => review.status === 'approved');
+    const sessionStats = sessionStatsRows[0] || {};
+    const reviewStats = reviewStatsRows[0] || {};
+    const approvedReviewCount = Number(reviewStats.approvedReviewCount) || 0;
 
     res.setHeader('Cache-Control', 'private, no-store');
     return res.json({
@@ -73,14 +86,14 @@ exports.getBookDetail = async (req, res) => {
       reviews,
       summary: {
         progressPercent: totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0,
-        sessionCount: Number(stats.sessionCount) || 0,
-        pagesReadInSessions: Number(stats.pagesRead) || 0,
-        durationMinutes: Number(stats.durationMinutes) || 0,
-        lastSessionAt: stats.lastSessionAt || null,
-        reviewCount: reviews.length,
-        approvedReviewCount: approvedReviews.length,
-        averageDepth: approvedReviews.length > 0
-          ? Math.round(approvedReviews.reduce((sum, review) => sum + Number(review.cognitiveDepth || 0), 0) / approvedReviews.length)
+        sessionCount: Number(sessionStats.sessionCount) || 0,
+        pagesReadInSessions: Number(sessionStats.pagesRead) || 0,
+        durationMinutes: Number(sessionStats.durationMinutes) || 0,
+        lastSessionAt: sessionStats.lastSessionAt || null,
+        reviewCount: Number(reviewStats.reviewCount) || 0,
+        approvedReviewCount,
+        averageDepth: approvedReviewCount > 0
+          ? Math.round((Number(reviewStats.approvedDepthTotal) || 0) / approvedReviewCount)
           : 0,
       },
       meta: {
@@ -89,6 +102,7 @@ exports.getBookDetail = async (req, res) => {
       },
     });
   } catch (error) {
+    logger.error('book_detail_load_failed', { requestId: req.requestId, userBookId: id, error });
     return res.status(500).json({
       message: 'Não foi possível carregar esta leitura agora.',
       code: 'BOOK_DETAIL_LOAD_FAILED',
@@ -101,6 +115,7 @@ exports.createReadingSession = async (req, res) => {
   if (!mongoose.isValidObjectId(id)) return invalidIdResponse(res);
 
   let session;
+  let progressUpdated = false;
   try {
     const existing = await UserBook.findOne({ _id: id, userId: req.user._id }).populate('bookId');
     if (!existing) {
@@ -143,6 +158,7 @@ exports.createReadingSession = async (req, res) => {
       .select('-deepReviews')
       .populate('bookId')
       .lean();
+    progressUpdated = true;
 
     if (completed && existing.status !== 'read') {
       await SocialActivity.create({
@@ -151,17 +167,26 @@ exports.createReadingSession = async (req, res) => {
         bookId: existing.bookId?._id,
         pages: totalPages || nextCurrentPage,
         message: `Concluiu a leitura de “${existing.bookId?.title || 'um livro'}”.`,
+      }).catch((error) => {
+        logger.warn('reading_session_social_activity_failed', {
+          requestId: req.requestId,
+          userBookId: id,
+          error,
+        });
       });
     }
 
     return res.status(201).json({ session: session.toObject(), userBook });
   } catch (error) {
-    if (session?._id) await ReadingSession.deleteOne({ _id: session._id }).catch(() => {});
+    if (session?._id && !progressUpdated) await ReadingSession.deleteOne({ _id: session._id }).catch(() => {});
     if (error.status === 400) {
       return res.status(400).json({ message: error.message, code: error.code });
     }
+    logger.error('reading_session_create_failed', { requestId: req.requestId, userBookId: id, error });
     return res.status(500).json({
-      message: 'Não foi possível registrar esta sessão. Seu progresso anterior foi preservado.',
+      message: progressUpdated
+        ? 'A sessão foi registrada, mas o Bubo não conseguiu atualizar todas as informações auxiliares.'
+        : 'Não foi possível registrar esta sessão. Seu progresso anterior foi preservado.',
       code: 'READING_SESSION_CREATE_FAILED',
     });
   }
@@ -190,6 +215,12 @@ exports.deleteReadingSession = async (req, res) => {
     }
     return res.status(204).send();
   } catch (error) {
+    logger.error('reading_session_delete_failed', {
+      requestId: req.requestId,
+      userBookId: id,
+      sessionId,
+      error,
+    });
     return res.status(500).json({
       message: 'Não foi possível remover a sessão agora.',
       code: 'READING_SESSION_DELETE_FAILED',
