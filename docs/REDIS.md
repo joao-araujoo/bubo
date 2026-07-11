@@ -69,6 +69,7 @@ REDIS_REQUIRED=false
 REDIS_KEY_PREFIX=bubo:development
 REDIS_CONNECT_TIMEOUT_MS=5000
 REDIS_COMMAND_TIMEOUT_MS=1500
+REDIS_RECONNECT_DELAY_MS=30000
 REDIS_CACHE_TTL_MS=3600000
 ```
 
@@ -92,6 +93,8 @@ Protocolos aceitos:
 - `rediss://` para conexão TLS.
 
 Credenciais podem existir na URL, mas nunca aparecem em logs, health checks ou métricas. O estado público contém apenas protocolo, host, porta e database.
+
+Quando Redis é opcional e não está disponível no startup, o backend inicia degradado e agenda novas tentativas usando `REDIS_RECONNECT_DELAY_MS`. O timer não mantém o processo aberto durante shutdown e é cancelado assim que a conexão volta ou o encerramento começa.
 
 ## Rate limiting
 
@@ -173,6 +176,7 @@ Redis opcional e degradado mantém HTTP 200 na readiness, mas o campo geral `sta
 - reconexões;
 - latência média e máxima;
 - último erro, último ready e último ping;
+- próxima tentativa agendada, quando aplicável;
 - destino sanitizado.
 
 ## Persistência e política de memória
@@ -211,7 +215,7 @@ O comando valida:
 
 1. consulte readiness e métricas;
 2. verifique se Redis é obrigatório;
-3. filtre logs por `redis_operation_failed` e `redis_reconnecting`;
+3. filtre logs por `redis_operation_failed`, `redis_reconnecting` e `redis_reconnect_scheduled`;
 4. confira DNS, TLS, credenciais, limites de conexão e memória;
 5. não altere para `REDIS_REQUIRED=false` em ambiente com múltiplas réplicas;
 6. reduza réplicas para uma somente como mitigação consciente e temporária;
