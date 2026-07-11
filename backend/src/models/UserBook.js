@@ -28,4 +28,10 @@ userBookSchema.index({ userId: 1, bookId: 1 }, { unique: true });
 userBookSchema.index({ userId: 1, status: 1, updatedAt: -1 });
 userBookSchema.index({ userId: 1, updatedAt: -1 });
 
+userBookSchema.post('findOneAndDelete', async (document) => {
+  if (!document) return;
+  const ReadingSession = mongoose.models.ReadingSession;
+  if (ReadingSession) await ReadingSession.deleteMany({ userBookId: document._id });
+});
+
 module.exports = mongoose.model('UserBook', userBookSchema);
