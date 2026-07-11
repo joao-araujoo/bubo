@@ -42,7 +42,11 @@ const createLimiter = ({ max, message }) => rateLimit({
   max,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message, code: 'RATE_LIMIT_EXCEEDED' },
+  handler: (req, res) => res.status(429).json({
+    message,
+    code: 'RATE_LIMIT_EXCEEDED',
+    requestId: req.requestId,
+  }),
   skip: (req) => req.path.startsWith('/health'),
 });
 
