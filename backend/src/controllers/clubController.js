@@ -195,7 +195,12 @@ exports.createClub = async (req, res) => {
     });
     return res.status(201).json({ club: serialized });
   } catch (error) {
-    if (club?._id) await ReadingClub.findByIdAndDelete(club._id).catch(() => {});
+    if (club?._id) {
+      await Promise.allSettled([
+        ClubMembership.deleteMany({ clubId: club._id }),
+        ReadingClub.findByIdAndDelete(club._id),
+      ]);
+    }
     logger.error('club_create_failed', { requestId: req.requestId, error });
     return res.status(500).json({
       message: 'Não foi possível criar o clube. Nenhum dado parcial foi mantido.',
