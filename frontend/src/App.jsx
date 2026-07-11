@@ -6,6 +6,7 @@ import { useAuthStore } from './stores/useAuthStore';
 
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
+const BookDetailPage = lazy(() => import('./pages/BookDetailPage'));
 const ClubDetailPage = lazy(() => import('./pages/ClubDetailPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const CoachPage = lazy(() => import('./pages/CoachPage'));
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="library" element={<PrivateRoute><LibraryPage /></PrivateRoute>} />
+          <Route path="library/:id" element={<PrivateRoute><BookDetailPage /></PrivateRoute>} />
           <Route path="feed" element={<PrivateRoute><FeedPage /></PrivateRoute>} />
           <Route path="discover" element={<PrivateRoute><DiscoverPage /></PrivateRoute>} />
           <Route path="clubs" element={<PrivateRoute><ClubsPage /></PrivateRoute>} />
