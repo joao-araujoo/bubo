@@ -54,7 +54,7 @@ export default function ReadingSessionModal({ isOpen, onClose, onSaved, userBook
         durationMinutes,
         focus,
         note,
-        readAt: readAt ? `${readAt}T12:00:00` : undefined,
+        readAt: readAt ? `${readAt}T00:00:00.000Z` : undefined,
       });
       toast.success(`Sessão registrada com ${data.session.pagesRead} páginas.`);
       await Promise.resolve(onSaved?.(data));
