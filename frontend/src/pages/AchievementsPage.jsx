@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
-import { BookOpen, Brain, Flame, Gem, Medal, Target, Trophy, Zap } from 'lucide-react';
+import { BookOpen, Brain, Flame, Gem, Medal, RefreshCw, Target, Trophy, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import EmptyState from '../components/ui/EmptyState';
 import ProgressBar from '../components/ui/ProgressBar';
@@ -32,22 +34,33 @@ const challengeIcons = {
 };
 
 export default function AchievementsPage() {
+  const navigate = useNavigate();
   const { achievements, error, fetchAchievements, isLoading } = useAchievementStore();
   const { dashboard, fetchDashboard, isLoading: dashboardLoading } = useDashboardStore();
+  const challenges = dashboard?.challenges || [];
 
   useEffect(() => {
-    fetchAchievements().catch(() => {});
-    fetchDashboard().catch(() => {});
+    Promise.allSettled([fetchAchievements(), fetchDashboard()]);
   }, [fetchAchievements, fetchDashboard]);
 
-  const challenges = dashboard?.challenges || [];
+  const refreshAll = () => Promise.allSettled([
+    fetchAchievements(),
+    fetchDashboard(),
+  ]);
+
+  const openDeepReview = () => {
+    window.dispatchEvent(new CustomEvent('bubo:open-deep-review'));
+  };
 
   return (
     <div className="space-y-6">
-      <section>
-        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[rgb(var(--bubo-color-primary))]">Gamificação educativa</p>
-        <h1 className="mt-1 text-3xl font-black tracking-[-0.03em]">Conquistas por profundidade</h1>
-        <p className="mt-2 max-w-2xl leading-7 text-[rgb(var(--bubo-color-text-muted))]">O Bubo recompensa consistência, síntese e retenção — não apenas quantidade de páginas.</p>
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[rgb(var(--bubo-color-primary))]">Gamificação educativa</p>
+          <h1 className="mt-1 text-3xl font-black tracking-[-0.03em]">Conquistas por profundidade</h1>
+          <p className="mt-2 max-w-2xl leading-7 text-[rgb(var(--bubo-color-text-muted))]">O Bubo recompensa consistência, síntese e retenção — não apenas quantidade de páginas.</p>
+        </div>
+        <Button variant="secondary" onClick={refreshAll} leftIcon={<RefreshCw size={17} aria-hidden="true" />}>Atualizar progresso</Button>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
@@ -58,7 +71,16 @@ export default function AchievementsPage() {
               {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-24 w-full" />)}
             </div>
           ) : challenges.length === 0 ? (
-            <EmptyState className="mt-5" title="Missões indisponíveis" description="As missões voltarão a aparecer quando o painel for sincronizado." />
+            <EmptyState
+              className="mt-5"
+              icon={Target}
+              title="Nenhuma missão disponível agora"
+              description="Avance em uma leitura ou faça uma Deep Review para gerar novas metas."
+              actionLabel="Abrir acervo"
+              onAction={() => navigate('/library')}
+              secondaryActionLabel="Fazer Deep Review"
+              onSecondaryAction={openDeepReview}
+            />
           ) : (
             <div className="mt-5 space-y-4">
               {challenges.map((challenge) => {
@@ -66,7 +88,7 @@ export default function AchievementsPage() {
                 return (
                   <div key={challenge.id} className="rounded-[var(--bubo-radius-md)] border border-[rgb(var(--bubo-color-border))] p-4">
                     <div className="flex items-center gap-3">
-                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--bubo-color-primary)/0.1)] text-[rgb(var(--bubo-color-primary))]"><Icon size={20} /></span>
+                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--bubo-color-primary)/0.1)] text-[rgb(var(--bubo-color-primary))]"><Icon size={20} aria-hidden="true" /></span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3"><strong>{challenge.title}</strong><span className="text-xs font-extrabold text-[rgb(var(--bubo-color-primary))]">+{challenge.xp} XP</span></div>
                         <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">{challenge.description}</p>
@@ -86,6 +108,16 @@ export default function AchievementsPage() {
           </div>
         ) : error && achievements.length === 0 ? (
           <EmptyState title="Não foi possível carregar suas conquistas" description={error} actionLabel="Tentar novamente" onAction={() => fetchAchievements().catch(() => {})} />
+        ) : achievements.length === 0 ? (
+          <EmptyState
+            icon={Trophy}
+            title="Seu mural ainda está vazio"
+            description="Comece uma leitura e faça sua primeira Deep Review para desbloquear conquistas."
+            actionLabel="Abrir acervo"
+            onAction={() => navigate('/library')}
+            secondaryActionLabel="Descobrir livros"
+            onSecondaryAction={() => navigate('/discover')}
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {achievements.map((achievement) => {
@@ -94,7 +126,7 @@ export default function AchievementsPage() {
               return (
                 <Card key={achievement.id} className={!achievement.unlocked ? 'opacity-70' : ''}>
                   <div className="flex items-start gap-3">
-                    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${achievement.unlocked ? 'bg-[rgb(var(--bubo-color-primary)/0.13)] text-[rgb(var(--bubo-color-primary))]' : 'bg-[rgb(var(--bubo-color-surface-muted))] text-[rgb(var(--bubo-color-text-muted))]'}`}><Icon size={22} /></span>
+                    <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${achievement.unlocked ? 'bg-[rgb(var(--bubo-color-primary)/0.13)] text-[rgb(var(--bubo-color-primary))]' : 'bg-[rgb(var(--bubo-color-surface-muted))] text-[rgb(var(--bubo-color-text-muted))]'}`}><Icon size={22} aria-hidden="true" /></span>
                     <div>
                       <h2 className="font-extrabold">{localized.title}</h2>
                       <p className="mt-1 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">{localized.description}</p>

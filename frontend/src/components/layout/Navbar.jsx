@@ -49,7 +49,7 @@ export default function Navbar() {
         <Link to="/" className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]">
           <BuboMark size={40} />
           <span className="min-w-0">
-            <span className="block max-w-[6.25rem] truncate text-sm font-extrabold leading-tight text-[rgb(var(--bubo-color-text))] sm:max-w-none sm:text-base">{title}</span>
+            <span className="block max-w-[8rem] truncate text-sm font-extrabold leading-tight text-[rgb(var(--bubo-color-text))] sm:max-w-none sm:text-base">{title}</span>
             <span className="block text-[0.58rem] font-extrabold uppercase tracking-[0.24em] text-[rgb(var(--bubo-color-primary))] sm:text-[0.62rem] sm:tracking-[0.28em]">Read deeply</span>
           </span>
         </Link>
@@ -77,20 +77,21 @@ export default function Navbar() {
         )}
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-          <div className="hidden sm:block"><ThemeToggle /></div>
+          <div className="hidden md:block"><ThemeToggle /></div>
           {token ? (
             <>
               <MobileMoreMenu />
               <NotificationBell />
-              <Button
-                size="md"
-                aria-label="Fazer Deep Review"
-                leftIcon={<Sparkles size={17} aria-hidden="true" />}
-                onClick={openDeepReview}
-                className="w-11 px-0 sm:w-auto sm:px-4 [&>span]:hidden sm:[&>span]:inline"
-              >
-                Validar
-              </Button>
+              <div className="hidden md:block">
+                <Button
+                  size="md"
+                  aria-label="Fazer Deep Review"
+                  leftIcon={<Sparkles size={17} aria-hidden="true" />}
+                  onClick={openDeepReview}
+                >
+                  Validar
+                </Button>
+              </div>
             </>
           ) : (
             <Link

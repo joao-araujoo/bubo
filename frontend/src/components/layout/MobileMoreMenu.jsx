@@ -48,7 +48,7 @@ export default function MobileMoreMenu() {
   }, [isOpen]);
 
   return (
-    <div className="relative lg:hidden" ref={rootRef}>
+    <div className="relative hidden md:block lg:hidden" ref={rootRef}>
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -66,9 +66,7 @@ export default function MobileMoreMenu() {
           aria-label="Mais recursos"
           className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-[min(22rem,calc(100vw-2rem))] rounded-[var(--bubo-radius-lg)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] p-2 shadow-[var(--bubo-shadow-lg)]"
         >
-          <p className="px-3 pb-2 pt-2 text-xs font-extrabold uppercase tracking-[0.16em] text-[rgb(var(--bubo-color-text-muted))]">
-            Mais no Bubo
-          </p>
+          <p className="px-3 pb-2 pt-2 text-xs font-extrabold uppercase tracking-[0.16em] text-[rgb(var(--bubo-color-text-muted))]">Mais no Bubo</p>
           {items.map(({ Icon, description, label, to }, index) => (
             <NavLink
               key={to}
