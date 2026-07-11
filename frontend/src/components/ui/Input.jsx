@@ -6,7 +6,9 @@ export default function Input({
   error,
   id,
   label,
+  leftIcon,
   required = false,
+  rightIcon,
   ...props
 }) {
   const generatedId = useId();
@@ -31,14 +33,26 @@ export default function Input({
         </label>
       )}
 
-      <input
-        id={inputId}
-        required={required}
-        aria-invalid={Boolean(error)}
-        aria-describedby={describedBy}
-        className={`min-h-11 w-full rounded-[var(--bubo-radius-md)] border bg-[rgb(var(--bubo-color-surface))] px-3 text-[rgb(var(--bubo-color-text))] shadow-[var(--bubo-shadow-sm)] transition placeholder:text-[rgb(var(--bubo-color-text-muted))] focus:border-[rgb(var(--bubo-color-primary))] focus:outline-none disabled:cursor-not-allowed disabled:bg-[rgb(var(--bubo-color-surface-muted))] disabled:opacity-70 ${error ? 'border-[rgb(var(--bubo-color-danger))]' : 'border-[rgb(var(--bubo-color-border))]'} ${className}`}
-        {...props}
-      />
+      <div className="relative">
+        {leftIcon && (
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[rgb(var(--bubo-color-text-muted))]" aria-hidden="true">
+            {leftIcon}
+          </span>
+        )}
+        <input
+          id={inputId}
+          required={required}
+          aria-invalid={Boolean(error)}
+          aria-describedby={describedBy}
+          className={`min-h-11 w-full rounded-[var(--bubo-radius-md)] border bg-[rgb(var(--bubo-color-surface))] px-3 text-[rgb(var(--bubo-color-text))] shadow-[var(--bubo-shadow-sm)] transition placeholder:text-[rgb(var(--bubo-color-text-muted))] focus:border-[rgb(var(--bubo-color-primary))] focus:outline-none focus:ring-4 focus:ring-[rgb(var(--bubo-color-primary)/0.1)] disabled:cursor-not-allowed disabled:bg-[rgb(var(--bubo-color-surface-muted))] disabled:opacity-70 ${leftIcon ? 'pl-11' : ''} ${rightIcon ? 'pr-11' : ''} ${error ? 'border-[rgb(var(--bubo-color-danger))]' : 'border-[rgb(var(--bubo-color-border))]'} ${className}`}
+          {...props}
+        />
+        {rightIcon && (
+          <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[rgb(var(--bubo-color-text-muted))]" aria-hidden="true">
+            {rightIcon}
+          </span>
+        )}
+      </div>
 
       {description && !error && (
         <p id={descriptionId} className="mt-1.5 text-sm text-[rgb(var(--bubo-color-text-muted))]">
