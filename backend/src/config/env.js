@@ -34,6 +34,7 @@ const normalizeEnvironment = (env = process.env) => {
     redisKeyPrefix: String(env.REDIS_KEY_PREFIX || `bubo:${nodeEnv}`).trim(),
     redisConnectTimeoutMs: numberWithin(env.REDIS_CONNECT_TIMEOUT_MS, 5000, 500, 30000),
     redisCommandTimeoutMs: numberWithin(env.REDIS_COMMAND_TIMEOUT_MS, 1500, 100, 10000),
+    redisReconnectDelayMs: numberWithin(env.REDIS_RECONNECT_DELAY_MS, 30000, 1000, 300000),
     redisCacheTtlMs: numberWithin(env.REDIS_CACHE_TTL_MS, 60 * 60 * 1000, 1000, 24 * 60 * 60 * 1000),
     jwtSecret: env.JWT_SECRET || '',
     clientOrigins: String(env.CLIENT_URL || 'http://localhost:5173')
