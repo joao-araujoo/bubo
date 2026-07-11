@@ -179,8 +179,10 @@ export default function ClubDetailPage() {
   };
 
   const focusDiscussion = () => {
-    document.getElementById('club-discussion-body')?.focus();
-    document.getElementById('club-discussion-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const editor = document.getElementById('club-discussion-body');
+    const form = document.getElementById('club-discussion-form');
+    editor?.focus();
+    form?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   };
 
   const confirmLeave = async () => {
