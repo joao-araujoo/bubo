@@ -2,40 +2,34 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 export default function CognitiveDepthMeter({ score = 0, size = 120 }) {
-  const radius = (size - 20) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const normalizedScore = Math.min(100, Math.max(0, Number(score) || 0));
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="transform -rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#1E1E1E" strokeWidth="8" />
-          <motion.circle
-            cx={size / 2} cy={size / 2} r={radius}
-            fill="none"
-            stroke="#00FFFF"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset }}
-            transition={{ duration: 1.5, ease: 'easeOut' }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <motion.span
-            className="text-2xl font-bold text-[#00FFFF]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            {score}
-          </motion.span>
-          <span className="text-xs text-[#BDBDBD]">depth</span>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="relative grid place-items-center rounded-full"
+        style={{
+          width: size,
+          height: size,
+          background: `conic-gradient(rgb(var(--bubo-color-primary)) ${normalizedScore * 3.6}deg, rgb(var(--bubo-color-border)) 0deg)`,
+        }}
+        role="img"
+        aria-label={`Profundidade cognitiva: ${normalizedScore} de 100`}
+      >
+        <div
+          className="grid place-items-center rounded-full bg-[rgb(var(--bubo-color-surface))] shadow-[inset_0_0_0_1px_rgb(var(--bubo-color-border))]"
+          style={{ width: size - 16, height: size - 16 }}
+        >
+          <div className="text-center">
+            <span className="block text-2xl font-black text-[rgb(var(--bubo-color-primary))]">{normalizedScore}</span>
+            <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[rgb(var(--bubo-color-text-muted))]">de 100</span>
+          </div>
         </div>
-      </div>
-      <p className="text-xs text-[#BDBDBD] text-center">Cognitive Depth Score</p>
+      </motion.div>
+      <p className="text-center text-xs font-semibold text-[rgb(var(--bubo-color-text-muted))]">Profundidade cognitiva</p>
     </div>
   );
 }
