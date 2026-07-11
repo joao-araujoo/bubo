@@ -32,6 +32,7 @@ const main = async () => {
   const cacheIdentifier = `cache-${verificationId}`;
   const ttlIdentifier = `${cacheIdentifier}-ttl`;
   const rateLimitIdentifier = `client-${verificationId}`;
+  const rateLimitKey = `${redisKeyPrefix}:verification:rate-limit:${verificationId}:${rateLimitIdentifier}`;
   const rateLimitPrefix = `${redisKeyPrefix}:verification:rate-limit:${verificationId}:`;
   const phases = [];
   let output;
@@ -80,8 +81,11 @@ const main = async () => {
     phases.push('shared-counter');
 
     await firstStore.resetKey(rateLimitIdentifier);
-    const resetValue = await secondStore.get(rateLimitIdentifier);
-    assert.equal(resetValue.totalHits, 0, 'Reset in one store must be visible to another');
+    const resetKeyExists = Number(await sendRedisCommand(
+      ['EXISTS', rateLimitKey],
+      { operation: 'verification_rate_limit_reset' },
+    ));
+    assert.equal(resetKeyExists, 0, 'Reset in one store must remove the shared Redis key');
     phases.push('shared-reset');
 
     await setRedisJson('verification', ttlIdentifier, { expires: true }, 1000);
@@ -114,7 +118,7 @@ const main = async () => {
   } finally {
     await deleteRedisKey('verification', cacheIdentifier).catch(() => undefined);
     await deleteRedisKey('verification', ttlIdentifier).catch(() => undefined);
-    await sendRedisCommand(['DEL', `${rateLimitPrefix}${rateLimitIdentifier}`], {
+    await sendRedisCommand(['DEL', rateLimitKey], {
       operation: 'verification_cleanup',
     }).catch(() => undefined);
     await disconnectRedis();
