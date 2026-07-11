@@ -1,9 +1,11 @@
-import React, { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { Children, isValidElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
 
 const getOptionLabel = (children) => {
   if (typeof children === 'string' || typeof children === 'number') return String(children);
-  return Children.toArray(children).join('');
+  return Children.toArray(children).map((child) => (
+    typeof child === 'string' || typeof child === 'number' ? String(child) : ''
+  )).join('');
 };
 
 export default function Select({
@@ -40,7 +42,6 @@ export default function Select({
       value: String(option.props.value ?? ''),
       label: getOptionLabel(option.props.children),
       disabled: Boolean(option.props.disabled),
-      element: option,
     })), [children]);
 
   const selectedValue = value !== undefined ? String(value) : String(uncontrolledValue ?? '');
@@ -105,7 +106,7 @@ export default function Select({
       else moveActive(-1);
     } else if (event.key === 'Home' && isOpen) {
       event.preventDefault();
-      setActiveIndex(options.findIndex((option) => !option.disabled));
+      setActiveIndex(Math.max(0, options.findIndex((option) => !option.disabled)));
     } else if (event.key === 'End' && isOpen) {
       event.preventDefault();
       const reversedIndex = [...options].reverse().findIndex((option) => !option.disabled);
@@ -208,10 +209,6 @@ export default function Select({
 
       {description && !error && <p id={descriptionId} className="mt-1.5 text-sm text-[rgb(var(--bubo-color-text-muted))]">{description}</p>}
       {error && <p id={errorId} className="mt-1.5 text-sm text-[rgb(var(--bubo-color-danger))]" role="alert">{error}</p>}
-
-      <span className="sr-only" aria-hidden="true">
-        {options.map((option) => cloneElement(option.element, { key: option.value }))}
-      </span>
     </div>
   );
 }
