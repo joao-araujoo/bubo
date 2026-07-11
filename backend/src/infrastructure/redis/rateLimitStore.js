@@ -1,4 +1,6 @@
+const { MemoryStore } = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
+const logger = require('../../utils/logger');
 const {
   getRedisState,
   sendRedisCommand,
@@ -67,7 +69,92 @@ class LazyRedisStore {
   async resetKey(key) {
     return this.getDelegate().resetKey(key);
   }
-};
+}
+
+class ResilientRateLimitStore {
+  constructor({
+    primary,
+    fallback = new MemoryStore(),
+    namespace,
+    loggerImpl = logger,
+    logIntervalMs = 30000,
+  }) {
+    this.primary = primary;
+    this.fallback = fallback;
+    this.namespace = namespace;
+    this.logger = loggerImpl;
+    this.logIntervalMs = logIntervalMs;
+    this.lastFallbackLogAt = 0;
+    this.prefix = primary.prefix;
+    this.localKeys = false;
+  }
+
+  init(options) {
+    this.primary.init(options);
+    this.fallback.init(options);
+  }
+
+  logFallback(error, operation) {
+    const now = Date.now();
+    if (now - this.lastFallbackLogAt < this.logIntervalMs) return;
+    this.lastFallbackLogAt = now;
+    this.logger.warn('rate_limit_local_fallback', {
+      namespace: this.namespace,
+      operation,
+      error,
+    });
+  }
+
+  async get(key) {
+    try {
+      const result = await this.primary.get(key);
+      await this.fallback.resetKey(key);
+      return result;
+    } catch (error) {
+      this.logFallback(error, 'get');
+      return this.fallback.get(key);
+    }
+  }
+
+  async increment(key) {
+    try {
+      const result = await this.primary.increment(key);
+      await this.fallback.resetKey(key);
+      return result;
+    } catch (error) {
+      this.logFallback(error, 'increment');
+      return this.fallback.increment(key);
+    }
+  }
+
+  async decrement(key) {
+    try {
+      await this.primary.decrement(key);
+      await this.fallback.resetKey(key);
+    } catch (error) {
+      this.logFallback(error, 'decrement');
+      await this.fallback.decrement(key);
+    }
+  }
+
+  async resetKey(key) {
+    const results = await Promise.allSettled([
+      this.primary.resetKey(key),
+      this.fallback.resetKey(key),
+    ]);
+    const primaryResult = results[0];
+    if (primaryResult.status === 'rejected') {
+      this.logFallback(primaryResult.reason, 'resetKey');
+    }
+  }
+
+  async shutdown() {
+    await Promise.allSettled([
+      this.primary.shutdown?.(),
+      this.fallback.shutdown?.(),
+    ]);
+  }
+}
 
 const createRateLimitStore = ({ namespace, config }) => {
   if (!config.redisEnabled) {
@@ -79,18 +166,32 @@ const createRateLimitStore = ({ namespace, config }) => {
   }
 
   const safeNamespace = sanitizeNamespace(namespace);
+  const primary = new LazyRedisStore({
+    prefix: `${config.redisKeyPrefix}:rate-limit:${safeNamespace}:`,
+    operation: `rate_limit_${safeNamespace}`,
+  });
+
+  if (config.redisRequired) {
+    return {
+      distributed: true,
+      passOnStoreError: false,
+      store: primary,
+    };
+  }
+
   return {
     distributed: true,
-    passOnStoreError: !config.redisRequired,
-    store: new LazyRedisStore({
-      prefix: `${config.redisKeyPrefix}:rate-limit:${safeNamespace}:`,
-      operation: `rate_limit_${safeNamespace}`,
+    passOnStoreError: false,
+    store: new ResilientRateLimitStore({
+      primary,
+      namespace: safeNamespace,
     }),
   };
 };
 
 module.exports = {
   LazyRedisStore,
+  ResilientRateLimitStore,
   createRateLimitStore,
   sanitizeNamespace,
 };
