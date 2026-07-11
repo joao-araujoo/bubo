@@ -29,6 +29,11 @@ const initialForm = {
   memberLimit: 30,
 };
 
+const localDateValue = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 10);
+};
+
 export default function ClubsPage() {
   const navigate = useNavigate();
   const {
@@ -72,10 +77,14 @@ export default function ClubsPage() {
   };
 
   const openCreate = () => {
+    if (availableBooks.length === 0) {
+      navigate('/discover');
+      return;
+    }
     setForm({
       ...initialForm,
       bookId: availableBooks[0]?.bookId?._id || '',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: localDateValue(),
     });
     setCreateOpen(true);
   };
@@ -108,6 +117,14 @@ export default function ClubsPage() {
     }
   };
 
+  const clearSearchOrDiscover = () => {
+    if (query) {
+      setQuery('');
+      return;
+    }
+    setScope('discover');
+  };
+
   return (
     <div className="space-y-6">
       <section className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
@@ -118,8 +135,12 @@ export default function ClubsPage() {
             Leia no seu ritmo, acompanhe o grupo e transforme capítulos em discussões que realmente permanecem.
           </p>
         </div>
-        <Button leftIcon={<Plus size={18} />} onClick={openCreate} disabled={libraryLoading}>
-          Criar clube
+        <Button
+          leftIcon={availableBooks.length > 0 ? <Plus size={18} aria-hidden="true" /> : <BookOpen size={18} aria-hidden="true" />}
+          onClick={openCreate}
+          disabled={libraryLoading}
+        >
+          {availableBooks.length > 0 ? 'Criar clube' : 'Adicionar livro para criar'}
         </Button>
       </section>
 
@@ -132,7 +153,7 @@ export default function ClubsPage() {
               role="tab"
               aria-selected={scope === filter.key}
               onClick={() => setScope(filter.key)}
-              className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-bold transition ${scope === filter.key ? 'border-[rgb(var(--bubo-color-primary))] bg-[rgb(var(--bubo-color-primary))] text-white' : 'border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] text-[rgb(var(--bubo-color-text-muted))] hover:text-[rgb(var(--bubo-color-text))]'}`}
+              className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))] ${scope === filter.key ? 'border-[rgb(var(--bubo-color-primary))] bg-[rgb(var(--bubo-color-primary))] text-white' : 'border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] text-[rgb(var(--bubo-color-text-muted))] hover:text-[rgb(var(--bubo-color-text))]'}`}
             >
               {filter.label}
             </button>
@@ -140,12 +161,12 @@ export default function ClubsPage() {
         </div>
         <label className="relative">
           <span className="sr-only">Buscar clubes</span>
-          <Compass size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--bubo-color-text-muted))]" />
+          <Compass size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--bubo-color-text-muted))]" aria-hidden="true" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Clube, livro ou criador"
-            className="min-h-11 w-full rounded-[var(--bubo-radius-md)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-background))] pl-10 pr-3 text-sm outline-none focus:border-[rgb(var(--bubo-color-primary))]"
+            className="min-h-11 w-full rounded-[var(--bubo-radius-md)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] pl-10 pr-3 text-sm outline-none transition focus:border-[rgb(var(--bubo-color-primary))] focus:ring-4 focus:ring-[rgb(var(--bubo-color-primary)/0.1)]"
           />
         </label>
       </section>
@@ -167,14 +188,18 @@ export default function ClubsPage() {
           description={error}
           actionLabel="Tentar novamente"
           onAction={() => fetchClubs(scope).catch(() => {})}
+          secondaryActionLabel="Voltar ao início"
+          onSecondaryAction={() => navigate('/')}
         />
       ) : visibleClubs.length === 0 ? (
         <EmptyState
           icon={scope === 'mine' ? BookOpen : Users}
           title={scope === 'mine' ? 'Você ainda não participa de clubes' : 'Nenhum clube encontrado'}
-          description={scope === 'mine' ? 'Crie um clube ou descubra uma leitura coletiva pública.' : 'Tente outra busca ou seja a primeira pessoa a criar um clube para esse livro.'}
-          actionLabel={scope === 'mine' ? 'Criar clube' : undefined}
-          onAction={scope === 'mine' ? openCreate : undefined}
+          description={scope === 'mine' ? 'Descubra uma leitura coletiva pública ou crie um clube a partir do seu acervo.' : 'Tente outra busca ou seja a primeira pessoa a criar um clube para esse livro.'}
+          actionLabel={scope === 'mine' ? 'Descobrir clubes' : query ? 'Limpar busca' : availableBooks.length > 0 ? 'Criar clube' : 'Adicionar livro'}
+          onAction={scope === 'mine' ? () => setScope('discover') : query ? clearSearchOrDiscover : openCreate}
+          secondaryActionLabel={scope === 'mine' && availableBooks.length > 0 ? 'Criar clube' : undefined}
+          onSecondaryAction={scope === 'mine' && availableBooks.length > 0 ? openCreate : undefined}
         />
       ) : (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -191,22 +216,28 @@ export default function ClubsPage() {
 
       <Modal
         isOpen={isCreateOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => !isMutating && setCreateOpen(false)}
+        closeOnBackdrop={!isMutating}
+        closeOnEscape={!isMutating}
         title="Criar clube de leitura"
         description="Defina o livro, o ritmo e quem poderá participar."
         size="lg"
-        footer={(
+        footer={availableBooks.length > 0 ? (
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={isMutating}>Cancelar</Button>
             <Button type="submit" form="create-club-form" isLoading={isMutating}>Criar clube</Button>
           </div>
-        )}
+        ) : undefined}
       >
         {availableBooks.length === 0 ? (
           <EmptyState
             icon={BookOpen}
             title="Adicione um livro primeiro"
-            description="Clubes precisam estar ligados a um livro real do catálogo."
+            description="Clubes precisam estar ligados a uma leitura real do seu acervo."
+            actionLabel="Descobrir livros"
+            onAction={() => { setCreateOpen(false); navigate('/discover'); }}
+            secondaryActionLabel="Fechar"
+            onSecondaryAction={() => setCreateOpen(false)}
           />
         ) : (
           <form id="create-club-form" className="grid gap-4 sm:grid-cols-2" onSubmit={submitClub}>
@@ -229,10 +260,10 @@ export default function ClubsPage() {
             </Select>
             <Input label="Limite de membros" type="number" value={form.memberLimit} onChange={updateForm('memberLimit')} min={2} max={100} required />
             <Input label="Início" type="date" value={form.startDate} onChange={updateForm('startDate')} required />
-            <Input label="Meta de conclusão" type="date" value={form.targetDate} onChange={updateForm('targetDate')} description="Opcional" />
+            <Input label="Meta de conclusão" type="date" value={form.targetDate} onChange={updateForm('targetDate')} min={form.startDate || undefined} description="Opcional" />
             {form.visibility === 'private' && (
               <div className="sm:col-span-2 flex gap-3 rounded-[var(--bubo-radius-md)] bg-[rgb(var(--bubo-color-surface-muted))] p-4 text-sm text-[rgb(var(--bubo-color-text-muted))]">
-                <Lock className="shrink-0 text-[rgb(var(--bubo-color-primary))]" size={19} />
+                <Lock className="shrink-0 text-[rgb(var(--bubo-color-primary))]" size={19} aria-hidden="true" />
                 Um código de convite será gerado automaticamente e ficará visível para owner e moderadores.
               </div>
             )}
