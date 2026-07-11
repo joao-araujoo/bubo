@@ -5,6 +5,11 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const mongoose = require('mongoose');
 const { getEnvironment } = require('./config/env');
+const observabilityMiddleware = require('./middleware/observability');
+const { captureException } = require('./observability/errorReporter');
+const { buildLiveness, buildReadiness } = require('./observability/health');
+const { getMetricsSnapshot } = require('./observability/metrics');
+const { getRuntimeState } = require('./observability/runtimeState');
 const logger = require('./utils/logger');
 
 const authRoutes = require('./routes/auth');
@@ -25,8 +30,9 @@ const corsOptions = {
   credentials: true,
   origin(origin, callback) {
     if (!origin || config.clientOrigins.includes(origin)) return callback(null, true);
-    const error = new Error('Origin not allowed by CORS policy');
+    const error = new Error('Origem não permitida pela política CORS.');
     error.status = 403;
+    error.code = 'CORS_ORIGIN_DENIED';
     return callback(error);
   },
 };
@@ -36,8 +42,12 @@ const createLimiter = ({ max, message }) => rateLimit({
   max,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message },
-  skip: (req) => req.path === '/health',
+  handler: (req, res) => res.status(429).json({
+    message,
+    code: 'RATE_LIMIT_EXCEEDED',
+    requestId: req.requestId,
+  }),
+  skip: (req) => req.path.startsWith('/health'),
 });
 
 const apiLimiter = createLimiter({
@@ -55,46 +65,68 @@ const bookSearchLimiter = createLimiter({
   message: 'Muitas buscas em pouco tempo. Aguarde alguns minutos antes de consultar o catálogo novamente.',
 });
 
-app.use((req, res, next) => {
-  const requestId = req.get('x-request-id') || crypto.randomUUID();
-  req.requestId = requestId;
-  res.setHeader('x-request-id', requestId);
-  res.setHeader('x-content-type-options', 'nosniff');
-  res.setHeader('x-frame-options', 'DENY');
-  res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
-  res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=()');
-  res.setHeader('cross-origin-resource-policy', 'same-site');
+const databaseReady = () => mongoose.connection.readyState === 1;
 
-  const startedAt = Date.now();
-  res.on('finish', () => {
-    logger.info('http_request', {
-      requestId,
-      method: req.method,
-      path: req.originalUrl.split('?')[0],
-      status: res.statusCode,
-      durationMs: Date.now() - startedAt,
-    });
+const readinessHandler = (req, res) => {
+  const payload = buildReadiness({
+    requestId: req.requestId,
+    runtime: getRuntimeState(),
+    databaseReady: databaseReady(),
   });
-  next();
-});
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(payload.ready ? 200 : 503).json(payload);
+};
 
+const metricsAuthorized = (req, res, next) => {
+  if (!config.metricsEnabled) {
+    return res.status(404).json({
+      message: 'Endpoint não encontrado.',
+      code: 'ENDPOINT_NOT_FOUND',
+      requestId: req.requestId,
+    });
+  }
+  if (!config.metricsToken) return next();
+
+  const provided = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(config.metricsToken);
+  const valid = providedBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+
+  if (!valid) {
+    return res.status(401).json({
+      message: 'Credencial de métricas inválida.',
+      code: 'METRICS_UNAUTHORIZED',
+      requestId: req.requestId,
+    });
+  }
+  return next();
+};
+
+app.use(observabilityMiddleware);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: config.bodyLimit }));
 app.use(mongoSanitize());
 
-app.get('/api/health', (req, res) => {
-  const databaseConnected = mongoose.connection.readyState === 1;
-  const status = databaseConnected ? 'ok' : 'degraded';
+app.get('/api/health/live', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.status(databaseConnected ? 200 : 503).json({
-    status,
-    database: databaseConnected ? 'connected' : 'disconnected',
-    uptimeSeconds: Math.round(process.uptime()),
-    memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
-    timestamp: new Date().toISOString(),
+  return res.json(buildLiveness({
     requestId: req.requestId,
-  });
+    runtime: getRuntimeState(),
+  }));
+});
+app.get('/api/health/ready', readinessHandler);
+app.get('/api/health', readinessHandler);
+
+app.get('/api/metrics', metricsAuthorized, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json(getMetricsSnapshot({
+    database: databaseReady() ? 'connected' : 'disconnected',
+    runtime: getRuntimeState(),
+    service: config.serviceName,
+    release: config.release,
+  }));
 });
 
 app.use('/api/', apiLimiter);
@@ -106,26 +138,40 @@ app.use('/api/social', socialRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/clubs', clubRoutes);
 
-app.use('/api', (req, res) => {
-  res.status(404).json({
-    message: 'Endpoint não encontrado.',
-    requestId: req.requestId,
-  });
-});
+app.use('/api', (req, res) => res.status(404).json({
+  message: 'Endpoint não encontrado.',
+  code: 'ENDPOINT_NOT_FOUND',
+  requestId: req.requestId,
+}));
 
 app.use((err, req, res, next) => {
   const status = Number(err.status || err.statusCode) || 500;
+  const path = req.originalUrl.split('?')[0];
+  const code = /^[A-Z0-9_]{3,80}$/.test(String(err.code || ''))
+    ? err.code
+    : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED';
+
   logger.error('request_failed', {
-    requestId: req.requestId,
     method: req.method,
-    path: req.originalUrl.split('?')[0],
+    path,
     status,
+    code,
     error: err,
   });
+
+  if (status >= 500) {
+    captureException(err, {
+      method: req.method,
+      path,
+      status,
+      code,
+    });
+  }
 
   if (res.headersSent) return next(err);
   return res.status(status).json({
     message: status >= 500 ? 'O Bubo encontrou uma falha inesperada.' : err.message,
+    code,
     requestId: req.requestId,
     ...(config.nodeEnv === 'development' && status >= 500 ? { error: err.message } : {}),
   });
