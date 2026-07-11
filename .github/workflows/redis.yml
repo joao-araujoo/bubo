@@ -1,6 +1,38 @@
 name: Redis
 
 on:
+  pull_request:
+    paths:
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
+      - 'backend/scripts/verify-redis*.js'
+      - 'backend/src/app.js'
+      - 'backend/src/server.js'
+      - 'backend/src/config/env.js'
+      - 'backend/src/infrastructure/redis/**'
+      - 'backend/src/observability/**'
+      - 'backend/src/services/books/bookSearchCache.js'
+      - 'backend/src/utils/logger.js'
+      - 'backend/test/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/redis.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
+      - 'backend/scripts/verify-redis*.js'
+      - 'backend/src/app.js'
+      - 'backend/src/server.js'
+      - 'backend/src/config/env.js'
+      - 'backend/src/infrastructure/redis/**'
+      - 'backend/src/observability/**'
+      - 'backend/src/services/books/bookSearchCache.js'
+      - 'backend/src/utils/logger.js'
+      - 'backend/test/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/redis.yml'
   workflow_dispatch:
 
 permissions:
