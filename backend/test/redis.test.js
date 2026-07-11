@@ -5,7 +5,10 @@ const {
   createRedisManager,
   targetFromUrl,
 } = require('../src/infrastructure/redis/redisManager');
-const { sanitizeNamespace } = require('../src/infrastructure/redis/rateLimitStore');
+const {
+  LazyRedisStore,
+  sanitizeNamespace,
+} = require('../src/infrastructure/redis/rateLimitStore');
 
 class FakeRedisClient extends EventEmitter {
   constructor({ failConnect = false, responses = {} } = {}) {
@@ -128,6 +131,48 @@ test('required redis prevents startup when it cannot connect', async () => {
   await assert.rejects(() => manager.connect(), /connection refused/);
   assert.equal(manager.getState().required, true);
   assert.equal(manager.getState().ready, false);
+});
+
+test('lazy rate-limit store does not load scripts before redis is ready', async () => {
+  let ready = false;
+  let factoryCalls = 0;
+  let initOptions;
+  const delegate = {
+    init(options) {
+      initOptions = options;
+    },
+    async increment() {
+      return { totalHits: 1, resetTime: new Date() };
+    },
+    async get() {
+      return { totalHits: 1, resetTime: new Date() };
+    },
+    async decrement() {},
+    async resetKey() {},
+  };
+  const store = new LazyRedisStore({
+    prefix: 'bubo:test:rate-limit:api:',
+    operation: 'rate_limit_api',
+    getState: () => ({ ready }),
+    sendCommand: async () => 'OK',
+    storeFactory: () => {
+      factoryCalls += 1;
+      return delegate;
+    },
+  });
+  store.init({ windowMs: 10000 });
+
+  await assert.rejects(() => store.increment('client'), (error) => error.code === 'REDIS_UNAVAILABLE');
+  assert.equal(factoryCalls, 0);
+
+  ready = true;
+  const incremented = await store.increment('client');
+  assert.equal(incremented.totalHits, 1);
+  assert.equal(factoryCalls, 1);
+  assert.equal(initOptions.windowMs, 10000);
+
+  await store.get('client');
+  assert.equal(factoryCalls, 1, 'The same delegate must be reused after initialization');
 });
 
 test('rate-limit namespaces are deterministic and bounded', () => {
