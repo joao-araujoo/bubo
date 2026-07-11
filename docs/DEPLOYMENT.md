@@ -12,11 +12,11 @@ Reverse proxy / load balancer
 Frontend Nginx (porta 80 interna)
   ├── arquivos React/PWA
   └── /api → backend:3001
-             ↓
-          MongoDB
+                 ├── MongoDB: dados persistentes do produto
+                 └── Redis: rate limit e cache compartilhado
 ```
 
-O `docker-compose.yml` é adequado para desenvolvimento, homologação e uma instalação simples em um único servidor. Em produção com maior escala, use banco gerenciado, armazenamento de logs e um orquestrador apropriado.
+O `docker-compose.yml` é adequado para desenvolvimento, homologação e uma instalação simples em um único servidor. Em produção com maior escala, use MongoDB e Redis gerenciados, armazenamento centralizado de logs e um orquestrador apropriado.
 
 ## Requisitos
 
@@ -24,6 +24,7 @@ O `docker-compose.yml` é adequado para desenvolvimento, homologação e uma ins
 - Docker Engine e Compose;
 - domínio com HTTPS;
 - backup persistente do MongoDB;
+- Redis privado ou gerenciado;
 - segredo JWT aleatório;
 - chave de IA opcional.
 
@@ -39,7 +40,7 @@ Defina no `.env`:
 
 ```env
 JWT_SECRET=valor_gerado
-AI_PROVIDER=local
+AI_PROVIDER=auto
 ```
 
 Para IA conectada, adicione somente uma chave no servidor:
@@ -56,7 +57,33 @@ AI_PROVIDER=gemini
 GEMINI_API_KEY=...
 ```
 
-Nunca inclua `.env`, dumps do MongoDB ou chaves em commits, imagens públicas ou logs.
+Nunca inclua `.env`, dumps do MongoDB, URLs Redis com credenciais ou chaves em commits, imagens públicas ou logs.
+
+## Redis
+
+O Compose fornece Redis na rede interna e não publica a porta `6379` no host:
+
+```env
+REDIS_URL=redis://redis:6379/0
+REDIS_REQUIRED=true
+REDIS_KEY_PREFIX=bubo:production
+```
+
+Em um serviço gerenciado, prefira TLS:
+
+```env
+REDIS_URL=rediss://usuario:senha@cache.example:6380/0
+```
+
+Declare a quantidade esperada de réplicas:
+
+```env
+INSTANCE_COUNT=1
+```
+
+Quando `INSTANCE_COUNT` é maior que um, Redis se torna obrigatório automaticamente. Não desative essa proteção em uma implantação com múltiplas instâncias.
+
+Consulte `docs/REDIS.md` para namespaces, política de falha, métricas e recuperação.
 
 ## CORS e URL pública
 
@@ -98,6 +125,7 @@ Verifique:
 ```bash
 docker compose ps
 curl -fsS http://localhost:8080/api/health
+curl -fsS http://localhost:8080/api/health/ready
 ```
 
 A resposta saudável contém:
@@ -105,8 +133,16 @@ A resposta saudável contém:
 ```json
 {
   "status": "ok",
-  "database": "connected"
+  "ready": true,
+  "database": "connected",
+  "redis": "connected"
 }
+```
+
+O endpoint de liveness não depende das bases:
+
+```bash
+curl -fsS http://localhost:8080/api/health/live
 ```
 
 ## Seed
@@ -121,25 +157,35 @@ Ele é idempotente, mas cria credenciais conhecidas quando os valores padrão s�
 
 ## Logs
 
-Backend:
-
 ```bash
 docker compose logs -f backend
-```
-
-Frontend:
-
-```bash
 docker compose logs -f frontend
+docker compose logs -f mongo
+docker compose logs -f redis
 ```
 
-MongoDB:
+Os logs da API são JSON e incluem request ID, usuário quando autenticado, método, rota sem query string, status e duração. Senhas, tokens, cookies, chaves e credenciais são removidos recursivamente.
+
+Não registre textos integrais de Deep Review, corpos de requisição ou URLs Redis completas.
+
+## Métricas
+
+Em produção, o endpoint fica desabilitado por padrão. Para habilitar:
+
+```env
+METRICS_ENABLED=true
+METRICS_TOKEN=<segredo-com-pelo-menos-24-caracteres>
+```
+
+Consulta:
 
 ```bash
-docker compose logs -f mongo
+curl -fsS \
+  -H "Authorization: Bearer $METRICS_TOKEN" \
+  https://bubo.example/api/metrics
 ```
 
-Os logs da API são JSON e incluem request ID, método, rota sem query string, status e duração. O texto das Deep Reviews e credenciais não são registrados pelo logger HTTP.
+As métricas incluem HTTP, memória, event loop, MongoDB e Redis. O token nunca deve ser enviado ao frontend.
 
 ## Backup do MongoDB
 
@@ -159,6 +205,8 @@ docker compose exec mongo mongorestore --archive=/tmp/bubo.archive --gzip --drop
 
 Teste restaurações periodicamente. Um backup nunca testado não é uma estratégia de recuperação.
 
+Redis não é a fonte principal dos dados do produto. O Compose mantém AOF para reduzir perda de cache e contadores em reinícios, mas a recuperação do sistema não deve depender de backup Redis.
+
 ## Atualização
 
 ```bash
@@ -166,7 +214,7 @@ git pull
 docker compose build --pull
 docker compose up -d
 docker compose ps
-curl -fsS http://localhost:8080/api/health
+curl -fsS http://localhost:8080/api/health/ready
 ```
 
 Não remova volumes durante uma atualização comum.
@@ -177,12 +225,12 @@ Não remova volumes durante uma atualização comum.
 2. faça checkout desse commit;
 3. reconstrua frontend e backend;
 4. inicie os serviços novamente;
-5. valide health check e login.
+5. valide readiness, login e uma rota protegida.
 
 ```bash
 git checkout <commit-estavel>
 docker compose build backend frontend
-docker compose up -d backend frontend
+docker compose up -d mongo redis backend frontend
 ```
 
 Mudanças futuras de schema que exigirem migração devem incluir estratégia explícita de rollback antes do deploy.
@@ -191,36 +239,43 @@ Mudanças futuras de schema que exigirem migração devem incluir estratégia ex
 
 Monitore:
 
-- disponibilidade de `/api/health`;
+- disponibilidade de `/api/health/live` e `/api/health/ready`;
 - reinícios dos containers;
 - uso de CPU, memória e disco;
 - crescimento do volume MongoDB;
-- taxas de erro HTTP 5xx;
-- latência da API;
+- memória, latência, reconexões e rejeições de escrita do Redis;
+- taxas de erro HTTP 5xx e 429;
+- p95 e p99 de latência da API;
+- atraso do event loop;
 - falhas e tempo de resposta do provedor de IA;
 - validade do certificado HTTPS.
 
 ## Limites e escalabilidade
 
-O Compose atual executa uma instância da API. Antes de múltiplas réplicas:
+O Compose atual publica uma instância da API. Para múltiplas réplicas:
 
 - use MongoDB gerenciado ou replica set;
-- mova rate limiting para um armazenamento compartilhado;
-- centralize logs;
-- mantenha todas as instâncias com o mesmo JWT secret;
+- mantenha Redis obrigatório e compartilhado;
+- defina `INSTANCE_COUNT` corretamente;
+- use o mesmo `JWT_SECRET` em todas as instâncias;
+- use o mesmo `REDIS_KEY_PREFIX` dentro do ambiente;
+- centralize logs e métricas;
 - implemente migrações versionadas;
-- avalie filas para tarefas de IA demoradas.
+- coloque tarefas demoradas de IA em filas antes de aumentar concorrência.
 
 ## Checklist pós-deploy
 
-- health check responde `ok`;
+- liveness responde `ok`;
+- readiness responde `ready: true`;
+- MongoDB e Redis aparecem como `connected`;
+- Redis não possui porta pública acidental;
 - cadastro e login funcionam;
-- busca de livros responde;
+- rate limit retorna 429 quando esperado;
+- busca de livros responde e reutiliza cache;
 - Deep Review funciona no modo configurado;
-- fallback local aparece quando esperado;
 - feed persiste curtida e comentário;
 - clube pode ser criado e acessado;
 - PWA possui manifest e service worker;
 - logs não contêm segredos;
-- backup foi executado;
+- backup MongoDB foi executado e restaurado em teste;
 - alertas básicos estão ativos.
