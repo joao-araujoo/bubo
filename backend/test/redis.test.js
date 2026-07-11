@@ -7,6 +7,7 @@ const {
 } = require('../src/infrastructure/redis/redisManager');
 const {
   LazyRedisStore,
+  ResilientRateLimitStore,
   sanitizeNamespace,
 } = require('../src/infrastructure/redis/rateLimitStore');
 
@@ -51,6 +52,45 @@ class FakeRedisClient extends EventEmitter {
   }
 }
 
+class FakeCounterStore {
+  constructor({ fail = false } = {}) {
+    this.fail = fail;
+    this.values = new Map();
+    this.windowMs = 60000;
+  }
+
+  init(options) {
+    this.windowMs = options.windowMs;
+  }
+
+  async get(key) {
+    if (this.fail) throw new Error('primary unavailable');
+    return this.values.get(key);
+  }
+
+  async increment(key) {
+    if (this.fail) throw new Error('primary unavailable');
+    const current = this.values.get(key) || {
+      totalHits: 0,
+      resetTime: new Date(Date.now() + this.windowMs),
+    };
+    current.totalHits += 1;
+    this.values.set(key, current);
+    return current;
+  }
+
+  async decrement(key) {
+    if (this.fail) throw new Error('primary unavailable');
+    const current = this.values.get(key);
+    if (current && current.totalHits > 0) current.totalHits -= 1;
+  }
+
+  async resetKey(key) {
+    if (this.fail) throw new Error('primary unavailable');
+    this.values.delete(key);
+  }
+}
+
 const baseConfig = {
   redisEnabled: true,
   redisRequired: true,
@@ -58,6 +98,7 @@ const baseConfig = {
   redisKeyPrefix: 'bubo:test',
   redisConnectTimeoutMs: 1000,
   redisCommandTimeoutMs: 1000,
+  redisReconnectDelayMs: 1000,
 };
 
 test('redis target metadata never exposes credentials', () => {
@@ -67,6 +108,8 @@ test('redis target metadata never exposes credentials', () => {
     port: 6379,
     database: 2,
   });
+  assert.equal(targetFromUrl('https://cache.internal'), null);
+  assert.equal(targetFromUrl('not-a-url'), null);
 });
 
 test('redis manager remains disabled without a configured url', async () => {
@@ -77,6 +120,25 @@ test('redis manager remains disabled without a configured url', async () => {
   assert.equal(state.enabled, false);
   assert.equal(state.ready, false);
   assert.equal(state.status, 'disabled');
+});
+
+test('invalid redis urls never create a client during module configuration', async () => {
+  let clientCreations = 0;
+  const manager = createRedisManager({
+    createClientImpl: () => {
+      clientCreations += 1;
+      return new FakeRedisClient();
+    },
+    loggerImpl: { info() {}, warn() {} },
+  });
+  const configured = manager.configure({
+    ...baseConfig,
+    redisUrl: 'https://cache.internal',
+  });
+
+  assert.equal(configured.status, 'invalid');
+  assert.equal(clientCreations, 0);
+  await assert.rejects(() => manager.connect(), (error) => error.code === 'REDIS_UNAVAILABLE');
 });
 
 test('redis manager connects, namespaces JSON values and records commands', async () => {
@@ -103,12 +165,13 @@ test('redis manager connects, namespaces JSON values and records commands', asyn
   assert.ok(state.commands >= 5);
   assert.equal(state.failures, 0);
   assert.equal(state.target.host, 'cache.internal');
+  assert.equal(JSON.stringify(state).includes('very-secret'), false);
 
   await manager.disconnect();
   assert.equal(manager.getState().ready, false);
 });
 
-test('optional redis degrades without preventing startup', async () => {
+test('optional redis degrades without preventing startup and schedules recovery', async () => {
   const manager = createRedisManager({
     createClientImpl: () => new FakeRedisClient({ failConnect: true }),
     loggerImpl: { info() {}, warn() {} },
@@ -119,6 +182,9 @@ test('optional redis degrades without preventing startup', async () => {
   assert.equal(state.ready, false);
   assert.equal(state.status, 'degraded');
   assert.equal(state.failures, 1);
+  assert.ok(state.nextRetryAt);
+  await manager.disconnect();
+  assert.equal(manager.getState().nextRetryAt, null);
 });
 
 test('required redis prevents startup when it cannot connect', async () => {
@@ -173,6 +239,36 @@ test('lazy rate-limit store does not load scripts before redis is ready', async 
 
   await store.get('client');
   assert.equal(factoryCalls, 1, 'The same delegate must be reused after initialization');
+});
+
+test('optional rate-limit store counts locally during outage and returns to primary', async () => {
+  const primary = new FakeCounterStore({ fail: true });
+  const fallback = new FakeCounterStore();
+  const warnings = [];
+  const store = new ResilientRateLimitStore({
+    primary,
+    fallback,
+    namespace: 'api',
+    loggerImpl: { warn: (...args) => warnings.push(args) },
+    logIntervalMs: 60000,
+  });
+  store.init({ windowMs: 10000 });
+
+  const firstLocal = await store.increment('reader');
+  const secondLocal = await store.increment('reader');
+  assert.equal(firstLocal.totalHits, 1);
+  assert.equal(secondLocal.totalHits, 2);
+  assert.equal((await store.get('reader')).totalHits, 2);
+  assert.equal(warnings.length, 1, 'Repeated failures should be log-rate-limited');
+
+  primary.fail = false;
+  const recovered = await store.increment('reader');
+  assert.equal(recovered.totalHits, 1, 'Recovered primary starts its distributed counter');
+  assert.equal(await fallback.get('reader'), undefined, 'Stale local counter is cleared after recovery');
+
+  primary.fail = true;
+  const newLocalWindow = await store.increment('reader');
+  assert.equal(newLocalWindow.totalHits, 1, 'A later outage starts a fresh local fallback');
 });
 
 test('rate-limit namespaces are deterministic and bounded', () => {
