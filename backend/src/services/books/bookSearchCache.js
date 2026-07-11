@@ -1,11 +1,18 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const BookSearchCache = require('../../models/BookSearchCache');
+const {
+  getRedisJson,
+  getRedisState,
+  setRedisJson,
+} = require('../../infrastructure/redis/redisManager');
 const logger = require('../../utils/logger');
 
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_MEMORY_TTL_MS = 15 * 60 * 1000;
+const DEFAULT_REDIS_TTL_MS = 60 * 60 * 1000;
 const MAX_MEMORY_ENTRIES = 120;
+const REDIS_SCOPE = 'book-search';
 
 const memoryCache = new Map();
 const inFlight = new Map();
@@ -25,6 +32,17 @@ const cacheKeyFor = (query) => crypto
 const ttlFromEnv = (name, fallback) => {
   const parsed = Number(process.env[name]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const normalizePayload = (payload) => {
+  if (!payload || typeof payload !== 'object') return null;
+  return {
+    books: Array.isArray(payload.books) ? payload.books : [],
+    sourceStatus: payload.sourceStatus && typeof payload.sourceStatus === 'object'
+      ? payload.sourceStatus
+      : {},
+    partial: Boolean(payload.partial),
+  };
 };
 
 const pruneMemory = () => {
@@ -61,6 +79,30 @@ const writeMemory = (key, payload) => {
   pruneMemory();
 };
 
+const readRedis = async (key) => {
+  if (!getRedisState().ready) return null;
+  try {
+    return normalizePayload(await getRedisJson(REDIS_SCOPE, key));
+  } catch (error) {
+    logger.warn('book_search_redis_cache_read_failed', { error });
+    return null;
+  }
+};
+
+const writeRedis = async (key, payload) => {
+  if (!getRedisState().ready) return;
+  try {
+    await setRedisJson(
+      REDIS_SCOPE,
+      key,
+      normalizePayload(payload),
+      ttlFromEnv('REDIS_CACHE_TTL_MS', DEFAULT_REDIS_TTL_MS),
+    );
+  } catch (error) {
+    logger.warn('book_search_redis_cache_write_failed', { error });
+  }
+};
+
 const canUseDatabase = () => mongoose.connection.readyState === 1;
 
 const readDatabase = async (key) => {
@@ -72,11 +114,7 @@ const readDatabase = async (key) => {
     }).lean();
 
     if (!cached) return null;
-    return {
-      books: cached.books || [],
-      sourceStatus: cached.sourceStatus || {},
-      partial: Boolean(cached.partial),
-    };
+    return normalizePayload(cached);
   } catch (error) {
     logger.warn('book_search_cache_read_failed', { error });
     return null;
@@ -107,21 +145,32 @@ const writeDatabase = async (key, query, payload) => {
 const getCachedBookSearch = async (query) => {
   const key = cacheKeyFor(query);
   const memory = readMemory(key);
-  if (memory) return { payload: memory, cache: 'memory' };
+  if (memory) return { payload: memory, cache: 'memory', layer: 'memory' };
+
+  const redis = await readRedis(key);
+  if (redis) {
+    writeMemory(key, redis);
+    return { payload: redis, cache: 'shared', layer: 'redis' };
+  }
 
   const database = await readDatabase(key);
   if (database) {
     writeMemory(key, database);
-    return { payload: database, cache: 'shared' };
+    await writeRedis(key, database);
+    return { payload: database, cache: 'shared', layer: 'database' };
   }
 
-  return { payload: null, cache: 'miss' };
+  return { payload: null, cache: 'miss', layer: 'none' };
 };
 
 const setCachedBookSearch = async (query, payload) => {
   const key = cacheKeyFor(query);
-  writeMemory(key, payload);
-  await writeDatabase(key, query, payload);
+  const normalized = normalizePayload(payload);
+  writeMemory(key, normalized);
+  await Promise.all([
+    writeRedis(key, normalized),
+    writeDatabase(key, query, normalized),
+  ]);
 };
 
 const loadBookSearch = async (query, loader) => {
@@ -131,20 +180,20 @@ const loadBookSearch = async (query, loader) => {
   const key = cacheKeyFor(query);
   if (inFlight.has(key)) {
     const payload = await inFlight.get(key);
-    return { payload, cache: 'coalesced' };
+    return { payload, cache: 'coalesced', layer: 'memory' };
   }
 
   const request = Promise.resolve()
     .then(loader)
     .then(async (payload) => {
       await setCachedBookSearch(query, payload);
-      return payload;
+      return normalizePayload(payload);
     })
     .finally(() => inFlight.delete(key));
 
   inFlight.set(key, request);
   const payload = await request;
-  return { payload, cache: 'miss' };
+  return { payload, cache: 'miss', layer: 'source' };
 };
 
 const clearMemoryBookSearchCache = () => {
@@ -157,6 +206,7 @@ module.exports = {
   clearMemoryBookSearchCache,
   getCachedBookSearch,
   loadBookSearch,
+  normalizePayload,
   normalizeQuery,
   setCachedBookSearch,
 };
