@@ -1,7 +1,12 @@
 const Book = require('../models/Book');
+const DeepReview = require('../models/DeepReview');
 const UserBook = require('../models/UserBook');
 const SocialActivity = require('../models/SocialActivity');
 const { searchBookMetadata } = require('../services/books/bookMetadata');
+const { loadBookSearch } = require('../services/books/bookSearchCache');
+
+const BOOK_STATUSES = new Set(['reading', 'to-read', 'read', 'abandoned']);
+const MAX_LIBRARY_ITEMS = 500;
 
 const normalizeImageUrl = (url) => String(url || '').replace(/^http:\/\//i, 'https://');
 
@@ -78,18 +83,28 @@ const enrichExistingBook = async (book, incoming) => {
   return Book.findByIdAndUpdate(book._id, { $set: updates }, { new: true, runValidators: true });
 };
 
+const effectiveTotalPages = (userBook) => Number(userBook.totalPagesOverride)
+  || Number(userBook.bookId?.totalPages)
+  || 0;
+
 exports.searchBooks = async (req, res) => {
   const q = String(req.query.q || '').trim();
   if (!q) return res.status(400).json({ message: 'Informe um título, autor ou ISBN para buscar.', code: 'BOOK_QUERY_REQUIRED' });
+  if (q.length > 160) return res.status(400).json({ message: 'A busca deve ter no máximo 160 caracteres.', code: 'BOOK_QUERY_TOO_LONG' });
 
+  const startedAt = Date.now();
   try {
-    const result = await searchBookMetadata(q);
+    const { payload: result, cache } = await loadBookSearch(q, () => searchBookMetadata(q));
+    res.setHeader('Cache-Control', 'private, max-age=300, stale-while-revalidate=1800');
+    res.setHeader('X-Bubo-Book-Cache', cache);
+    res.setHeader('Server-Timing', `book-search;dur=${Date.now() - startedAt}`);
     res.json({
       books: result.books,
       meta: {
         query: q,
         sourceStatus: result.sourceStatus,
         partial: result.partial,
+        cache,
       },
     });
   } catch (err) {
@@ -100,7 +115,7 @@ exports.searchBooks = async (req, res) => {
         sourceStatus: err.sourceStatus,
       });
     }
-    res.status(502).json({
+    return res.status(502).json({
       message: 'Não foi possível consultar o catálogo agora. Tente novamente em alguns instantes.',
       code: 'BOOK_SEARCH_FAILED',
     });
@@ -109,7 +124,7 @@ exports.searchBooks = async (req, res) => {
 
 exports.addToLibrary = async (req, res) => {
   const payload = req.body || {};
-  const status = payload.status || 'to-read';
+  const status = BOOK_STATUSES.has(payload.status) ? payload.status : 'to-read';
   const hasIdentifier = payload.canonicalId || payload.googleBooksId || payload.openLibraryKey || payload.isbn;
 
   if (!hasIdentifier || !payload.title) {
@@ -120,15 +135,31 @@ exports.addToLibrary = async (req, res) => {
   }
 
   try {
-    const incoming = buildBookFields(payload);
+    const manualPages = payload.pagesSource === 'manual' ? Math.max(0, Number(payload.totalPages) || 0) : 0;
+    const catalogPayload = manualPages
+      ? {
+        ...payload,
+        totalPages: 0,
+        pagesSource: '',
+        metadataSources: (payload.metadataSources || []).filter((source) => source !== 'manual'),
+      }
+      : payload;
+    const incoming = buildBookFields(catalogPayload);
     const lookup = buildLookup(incoming);
     let book = lookup.length ? await Book.findOne({ $or: lookup }) : null;
 
     if (!book) {
-      book = await Book.create(incoming);
+      try {
+        book = await Book.create(incoming);
+      } catch (error) {
+        if (error?.code !== 11000) throw error;
+        book = await Book.findOne({ $or: lookup });
+      }
     } else {
       book = await enrichExistingBook(book, incoming);
     }
+
+    if (!book) throw new Error('Book catalog upsert failed');
 
     const existing = await UserBook.findOne({ userId: req.user._id, bookId: book._id });
     if (existing) {
@@ -138,10 +169,15 @@ exports.addToLibrary = async (req, res) => {
       });
     }
 
+    const now = new Date();
     const userBook = await UserBook.create({
       userId: req.user._id,
       bookId: book._id,
       status,
+      totalPagesOverride: manualPages,
+      startedAt: status === 'reading' || status === 'read' ? now : null,
+      completedAt: status === 'read' ? now : null,
+      currentPage: status === 'read' ? (manualPages || Number(book.totalPages) || 0) : 0,
     });
 
     await SocialActivity.create({
@@ -151,16 +187,19 @@ exports.addToLibrary = async (req, res) => {
       message: `Adicionou “${book.title}” ao acervo.`,
     });
 
-    const populated = await UserBook.findById(userBook._id).populate('bookId');
-    res.status(201).json({ userBook: populated });
+    const populated = await UserBook.findById(userBook._id)
+      .select('-deepReviews')
+      .populate('bookId')
+      .lean();
+    return res.status(201).json({ userBook: populated });
   } catch (err) {
     if (err?.code === 11000) {
       return res.status(409).json({
-        message: 'Este livro já existe no catálogo. Atualize a busca e tente adicioná-lo novamente.',
-        code: 'BOOK_CATALOG_CONFLICT',
+        message: 'Este livro já está no seu acervo.',
+        code: 'BOOK_ALREADY_IN_LIBRARY',
       });
     }
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Não foi possível adicionar o livro. Seus outros dados não foram alterados.',
       code: 'BOOK_ADD_FAILED',
     });
@@ -169,12 +208,24 @@ exports.addToLibrary = async (req, res) => {
 
 exports.getUserLibrary = async (req, res) => {
   try {
-    const userBooks = await UserBook.find({ userId: req.user._id })
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isInteger(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), MAX_LIBRARY_ITEMS)
+      : MAX_LIBRARY_ITEMS;
+    const filter = { userId: req.user._id };
+    if (BOOK_STATUSES.has(req.query.status)) filter.status = req.query.status;
+
+    const userBooks = await UserBook.find(filter)
+      .select('-deepReviews')
       .populate('bookId')
-      .sort({ updatedAt: -1 });
-    res.json({ userBooks });
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.setHeader('Cache-Control', 'private, max-age=15, stale-while-revalidate=60');
+    return res.json({ userBooks, meta: { limit, count: userBooks.length } });
   } catch (err) {
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Não foi possível carregar seu acervo. Tente novamente sem recarregar a página.',
       code: 'LIBRARY_LOAD_FAILED',
     });
@@ -183,44 +234,88 @@ exports.getUserLibrary = async (req, res) => {
 
 exports.updateBookStatus = async (req, res) => {
   const { id } = req.params;
-  const { status, currentPage } = req.body;
+  const { status, currentPage, totalPages } = req.body;
+
+  if (status !== undefined && !BOOK_STATUSES.has(status)) {
+    return res.status(400).json({ message: 'Status de leitura inválido.', code: 'BOOK_STATUS_INVALID' });
+  }
 
   try {
     const existing = await UserBook.findOne({ _id: id, userId: req.user._id }).populate('bookId');
     if (!existing) return res.status(404).json({ message: 'Livro não encontrado no seu acervo.', code: 'USER_BOOK_NOT_FOUND' });
 
-    const updates = { updatedAt: Date.now() };
+    const now = new Date();
+    const updates = { updatedAt: now };
+    const nextOverride = totalPages !== undefined
+      ? Math.max(0, Number(totalPages) || 0)
+      : Number(existing.totalPagesOverride) || 0;
+    const total = nextOverride || Number(existing.bookId?.totalPages) || 0;
+
     if (status !== undefined) updates.status = status;
+    if (totalPages !== undefined) updates.totalPagesOverride = nextOverride;
     if (currentPage !== undefined) {
-      const totalPages = Number(existing.bookId?.totalPages) || 0;
       const normalizedPage = Math.max(0, Number(currentPage) || 0);
-      updates.currentPage = totalPages > 0 ? Math.min(normalizedPage, totalPages) : normalizedPage;
+      updates.currentPage = total > 0 ? Math.min(normalizedPage, total) : normalizedPage;
     }
-    if (status === 'read' && currentPage === undefined && existing.bookId?.totalPages) {
-      updates.currentPage = existing.bookId.totalPages;
+
+    if (status === 'reading') {
+      updates.startedAt = existing.startedAt || now;
+      updates.completedAt = null;
+    }
+    if (status === 'read') {
+      updates.startedAt = existing.startedAt || now;
+      updates.completedAt = now;
+      if (currentPage === undefined && total > 0) updates.currentPage = total;
+    }
+    if (status === 'to-read') {
+      updates.completedAt = null;
+    }
+    if (status === 'abandoned') {
+      updates.completedAt = null;
     }
 
     const userBook = await UserBook.findOneAndUpdate(
       { _id: id, userId: req.user._id },
       { $set: updates },
       { new: true, runValidators: true },
-    ).populate('bookId');
+    )
+      .select('-deepReviews')
+      .populate('bookId')
+      .lean();
 
     if (status === 'read' && existing.status !== 'read') {
       await SocialActivity.create({
         userId: req.user._id,
         type: 'book_completed',
         bookId: userBook.bookId?._id,
-        pages: Number(userBook.bookId?.totalPages) || Number(userBook.currentPage) || 0,
+        pages: effectiveTotalPages(userBook) || Number(userBook.currentPage) || 0,
         message: `Concluiu a leitura de “${userBook.bookId?.title || 'um livro'}”.`,
       });
     }
 
-    res.json({ userBook });
+    return res.json({ userBook });
   } catch (err) {
-    res.status(500).json({
+    return res.status(500).json({
       message: 'Não foi possível atualizar este livro. O estado anterior foi preservado.',
       code: 'USER_BOOK_UPDATE_FAILED',
+    });
+  }
+};
+
+exports.removeFromLibrary = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const userBook = await UserBook.findOneAndDelete({ _id: id, userId: req.user._id });
+    if (!userBook) {
+      return res.status(404).json({ message: 'Livro não encontrado no seu acervo.', code: 'USER_BOOK_NOT_FOUND' });
+    }
+
+    await DeepReview.deleteMany({ userId: req.user._id, userBookId: userBook._id });
+    return res.status(204).send();
+  } catch (err) {
+    return res.status(500).json({
+      message: 'Não foi possível remover o livro. Seu acervo foi preservado.',
+      code: 'USER_BOOK_DELETE_FAILED',
     });
   }
 };

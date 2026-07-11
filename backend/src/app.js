@@ -18,6 +18,7 @@ const config = getEnvironment(process.env, { allowInvalid: true });
 const app = express();
 
 if (config.trustProxy) app.set('trust proxy', 1);
+app.set('etag', 'strong');
 app.disable('x-powered-by');
 
 const corsOptions = {
@@ -47,6 +48,11 @@ const apiLimiter = createLimiter({
 const authLimiter = createLimiter({
   max: config.authRateLimit,
   message: 'Muitas tentativas de autenticação. Aguarde e tente novamente.',
+});
+
+const bookSearchLimiter = createLimiter({
+  max: config.bookSearchRateLimit,
+  message: 'Muitas buscas em pouco tempo. Aguarde alguns minutos antes de consultar o catálogo novamente.',
 });
 
 app.use((req, res, next) => {
@@ -80,10 +86,12 @@ app.use(mongoSanitize());
 app.get('/api/health', (req, res) => {
   const databaseConnected = mongoose.connection.readyState === 1;
   const status = databaseConnected ? 'ok' : 'degraded';
+  res.setHeader('Cache-Control', 'no-store');
   res.status(databaseConnected ? 200 : 503).json({
     status,
     database: databaseConnected ? 'connected' : 'disconnected',
     uptimeSeconds: Math.round(process.uptime()),
+    memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
   });
@@ -91,6 +99,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/', apiLimiter);
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/books/search', bookSearchLimiter);
 app.use('/api/books', bookRoutes);
 app.use('/api/deep-review', deepReviewRoutes);
 app.use('/api/social', socialRoutes);

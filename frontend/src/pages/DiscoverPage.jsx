@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
-  AlertCircle,
   BookOpen,
   Check,
-  CheckCircle2,
-  Database,
-  ExternalLink,
+  Library,
   Search,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -14,268 +13,256 @@ import BookCover from '../components/books/BookCover';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import EmptyState from '../components/ui/EmptyState';
-import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
+import Select from '../components/ui/Select';
 import Skeleton from '../components/ui/Skeleton';
 import { useLibraryStore } from '../stores/useLibraryStore';
 
-const confidenceLabels = {
-  high: 'Dados confirmados',
-  medium: 'Dados parciais',
-  low: 'Revisar dados',
-};
+const LAST_QUERY_KEY = 'bubo:last-book-query';
 
-const sourceLabels = {
-  google_books: 'Google Books',
-  open_library: 'Open Library',
-};
+const statusOptions = [
+  { value: 'to-read', label: 'Quero ler', description: 'Adiciona à sua lista para começar depois.' },
+  { value: 'reading', label: 'Estou lendo', description: 'Deixa o livro pronto para progresso e Deep Review.' },
+  { value: 'read', label: 'Já li', description: 'Marca a leitura como concluída.' },
+];
+
+const getBookId = (book) => book.canonicalId || book.googleBooksId || book.openLibraryKey || book.isbn;
 
 export default function DiscoverPage() {
-  const { addBook, books, fetchLibrary, isUpdating } = useLibraryStore();
-  const [input, setInput] = useState('Dom Casmurro');
-  const [query, setQuery] = useState('Dom Casmurro');
-  const [results, setResults] = useState([]);
-  const [searchMeta, setSearchMeta] = useState(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState(null);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [addingId, setAddingId] = useState(null);
-  const [pendingBook, setPendingBook] = useState(null);
-  const [manualPages, setManualPages] = useState('');
+  const { addBook, books, fetchLibrary, updatingIds } = useLibraryStore();
+  const [input, setInput] = useState(() => sessionStorage.getItem(LAST_QUERY_KEY) || '');
+  const [query, setQuery] = useState(() => sessionStorage.getItem(LAST_QUERY_KEY) || '');
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState('to-read');
 
   useEffect(() => {
     fetchLibrary().catch(() => {});
   }, [fetchLibrary]);
 
-  useEffect(() => {
-    let active = true;
+  const searchResult = useQuery({
+    queryKey: ['book-search', query],
+    enabled: Boolean(query),
+    staleTime: 6 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get('/books/search', {
+        params: { q: query },
+        signal,
+      });
+      return data;
+    },
+  });
 
-    const runSearch = async () => {
-      setIsSearching(true);
-      setSearchError(null);
-      try {
-        const { data } = await api.get('/books/search', { params: { q: query } });
-        if (active) {
-          setResults(data.books || []);
-          setSearchMeta(data.meta || null);
-        }
-      } catch (error) {
-        if (active) {
-          setSearchError(error.response?.data?.message || 'Não foi possível consultar o catálogo agora.');
-          setSearchMeta(error.response?.data?.sourceStatus ? {
-            sourceStatus: error.response.data.sourceStatus,
-            partial: false,
-          } : null);
-        }
-      } finally {
-        if (active) {
-          setIsSearching(false);
-          setHasSearched(true);
-        }
-      }
-    };
+  const results = searchResult.data?.books || [];
+  const libraryIds = useMemo(() => new Set(books.flatMap((userBook) => {
+    const book = userBook.bookId || {};
+    return [book.canonicalId, book.googleBooksId, book.openLibraryKey, book.isbn].filter(Boolean);
+  })), [books]);
 
-    runSearch();
-    return () => { active = false; };
-  }, [query]);
+  const isInLibrary = (book) => [book.canonicalId, book.googleBooksId, book.openLibraryKey, book.isbn]
+    .filter(Boolean)
+    .some((id) => libraryIds.has(id));
 
-  const search = (event) => {
+  const submitSearch = (event) => {
     event.preventDefault();
-    const normalized = input.trim();
+    const normalized = input.trim().replace(/\s+/g, ' ');
     if (!normalized) {
       toast.error('Digite um título, autor ou ISBN.');
       return;
     }
+    sessionStorage.setItem(LAST_QUERY_KEY, normalized);
+    setInput(normalized);
     setQuery(normalized);
   };
 
-  const isInLibrary = (book) => books.some((userBook) => {
-    const existing = userBook.bookId || {};
-    return (
-      (existing.canonicalId && existing.canonicalId === book.canonicalId)
-      || (existing.isbn && book.isbn && existing.isbn === book.isbn)
-      || (existing.googleBooksId && existing.googleBooksId === book.googleBooksId)
-      || (existing.openLibraryKey && existing.openLibraryKey === book.openLibraryKey)
-      || (existing.title === book.title && existing.author === book.author)
-    );
-  });
+  const openAddBook = (book) => {
+    setSelectedBook(book);
+    setSelectedStatus('to-read');
+  };
 
-  const performAdd = async (book) => {
-    const id = book.canonicalId || book.googleBooksId || book.openLibraryKey;
-    setAddingId(id);
+  const confirmAdd = async () => {
+    if (!selectedBook) return;
     try {
-      await addBook(book, 'to-read');
-      toast.success(`“${book.title}” foi adicionado ao seu acervo.`);
-      setPendingBook(null);
-      setManualPages('');
+      const userBook = await addBook(selectedBook, selectedStatus);
+      toast.success(`“${selectedBook.title}” foi adicionado ao seu acervo.`);
+      setSelectedBook(null);
+      if (selectedStatus === 'reading') {
+        window.dispatchEvent(new CustomEvent('bubo:library-book-added', { detail: { userBook } }));
+      }
     } catch (error) {
       toast.error(error.message);
-    } finally {
-      setAddingId(null);
     }
   };
 
-  const handleAdd = (book) => {
-    if (!book.totalPages) {
-      setPendingBook(book);
-      setManualPages('');
-      return;
-    }
-    performAdd(book);
-  };
-
-  const confirmManualPages = () => {
-    const pages = Number.parseInt(manualPages, 10);
-    if (!Number.isInteger(pages) || pages < 1) {
-      toast.error('Informe um total de páginas válido.');
-      return;
-    }
-    performAdd({
-      ...pendingBook,
-      totalPages: pages,
-      pagesSource: 'manual',
-      metadataSources: [...new Set([...(pendingBook.metadataSources || []), 'manual'])],
-      metadataConfidence: pendingBook.coverImage && pendingBook.author ? 'high' : 'medium',
-    });
-  };
-
-  const availableSources = searchMeta?.sourceStatus
-    ? Object.entries(searchMeta.sourceStatus).filter(([, status]) => status === 'available').map(([source]) => sourceLabels[source])
-    : [];
+  const selectedBookId = selectedBook ? getBookId(selectedBook) : null;
+  const isAdding = selectedBookId
+    ? updatingIds.includes(`adding:${selectedBookId}`)
+    : false;
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <form className="flex flex-col gap-3 sm:flex-row" onSubmit={search}>
-          <label className="relative flex-1">
-            <span className="sr-only">Buscar livros</span>
-            <Search size={19} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--bubo-color-text-muted))]" aria-hidden="true" />
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              className="min-h-12 w-full rounded-[var(--bubo-radius-md)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] pl-10 pr-3 outline-none transition focus:border-[rgb(var(--bubo-color-primary))] focus:ring-4 focus:ring-[rgb(var(--bubo-color-primary)/0.1)]"
-              placeholder="Título, autor ou ISBN"
-            />
-          </label>
-          <Button type="submit" className="sm:min-w-28" isLoading={isSearching}>Buscar</Button>
-        </form>
-      </Card>
+    <div className="space-y-7">
+      <section className="overflow-hidden rounded-[1.75rem] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] shadow-[var(--bubo-shadow-sm)]">
+        <div className="grid gap-6 px-5 py-7 sm:px-8 sm:py-9 lg:grid-cols-[1fr_18rem] lg:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[rgb(var(--bubo-color-primary)/0.1)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.13em] text-[rgb(var(--bubo-color-primary))]">
+              <Sparkles size={14} aria-hidden="true" /> Descobrir livros
+            </div>
+            <h1 className="mt-4 max-w-2xl text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+              Encontre a edição certa e coloque a leitura em movimento.
+            </h1>
+            <p className="mt-3 max-w-2xl leading-7 text-[rgb(var(--bubo-color-text-muted))]">
+              Busque por título, autor ou ISBN. O Bubo combina catálogos e organiza os resultados pela proximidade com o que você digitou.
+            </p>
+          </div>
+          <div className="hidden justify-self-end rounded-[1.5rem] bg-[rgb(var(--bubo-color-primary)/0.07)] p-7 text-[rgb(var(--bubo-color-primary))] lg:block">
+            <Library size={88} strokeWidth={1.25} aria-hidden="true" />
+          </div>
+        </div>
 
-      <section>
-        <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[rgb(var(--bubo-color-primary))]">Catálogo enriquecido</p>
-        <h1 className="mt-1 text-2xl font-black">{hasSearched ? `${results.length} livros encontrados` : 'Encontre sua próxima leitura'}</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
-          O Bubo cruza fontes independentes para priorizar capa, autor, ISBN e número de páginas. Quando o total não pode ser confirmado, você pode informá-lo antes de adicionar.
-        </p>
+        <form className="border-t border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface-muted)/0.55)] p-4 sm:p-6" onSubmit={submitSearch}>
+          <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row">
+            <label className="relative flex-1">
+              <span className="sr-only">Buscar livros</span>
+              <Search size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgb(var(--bubo-color-text-muted))]" aria-hidden="true" />
+              <input
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                className="min-h-14 w-full rounded-[var(--bubo-radius-lg)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] pl-12 pr-4 text-base shadow-[var(--bubo-shadow-sm)] outline-none transition focus:border-[rgb(var(--bubo-color-primary))] focus:ring-4 focus:ring-[rgb(var(--bubo-color-primary)/0.1)]"
+                placeholder="Ex.: Torto Arado, Itamar Vieira Junior ou ISBN"
+                autoComplete="off"
+              />
+            </label>
+            <Button type="submit" size="lg" className="sm:min-w-36" isLoading={searchResult.isFetching && !searchResult.data}>
+              Buscar
+            </Button>
+          </div>
+        </form>
       </section>
 
-      {searchMeta && (
-        <div className={`flex flex-col gap-3 rounded-[var(--bubo-radius-lg)] border p-4 sm:flex-row sm:items-center sm:justify-between ${searchMeta.partial ? 'border-[rgb(var(--bubo-color-warning)/0.3)] bg-[rgb(var(--bubo-color-warning)/0.07)]' : 'border-[rgb(var(--bubo-color-success)/0.24)] bg-[rgb(var(--bubo-color-success)/0.06)]'}`}>
-          <div className="flex items-start gap-3">
-            {searchMeta.partial ? <AlertCircle size={20} className="mt-0.5 shrink-0 text-[rgb(var(--bubo-color-warning))]" aria-hidden="true" /> : <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-[rgb(var(--bubo-color-success))]" aria-hidden="true" />}
-            <div>
-              <p className="font-extrabold">{searchMeta.partial ? 'Busca concluída com uma fonte indisponível' : 'Metadados cruzados com sucesso'}</p>
-              <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">Fontes ativas: {availableSources.join(' e ') || 'nenhuma fonte confirmou resposta'}.</p>
-            </div>
-          </div>
-          <Database size={20} className="hidden shrink-0 text-[rgb(var(--bubo-color-text-muted))] sm:block" aria-hidden="true" />
-        </div>
-      )}
-
-      {isSearching ? (
+      {!query ? (
+        <EmptyState
+          icon={BookOpen}
+          title="Qual livro você está procurando?"
+          description="A busca só acontece quando você solicitar. Nada será recarregado automaticamente ao entrar nesta página."
+        />
+      ) : searchResult.isLoading ? (
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, index) => (
+          {Array.from({ length: 10 }).map((_, index) => (
             <Card key={index} padding="sm">
               <Skeleton className="aspect-[2/3] w-full" />
-              <Skeleton className="mt-3 h-5 w-4/5" />
+              <Skeleton className="mt-4 h-5 w-4/5" />
               <Skeleton className="mt-2 h-4 w-3/5" />
-              <Skeleton className="mt-5 h-9 w-full" />
+              <Skeleton className="mt-5 h-10 w-full" />
             </Card>
           ))}
         </section>
-      ) : searchError ? (
+      ) : searchResult.isError ? (
         <EmptyState
           icon={Search}
-          title="O catálogo não respondeu"
-          description={searchError}
+          title="A busca não respondeu"
+          description={searchResult.error?.response?.data?.message || 'O catálogo está temporariamente indisponível. Seu acervo continua intacto.'}
           actionLabel="Tentar novamente"
-          onAction={() => setQuery(`${input.trim()} `)}
+          onAction={() => searchResult.refetch()}
         />
       ) : results.length === 0 ? (
         <EmptyState
           icon={BookOpen}
-          title={hasSearched ? 'Nenhum resultado' : 'Busque um livro'}
-          description={hasSearched ? 'Tente outro título, autor ou ISBN. Nenhum item incompleto foi inventado.' : 'Pesquise pelo que você quer ler e adicione ao seu acervo.'}
+          title="Nenhum livro encontrado"
+          description="Tente um título mais curto, o nome do autor ou o ISBN impresso na edição."
         />
       ) : (
-        <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {results.map((book) => {
-            const bookId = book.canonicalId || book.googleBooksId || book.openLibraryKey;
-            const alreadyAdded = isInLibrary(book);
-            const isAdding = addingId === bookId;
-            const confidence = book.metadataConfidence || 'low';
-            return (
-              <Card key={bookId} padding="sm" interactive className="flex flex-col">
-                <BookCover title={book.title} author={book.author} src={book.coverImage} />
-                <div className="mt-3 flex items-start justify-between gap-2">
-                  <span className={`rounded-full px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] ${confidence === 'high' ? 'bg-[rgb(var(--bubo-color-success)/0.1)] text-[rgb(var(--bubo-color-success))]' : confidence === 'medium' ? 'bg-[rgb(var(--bubo-color-warning)/0.1)] text-[rgb(var(--bubo-color-warning))]' : 'bg-[rgb(var(--bubo-color-surface-muted))] text-[rgb(var(--bubo-color-text-muted))]'}`}>
-                    {confidenceLabels[confidence]}
-                  </span>
-                  {book.previewLink && (
-                    <a href={book.previewLink} target="_blank" rel="noreferrer" className="grid h-8 w-8 place-items-center rounded-full text-[rgb(var(--bubo-color-text-muted))] hover:bg-[rgb(var(--bubo-color-surface-muted))] hover:text-[rgb(var(--bubo-color-primary))]" aria-label={`Abrir detalhes externos de ${book.title}`}>
-                      <ExternalLink size={15} aria-hidden="true" />
-                    </a>
-                  )}
-                </div>
-                <h2 className="mt-2 line-clamp-2 font-extrabold leading-5">{book.title}</h2>
-                <p className="mt-1 line-clamp-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">{book.author || 'Autor não informado'}</p>
-                <div className="mt-3 min-h-10 text-xs leading-5 text-[rgb(var(--bubo-color-text-muted))]">
-                  {book.totalPages ? (
-                    <p><strong className="text-[rgb(var(--bubo-color-text))]">{book.totalPages} páginas</strong><br />{book.pagesSource === 'google_books' ? 'Confirmado pelo Google Books' : book.pagesSource === 'open_library_median' ? 'Mediana de edições da Open Library' : 'Informado manualmente'}</p>
-                  ) : (
-                    <p className="text-[rgb(var(--bubo-color-warning))]">Total de páginas não confirmado</p>
-                  )}
-                </div>
-                <Button
-                  className="mt-4 w-full"
-                  size="sm"
-                  variant={alreadyAdded ? 'secondary' : 'primary'}
-                  disabled={alreadyAdded || (isUpdating && !isAdding)}
-                  isLoading={isAdding}
-                  leftIcon={alreadyAdded ? <Check size={16} aria-hidden="true" /> : undefined}
-                  onClick={() => handleAdd(book)}
+        <section aria-label={`Resultados para ${query}`}>
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[rgb(var(--bubo-color-primary))]">Resultados</p>
+              <h2 className="mt-1 text-2xl font-black">{results.length} opções para “{query}”</h2>
+            </div>
+            {searchResult.isFetching && <span className="text-sm text-[rgb(var(--bubo-color-text-muted))]">Atualizando…</span>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {results.map((book) => {
+              const bookId = getBookId(book);
+              const alreadyAdded = isInLibrary(book);
+              return (
+                <article
+                  key={bookId}
+                  className="group flex min-w-0 flex-col overflow-hidden rounded-[1.25rem] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] p-3 shadow-[var(--bubo-shadow-sm)] transition hover:-translate-y-0.5 hover:border-[rgb(var(--bubo-color-primary)/0.28)] hover:shadow-[var(--bubo-shadow-md)] sm:p-4"
                 >
-                  {alreadyAdded ? 'No acervo' : 'Adicionar'}
-                </Button>
-              </Card>
-            );
-          })}
+                  <BookCover title={book.title} author={book.author} src={book.coverImage} />
+                  <div className="flex flex-1 flex-col">
+                    <h3 className="mt-4 line-clamp-2 font-extrabold leading-5">{book.title}</h3>
+                    <p className="mt-1 line-clamp-2 text-sm leading-5 text-[rgb(var(--bubo-color-text-muted))]">{book.author || 'Autor não informado'}</p>
+                    <p className="mt-3 text-xs leading-5 text-[rgb(var(--bubo-color-text-muted))]">
+                      {[book.publishedDate?.slice(0, 4), book.totalPages ? `${book.totalPages} páginas` : null]
+                        .filter(Boolean)
+                        .join(' · ') || 'Detalhes da edição indisponíveis'}
+                    </p>
+                    <Button
+                      className="mt-auto w-full pt-0"
+                      size="sm"
+                      variant={alreadyAdded ? 'secondary' : 'primary'}
+                      disabled={alreadyAdded}
+                      leftIcon={alreadyAdded ? <Check size={16} aria-hidden="true" /> : <BookOpen size={16} aria-hidden="true" />}
+                      onClick={() => openAddBook(book)}
+                    >
+                      {alreadyAdded ? 'No acervo' : 'Adicionar'}
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </section>
       )}
 
       <Modal
-        isOpen={Boolean(pendingBook)}
-        onClose={() => { setPendingBook(null); setManualPages(''); }}
-        title="Confirme o total de páginas"
-        description={`Nenhuma fonte confirmou as páginas desta edição de “${pendingBook?.title || ''}”. Informe o total da sua edição para manter o progresso preciso.`}
+        isOpen={Boolean(selectedBook)}
+        onClose={() => !isAdding && setSelectedBook(null)}
+        closeOnBackdrop={!isAdding}
+        closeOnEscape={!isAdding}
+        size="lg"
+        title="Adicionar ao acervo"
+        description="Escolha como esta leitura entra na sua biblioteca. Você poderá alterar tudo depois."
         footer={(
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => { setPendingBook(null); setManualPages(''); }}>Cancelar</Button>
-            <Button onClick={confirmManualPages} isLoading={Boolean(pendingBook && addingId)}>Adicionar ao acervo</Button>
+            <Button variant="secondary" onClick={() => setSelectedBook(null)} disabled={isAdding}>Cancelar</Button>
+            <Button onClick={confirmAdd} isLoading={isAdding} leftIcon={<Library size={17} aria-hidden="true" />}>Adicionar ao acervo</Button>
           </div>
         )}
       >
-        <Input
-          label="Número total de páginas"
-          type="number"
-          min="1"
-          value={manualPages}
-          onChange={(event) => setManualPages(event.target.value)}
-          placeholder="Ex.: 256"
-          required
-          autoFocus
-        />
-        <p className="mt-3 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">Você poderá corrigir esse valor depois se perceber que selecionou outra edição.</p>
+        {selectedBook && (
+          <div className="grid gap-6 sm:grid-cols-[9rem_1fr]">
+            <div className="mx-auto w-32 sm:mx-0 sm:w-36">
+              <BookCover title={selectedBook.title} author={selectedBook.author} src={selectedBook.coverImage} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-xl font-black leading-tight">{selectedBook.title}</h3>
+              <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">{selectedBook.author || 'Autor não informado'}</p>
+              <p className="mt-3 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
+                {selectedBook.totalPages
+                  ? `${selectedBook.totalPages} páginas nesta edição.`
+                  : 'O total de páginas não foi encontrado. Você poderá informar sua edição dentro do acervo.'}
+              </p>
+
+              <Select
+                className="mt-5"
+                label="Como você quer adicionar?"
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value)}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </Select>
+              <p className="mt-2 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
+                {statusOptions.find((option) => option.value === selectedStatus)?.description}
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

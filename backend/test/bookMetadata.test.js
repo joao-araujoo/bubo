@@ -5,6 +5,8 @@ const {
   mergeBooks,
   normalizeGoogleBook,
   normalizeOpenLibraryBook,
+  rankBooks,
+  scoreBookRelevance,
 } = require('../src/services/books/bookMetadata');
 
 test('Google Books normalization prioritizes page count and high-resolution covers', () => {
@@ -42,7 +44,7 @@ test('Open Library normalization uses edition median pages and large covers', ()
   assert.match(book.coverImage, /-L\.jpg$/);
 });
 
-test('metadata merge fills missing pages without replacing stronger existing data', () => {
+test('metadata merge fills missing pages without replacing a Google Books cover', () => {
   const primary = {
     title: 'Duna',
     author: 'Frank Herbert',
@@ -79,4 +81,45 @@ test('confidence is high when core metadata and pages are present', () => {
     author: 'Autora',
     publisher: 'Editora',
   }), 'high');
+});
+
+test('exact title matches outrank technically complete but unrelated books', () => {
+  const ranked = rankBooks([
+    {
+      title: 'Manual completo de literatura brasileira',
+      author: 'Autora',
+      coverImage: 'https://example.com/complete.jpg',
+      totalPages: 600,
+      isbn: '1111111111111',
+      metadataSources: ['google_books'],
+    },
+    {
+      title: 'Dom Casmurro',
+      author: 'Machado de Assis',
+      coverImage: '',
+      totalPages: 0,
+      isbn: '',
+      metadataSources: ['open_library'],
+    },
+  ], 'Dom Casmurro');
+
+  assert.equal(ranked[0].title, 'Dom Casmurro');
+});
+
+test('ISBN exact matches receive the strongest relevance score', () => {
+  const exact = scoreBookRelevance({
+    title: 'Duna',
+    author: 'Frank Herbert',
+    isbn: '9780441172719',
+    metadataSources: ['open_library'],
+  }, '978-0-441-17271-9');
+  const other = scoreBookRelevance({
+    title: 'Duna',
+    author: 'Frank Herbert',
+    isbn: '9780000000000',
+    metadataSources: ['google_books'],
+  }, '978-0-441-17271-9');
+
+  assert.equal(exact, 1000);
+  assert.ok(exact > other);
 });

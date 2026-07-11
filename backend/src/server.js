@@ -13,6 +13,7 @@ const shutdown = async (signal, exitCode = 0) => {
 
   const forceExit = setTimeout(() => {
     logger.error('shutdown_timeout', { signal });
+    httpServer?.closeAllConnections?.();
     process.exit(1);
   }, 10000);
   forceExit.unref();
@@ -35,12 +36,21 @@ const shutdown = async (signal, exitCode = 0) => {
 const start = async () => {
   const config = getEnvironment();
 
+  mongoose.set('bufferCommands', false);
   await mongoose.connect(config.mongoUri, {
-    serverSelectionTimeoutMS: 10000,
+    maxPoolSize: config.mongoMaxPoolSize,
+    minPoolSize: config.mongoMinPoolSize,
+    maxIdleTimeMS: config.mongoMaxIdleTimeMS,
+    serverSelectionTimeoutMS: config.mongoServerSelectionTimeoutMS,
+    socketTimeoutMS: config.mongoSocketTimeoutMS,
+    retryReads: true,
+    retryWrites: true,
   });
   logger.info('database_connected', {
     host: mongoose.connection.host,
     database: mongoose.connection.name,
+    maxPoolSize: config.mongoMaxPoolSize,
+    minPoolSize: config.mongoMinPoolSize,
   });
 
   httpServer = app.listen(config.port, () => {
@@ -50,6 +60,11 @@ const start = async () => {
       allowedOrigins: config.clientOrigins,
     });
   });
+
+  httpServer.keepAliveTimeout = 65000;
+  httpServer.headersTimeout = 70000;
+  httpServer.requestTimeout = 65000;
+  httpServer.maxRequestsPerSocket = 1000;
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));

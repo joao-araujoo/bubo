@@ -230,10 +230,67 @@ jobs:
           TOKEN=$(printf '%s' "$LOGIN_RESPONSE" | jq -r '.token')
           test -n "$TOKEN"
           test "$TOKEN" != "null"
+          echo "SMOKE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
           curl -fsS \
             -H "Authorization: Bearer $TOKEN" \
             http://localhost:8080/api/auth/profile \
             | jq -e '.user.email == "demo@bubo.local" and .user.onboardingCompleted == true'
+
+      - name: Verify complete library lifecycle
+        shell: bash
+        run: |
+          BOOK_PAYLOAD=$(jq -n \
+            --arg canonicalId "smoke:${GITHUB_RUN_ID}" \
+            '{
+              canonicalId: $canonicalId,
+              title: "Livro de teste do acervo",
+              author: "Bubo CI",
+              status: "to-read",
+              totalPages: 240,
+              pagesSource: "manual",
+              metadataSources: ["manual"]
+            }')
+          CREATE_RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "$BOOK_PAYLOAD" \
+            http://localhost:8080/api/books/library)
+          USER_BOOK_ID=$(printf '%s' "$CREATE_RESPONSE" | jq -r '.userBook._id')
+          test -n "$USER_BOOK_ID"
+          test "$USER_BOOK_ID" != "null"
+          printf '%s' "$CREATE_RESPONSE" | jq -e '.userBook.status == "to-read" and .userBook.totalPagesOverride == 240'
+
+          UPDATE_RESPONSE=$(curl -fsS \
+            -X PATCH \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"status":"reading","currentPage":12,"totalPages":240}' \
+            "http://localhost:8080/api/books/library/$USER_BOOK_ID")
+          printf '%s' "$UPDATE_RESPONSE" | jq -e '.userBook.status == "reading" and .userBook.currentPage == 12 and .userBook.totalPagesOverride == 240'
+
+          curl -fsS \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            http://localhost:8080/api/books/library \
+            | jq -e --arg id "$USER_BOOK_ID" '.userBooks | any(._id == $id and .status == "reading" and .currentPage == 12)'
+
+          curl -fsS \
+            -X DELETE \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            "http://localhost:8080/api/books/library/$USER_BOOK_ID"
+
+          curl -fsS \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            http://localhost:8080/api/books/library \
+            | jq -e --arg id "$USER_BOOK_ID" '.userBooks | all(._id != $id)'
+
+      - name: Verify concurrent health and protected reads
+        shell: bash
+        run: |
+          seq 1 40 | xargs -P 10 -I{} curl -fsS http://localhost:8080/api/health >/dev/null
+          seq 1 40 | xargs -P 10 -I{} curl -fsS \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            http://localhost:8080/api/books/library >/dev/null
 
       - name: Verify frontend document and API health
         shell: bash

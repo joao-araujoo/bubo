@@ -1,9 +1,20 @@
 require('dotenv').config();
 
+const numberWithin = (value, fallback, min, max) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(Math.trunc(parsed), min), max);
+};
+
 const normalizeEnvironment = (env = process.env) => ({
   nodeEnv: env.NODE_ENV || 'development',
   port: Number(env.PORT) || 3001,
   mongoUri: env.MONGODB_URI || 'mongodb://localhost:27017/bubo',
+  mongoMaxPoolSize: numberWithin(env.MONGO_MAX_POOL_SIZE, 50, 5, 500),
+  mongoMinPoolSize: numberWithin(env.MONGO_MIN_POOL_SIZE, 5, 0, 100),
+  mongoMaxIdleTimeMS: numberWithin(env.MONGO_MAX_IDLE_TIME_MS, 60000, 1000, 600000),
+  mongoServerSelectionTimeoutMS: numberWithin(env.MONGO_SERVER_SELECTION_TIMEOUT_MS, 10000, 1000, 60000),
+  mongoSocketTimeoutMS: numberWithin(env.MONGO_SOCKET_TIMEOUT_MS, 45000, 5000, 300000),
   jwtSecret: env.JWT_SECRET || '',
   clientOrigins: String(env.CLIENT_URL || 'http://localhost:5173')
     .split(',')
@@ -13,6 +24,7 @@ const normalizeEnvironment = (env = process.env) => ({
   bodyLimit: env.BODY_LIMIT || '1mb',
   apiRateLimit: Math.max(10, Number(env.API_RATE_LIMIT) || 300),
   authRateLimit: Math.max(5, Number(env.AUTH_RATE_LIMIT) || 30),
+  bookSearchRateLimit: Math.max(10, Number(env.BOOK_SEARCH_RATE_LIMIT) || 60),
 });
 
 const validateEnvironment = (config) => {
@@ -27,6 +39,9 @@ const validateEnvironment = (config) => {
   }
   if (config.clientOrigins.length === 0) {
     errors.push('CLIENT_URL must contain at least one allowed origin');
+  }
+  if (config.mongoMinPoolSize > config.mongoMaxPoolSize) {
+    errors.push('MONGO_MIN_POOL_SIZE cannot be greater than MONGO_MAX_POOL_SIZE');
   }
 
   return errors;

@@ -7,5 +7,6 @@ router.get('/search', authMiddleware, bookController.searchBooks);
 router.post('/library', authMiddleware, bookController.addToLibrary);
 router.get('/library', authMiddleware, bookController.getUserLibrary);
 router.patch('/library/:id', authMiddleware, bookController.updateBookStatus);
+router.delete('/library/:id', authMiddleware, bookController.removeFromLibrary);
 
 module.exports = router;
