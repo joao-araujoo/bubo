@@ -15,6 +15,7 @@ const normalizeEnvironment = (env = process.env) => {
   const nodeEnv = env.NODE_ENV || 'development';
   const instanceCount = numberWithin(env.INSTANCE_COUNT, 1, 1, 1000);
   const redisUrl = String(env.REDIS_URL || '').trim();
+  const deepReviewQueueEnabled = booleanValue(env.DEEP_REVIEW_QUEUE_ENABLED, false);
 
   return {
     nodeEnv,
@@ -36,6 +37,15 @@ const normalizeEnvironment = (env = process.env) => {
     redisCommandTimeoutMs: numberWithin(env.REDIS_COMMAND_TIMEOUT_MS, 1500, 100, 10000),
     redisReconnectDelayMs: numberWithin(env.REDIS_RECONNECT_DELAY_MS, 30000, 1000, 300000),
     redisCacheTtlMs: numberWithin(env.REDIS_CACHE_TTL_MS, 60 * 60 * 1000, 1000, 24 * 60 * 60 * 1000),
+    deepReviewQueueEnabled,
+    deepReviewQueueName: String(env.DEEP_REVIEW_QUEUE_NAME || 'deep-review').trim(),
+    deepReviewQueuePrefix: String(env.DEEP_REVIEW_QUEUE_PREFIX || `${env.REDIS_KEY_PREFIX || `bubo:${nodeEnv}`}:bullmq`).trim(),
+    deepReviewQueueAttempts: numberWithin(env.DEEP_REVIEW_QUEUE_ATTEMPTS, 3, 1, 10),
+    deepReviewQueueBackoffMs: numberWithin(env.DEEP_REVIEW_QUEUE_BACKOFF_MS, 5000, 1000, 300000),
+    deepReviewQueueConcurrency: numberWithin(env.DEEP_REVIEW_QUEUE_CONCURRENCY, 2, 1, 20),
+    deepReviewQueueLeaseMs: numberWithin(env.DEEP_REVIEW_QUEUE_LEASE_MS, 120000, 30000, 900000),
+    deepReviewQueueCompletedRetention: numberWithin(env.DEEP_REVIEW_QUEUE_COMPLETED_RETENTION, 1000, 10, 100000),
+    deepReviewQueueFailedRetention: numberWithin(env.DEEP_REVIEW_QUEUE_FAILED_RETENTION, 5000, 10, 100000),
     jwtSecret: env.JWT_SECRET || '',
     clientOrigins: String(env.CLIENT_URL || 'http://localhost:5173')
       .split(',')
@@ -96,6 +106,15 @@ const validateEnvironment = (config) => {
   }
   if (!/^[A-Za-z0-9:_-]{3,80}$/.test(config.redisKeyPrefix)) {
     errors.push('REDIS_KEY_PREFIX must contain 3-80 letters, numbers, colons, underscores or hyphens');
+  }
+  if (config.deepReviewQueueEnabled && !config.redisUrl) {
+    errors.push('REDIS_URL is required when DEEP_REVIEW_QUEUE_ENABLED is true');
+  }
+  if (!/^[A-Za-z0-9_-]{3,80}$/.test(config.deepReviewQueueName)) {
+    errors.push('DEEP_REVIEW_QUEUE_NAME must contain 3-80 letters, numbers, underscores or hyphens');
+  }
+  if (!/^[A-Za-z0-9:_-]{3,100}$/.test(config.deepReviewQueuePrefix)) {
+    errors.push('DEEP_REVIEW_QUEUE_PREFIX must contain 3-100 letters, numbers, colons, underscores or hyphens');
   }
   if (config.nodeEnv === 'production' && config.metricsEnabled && config.metricsToken.length < 24) {
     errors.push('METRICS_TOKEN must contain at least 24 characters when metrics are enabled in production');
