@@ -5,6 +5,11 @@ const MAX_DEPTH = 6;
 const MAX_ARRAY_ITEMS = 50;
 const MAX_STRING_LENGTH = 4000;
 
+const redactSensitiveText = (value) => String(value)
+  .replace(/\b([a-z][a-z0-9+.-]*:\/\/)([^@\s/]+)@/gi, '$1[REDACTED]@')
+  .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+  .replace(/\b(Basic\s+)[A-Za-z0-9+/=]+/gi, '$1[REDACTED]');
+
 const serializeError = (error) => {
   if (!error) return undefined;
   return {
@@ -20,7 +25,10 @@ const sanitizeValue = (value, key = '', depth = 0, seen = new WeakSet()) => {
   if (value === null || value === undefined) return value;
   if (value instanceof Error) return sanitizeValue(serializeError(value), key, depth + 1, seen);
   if (typeof value === 'string') {
-    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…[truncated]` : value;
+    const redacted = redactSensitiveText(value);
+    return redacted.length > MAX_STRING_LENGTH
+      ? `${redacted.slice(0, MAX_STRING_LENGTH)}…[truncated]`
+      : redacted;
   }
   if (typeof value !== 'object') return value;
   if (depth >= MAX_DEPTH) return '[MAX_DEPTH]';
@@ -62,6 +70,7 @@ module.exports = {
   info: (message, context) => write('info', message, context),
   warn: (message, context) => write('warn', message, context),
   error: (message, context) => write('error', message, context),
+  redactSensitiveText,
   sanitizeValue,
   serializeError,
 };
