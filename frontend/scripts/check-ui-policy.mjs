@@ -38,9 +38,9 @@ for (const file of files) {
 }
 
 if (violations.length > 0) {
-  console.error('Bubo UI policy failed:\n');
-  violations.forEach((violation) => console.error(`- ${violation}`));
+  process.stderr.write('Bubo UI policy failed:\n\n');
+  process.stderr.write(`${violations.map((violation) => `- ${violation}`).join('\n')}\n`);
   process.exit(1);
 }
 
-console.log(`Bubo UI policy passed for ${files.length} source files.`);
+process.stdout.write(`Bubo UI policy passed for ${files.length} source files.\n`);
