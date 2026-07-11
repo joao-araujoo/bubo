@@ -2,6 +2,7 @@ name: Redis
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'backend/package.json'
       - 'backend/package-lock.json'
@@ -45,6 +46,7 @@ permissions:
 jobs:
   redis:
     name: Shared Redis journey
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       BUBO_PORT: 8080
