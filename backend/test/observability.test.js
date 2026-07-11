@@ -14,7 +14,10 @@ const {
   runWithRequestContext,
   updateRequestContext,
 } = require('../src/observability/requestContext');
-const { sanitizeValue } = require('../src/utils/logger');
+const {
+  redactSensitiveText,
+  sanitizeValue,
+} = require('../src/utils/logger');
 
 test('request context accepts safe ids and rejects unsafe values', () => {
   assert.equal(createRequestId('request-12345678'), 'request-12345678');
@@ -41,6 +44,7 @@ test('structured sanitization removes secrets recursively and handles circular o
   const value = {
     email: 'reader@example.com',
     password: 'do-not-log',
+    diagnostic: 'Failed redis://reader:private-password@cache.internal:6379 and Bearer abc.def.ghi',
     headers: {
       authorization: 'Bearer secret-token',
       'x-request-id': 'request-12345678',
@@ -54,22 +58,43 @@ test('structured sanitization removes secrets recursively and handles circular o
   assert.equal(sanitized.headers.authorization, '[REDACTED]');
   assert.equal(sanitized.headers['x-request-id'], 'request-12345678');
   assert.equal(sanitized.circular, '[CIRCULAR]');
+  assert.equal(sanitized.diagnostic.includes('private-password'), false);
+  assert.equal(sanitized.diagnostic.includes('abc.def.ghi'), false);
+  assert.equal(sanitized.diagnostic.includes('redis://[REDACTED]@cache.internal:6379'), true);
+});
+
+test('text redaction covers authenticated urls and authorization schemes', () => {
+  const redacted = redactSensitiveText(
+    'mongodb://user:pass@mongo:27017 redis://reader:secret@redis:6379 Bearer token.value Basic dXNlcjpwYXNz',
+  );
+
+  assert.equal(redacted.includes('user:pass'), false);
+  assert.equal(redacted.includes('reader:secret'), false);
+  assert.equal(redacted.includes('token.value'), false);
+  assert.equal(redacted.includes('dXNlcjpwYXNz'), false);
+  assert.match(redacted, /mongodb:\/\/\[REDACTED\]@mongo:27017/);
+  assert.match(redacted, /Bearer \[REDACTED\]/);
+  assert.match(redacted, /Basic \[REDACTED\]/);
 });
 
 test('external error payloads inherit context without leaking credentials', async () => {
   await runWithRequestContext({ requestId: 'request-report-1234', userId: 'user-8' }, async () => {
-    const payload = buildPayload(new Error('Database unavailable'), {
-      authorization: 'Bearer hidden',
-      password: 'hidden',
-      operation: 'create-review',
-    });
+    const payload = buildPayload(
+      new Error('Redis failed at redis://reader:hidden@cache.internal:6379'),
+      {
+        authorization: 'Bearer hidden',
+        password: 'hidden',
+        operation: 'create-review',
+      },
+    );
 
     assert.equal(payload.request.requestId, 'request-report-1234');
     assert.equal(payload.request.userId, 'user-8');
     assert.equal(payload.context.authorization, '[REDACTED]');
     assert.equal(payload.context.password, '[REDACTED]');
     assert.equal(payload.context.operation, 'create-review');
-    assert.equal(payload.error.message, 'Database unavailable');
+    assert.equal(payload.error.message.includes('hidden'), false);
+    assert.equal(payload.error.message.includes('redis://[REDACTED]@cache.internal:6379'), true);
   });
 });
 
