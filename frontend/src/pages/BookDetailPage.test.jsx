@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,7 +104,7 @@ describe('BookDetailPage', () => {
     expect(screen.getByText('29%')).toBeInTheDocument();
     expect(screen.getByText('Páginas 101–120')).toBeInTheDocument();
     expect(screen.getByText('Páginas 81–100')).toBeInTheDocument();
-    expect(screen.getByText('82/100')).toBeInTheDocument();
+    expect(screen.getAllByText('82/100')).toHaveLength(2);
     expect(api.get).toHaveBeenCalledWith('/books/library/user-book-1');
   });
 
@@ -113,8 +113,11 @@ describe('BookDetailPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar sessão' }));
 
-    expect(screen.getByRole('dialog', { name: 'Registrar sessão de leitura' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Página inicial')).toHaveValue(121);
-    expect(screen.getByLabelText('Página final')).toHaveAttribute('max', '412');
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar sessão de leitura' });
+    const pageFromInput = await within(dialog).findByLabelText('Página inicial');
+    const pageToInput = await within(dialog).findByLabelText('Página final');
+
+    await waitFor(() => expect(pageFromInput).toHaveValue(121));
+    expect(pageToInput).toHaveAttribute('max', '412');
   });
 });
