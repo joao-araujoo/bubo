@@ -6,6 +6,24 @@ let libraryRequest = null;
 
 const errorMessage = (error, fallback) => error.response?.data?.message || error.message || fallback;
 
+const normalizeUserBook = (userBook) => {
+  if (!userBook) return userBook;
+  const catalogBook = userBook.bookId || {};
+  const effectiveTotalPages = Number(userBook.totalPagesOverride)
+    || Number(catalogBook.totalPages)
+    || 0;
+
+  return {
+    ...userBook,
+    effectiveTotalPages,
+    bookId: {
+      ...catalogBook,
+      catalogTotalPages: Number(catalogBook.totalPages) || 0,
+      totalPages: effectiveTotalPages,
+    },
+  };
+};
+
 export const useLibraryStore = create((set, get) => ({
   books: [],
   isLoading: false,
@@ -24,7 +42,7 @@ export const useLibraryStore = create((set, get) => ({
     set({ isLoading: !state.hasLoaded, error: null });
     libraryRequest = api.get('/books/library')
       .then(({ data }) => {
-        const books = data.userBooks || [];
+        const books = (data.userBooks || []).map(normalizeUserBook);
         set({
           books,
           isLoading: false,
@@ -56,21 +74,28 @@ export const useLibraryStore = create((set, get) => ({
 
     try {
       const { data } = await api.post('/books/library', { ...bookData, status });
-      set((state) => ({
-        books: [data.userBook, ...state.books.filter((item) => item._id !== data.userBook._id)],
-        updatingIds: state.updatingIds.filter((id) => id !== temporaryId),
-        isUpdating: state.updatingIds.filter((id) => id !== temporaryId).length > 0,
-        hasLoaded: true,
-        lastFetchedAt: Date.now(),
-      }));
-      return data.userBook;
+      const userBook = normalizeUserBook(data.userBook);
+      set((state) => {
+        const updatingIds = state.updatingIds.filter((id) => id !== temporaryId);
+        return {
+          books: [userBook, ...state.books.filter((item) => item._id !== userBook._id)],
+          updatingIds,
+          isUpdating: updatingIds.length > 0,
+          hasLoaded: true,
+          lastFetchedAt: Date.now(),
+        };
+      });
+      return userBook;
     } catch (error) {
       const message = errorMessage(error, 'Não foi possível adicionar o livro.');
-      set((state) => ({
-        error: message,
-        updatingIds: state.updatingIds.filter((id) => id !== temporaryId),
-        isUpdating: state.updatingIds.filter((id) => id !== temporaryId).length > 0,
-      }));
+      set((state) => {
+        const updatingIds = state.updatingIds.filter((id) => id !== temporaryId);
+        return {
+          error: message,
+          updatingIds,
+          isUpdating: updatingIds.length > 0,
+        };
+      });
       throw new Error(message);
     }
   },
@@ -84,7 +109,9 @@ export const useLibraryStore = create((set, get) => ({
 
     set((state) => ({
       books: state.books.map((book) => (
-        book._id === userBookId ? { ...book, ...payload, updatedAt: new Date().toISOString() } : book
+        book._id === userBookId
+          ? normalizeUserBook({ ...book, ...payload, updatedAt: new Date().toISOString() })
+          : book
       )),
       updatingIds: [...new Set([...state.updatingIds, userBookId])],
       isUpdating: true,
@@ -93,16 +120,17 @@ export const useLibraryStore = create((set, get) => ({
 
     try {
       const { data } = await api.patch(`/books/library/${userBookId}`, payload);
+      const userBook = normalizeUserBook(data.userBook);
       set((state) => {
         const updatingIds = state.updatingIds.filter((id) => id !== userBookId);
         return {
-          books: state.books.map((book) => (book._id === userBookId ? data.userBook : book)),
+          books: state.books.map((book) => (book._id === userBookId ? userBook : book)),
           updatingIds,
           isUpdating: updatingIds.length > 0,
           lastFetchedAt: Date.now(),
         };
       });
-      return data.userBook;
+      return userBook;
     } catch (error) {
       const message = errorMessage(error, 'Não foi possível atualizar o livro.');
       set((state) => {
