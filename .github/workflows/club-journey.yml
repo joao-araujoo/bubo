@@ -1,0 +1,181 @@
+name: Club journey
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/controllers/clubController.js'
+      - 'backend/src/models/ClubDiscussion.js'
+      - 'backend/src/models/ClubMembership.js'
+      - 'backend/src/models/ReadingClub.js'
+      - 'backend/src/routes/clubs.js'
+      - 'backend/src/services/clubs/**'
+      - 'frontend/src/pages/ClubDetailPage.jsx'
+      - 'frontend/src/pages/ClubsPage.jsx'
+      - 'frontend/src/stores/useClubStore.js'
+      - '.github/workflows/club-journey.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/src/controllers/clubController.js'
+      - 'backend/src/models/ClubDiscussion.js'
+      - 'backend/src/models/ClubMembership.js'
+      - 'backend/src/models/ReadingClub.js'
+      - 'backend/src/routes/clubs.js'
+      - 'backend/src/services/clubs/**'
+      - 'frontend/src/pages/ClubDetailPage.jsx'
+      - 'frontend/src/pages/ClubsPage.jsx'
+      - 'frontend/src/stores/useClubStore.js'
+      - '.github/workflows/club-journey.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  club-journey:
+    name: Reading club journey
+    runs-on: ubuntu-latest
+    env:
+      BUBO_PORT: 8080
+      API_PORT: 3001
+      AI_PROVIDER: auto
+      SEED_DEMO_EMAIL: demo@bubo.local
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate ephemeral credentials
+        shell: bash
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "SEED_DEMO_PASSWORD=$(openssl rand -base64 30 | tr -d '\n')" >> "$GITHUB_ENV"
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Build production stack
+        run: docker compose build backend frontend
+
+      - name: Start Bubo
+        run: docker compose up -d mongo backend frontend
+
+      - name: Wait for API health
+        shell: bash
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Bubo stack did not become healthy in time."
+          exit 1
+
+      - name: Seed demonstration account
+        run: docker compose --profile demo run --rm seed
+
+      - name: Authenticate
+        shell: bash
+        run: |
+          LOGIN_PAYLOAD=$(jq -n \
+            --arg email "$SEED_DEMO_EMAIL" \
+            --arg password "$SEED_DEMO_PASSWORD" \
+            '{email: $email, password: $password}')
+          LOGIN_RESPONSE=$(curl -fsS \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            -d "$LOGIN_PAYLOAD" \
+            http://localhost:8080/api/auth/login)
+          TOKEN=$(printf '%s' "$LOGIN_RESPONSE" | jq -r '.token')
+          test -n "$TOKEN"
+          test "$TOKEN" != "null"
+          echo "CLUB_SMOKE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Verify complete private club journey
+        shell: bash
+        run: |
+          BOOK_PAYLOAD=$(jq -n \
+            --arg canonicalId "club-smoke:${GITHUB_RUN_ID}" \
+            '{
+              canonicalId: $canonicalId,
+              title: "Livro do clube de teste",
+              author: "Bubo CI",
+              status: "reading",
+              totalPages: 320,
+              pagesSource: "manual",
+              metadataSources: ["manual"]
+            }')
+          BOOK_RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $CLUB_SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "$BOOK_PAYLOAD" \
+            http://localhost:8080/api/books/library)
+          USER_BOOK_ID=$(printf '%s' "$BOOK_RESPONSE" | jq -r '.userBook._id')
+          CATALOG_BOOK_ID=$(printf '%s' "$BOOK_RESPONSE" | jq -r '.userBook.bookId._id')
+          test -n "$USER_BOOK_ID"
+          test "$USER_BOOK_ID" != "null"
+          test -n "$CATALOG_BOOK_ID"
+          test "$CATALOG_BOOK_ID" != "null"
+
+          CLUB_PAYLOAD=$(jq -n \
+            --arg bookId "$CATALOG_BOOK_ID" \
+            '{
+              name: "Clube privado do CI",
+              description: "Validação automatizada da jornada coletiva.",
+              bookId: $bookId,
+              visibility: "private",
+              startDate: "2026-07-10",
+              targetDate: "2026-12-20",
+              memberLimit: 20
+            }')
+          CLUB_RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $CLUB_SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "$CLUB_PAYLOAD" \
+            http://localhost:8080/api/clubs)
+          CLUB_ID=$(printf '%s' "$CLUB_RESPONSE" | jq -r '.club._id')
+          INVITE_CODE=$(printf '%s' "$CLUB_RESPONSE" | jq -r '.club.inviteCode')
+          test -n "$CLUB_ID"
+          test "$CLUB_ID" != "null"
+          test -n "$INVITE_CODE"
+          test "$INVITE_CODE" != "null"
+          printf '%s' "$CLUB_RESPONSE" | jq -e \
+            --arg userBookId "$USER_BOOK_ID" \
+            '.club.visibility == "private" and .club.membership.role == "owner" and .club.libraryEntry._id == $userBookId'
+
+          PROGRESS_RESPONSE=$(curl -fsS \
+            -X PATCH \
+            -H "Authorization: Bearer $CLUB_SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"currentPage":44}' \
+            "http://localhost:8080/api/clubs/$CLUB_ID/progress")
+          printf '%s' "$PROGRESS_RESPONSE" | jq -e '.membership.currentPage == 44 and .club.membership.currentPage == 44'
+
+          DISCUSSION_RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $CLUB_SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"body":"A discussão automatizada preserva o contexto do trecho.","insight":"Contexto coletivo validado.","pageFrom":20,"pageTo":44}' \
+            "http://localhost:8080/api/clubs/$CLUB_ID/discussions")
+          DISCUSSION_ID=$(printf '%s' "$DISCUSSION_RESPONSE" | jq -r '.discussion._id')
+          test -n "$DISCUSSION_ID"
+          test "$DISCUSSION_ID" != "null"
+          printf '%s' "$DISCUSSION_RESPONSE" | jq -e '.discussion.pageFrom == 20 and .discussion.pageTo == 44 and .discussion.isOwn == true'
+
+          DETAIL_RESPONSE=$(curl -fsS \
+            -H "Authorization: Bearer $CLUB_SMOKE_TOKEN" \
+            "http://localhost:8080/api/clubs/$CLUB_ID")
+          printf '%s' "$DETAIL_RESPONSE" | jq -e \
+            --arg discussionId "$DISCUSSION_ID" \
+            --arg userBookId "$USER_BOOK_ID" \
+            '.club.membership.role == "owner" and .club.membership.currentPage == 44 and .club.libraryEntry._id == $userBookId and .club.stats.memberCount == 1 and .club.stats.discussionsCount == 1 and (.club.discussions | any(._id == $discussionId and .pageFrom == 20 and .pageTo == 44))'
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans

@@ -1,28 +1,36 @@
 import { create } from 'zustand';
 import api from '../services/api';
 
+const apiError = (error, fallback) => ({
+  code: error.response?.data?.code || 'CLUB_REQUEST_FAILED',
+  message: error.response?.data?.errors?.[0]?.msg
+    || error.response?.data?.message
+    || fallback,
+});
+
 export const useClubStore = create((set, get) => ({
   clubs: [],
   activeClub: null,
   isLoading: false,
   isMutating: false,
   error: null,
+  errorCode: null,
 
   fetchClubs: async (scope = 'all') => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, errorCode: null });
     try {
       const { data } = await api.get('/clubs', { params: { scope } });
       set({ clubs: data.clubs || [], isLoading: false });
       return data.clubs || [];
     } catch (error) {
-      const message = error.response?.data?.message || 'Não foi possível carregar os clubes.';
-      set({ error: message, isLoading: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível carregar os clubes.');
+      set({ error: failure.message, errorCode: failure.code, isLoading: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
   fetchClub: async (clubId) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, errorCode: null });
     try {
       const { data } = await api.get(`/clubs/${clubId}`);
       set((state) => ({
@@ -32,14 +40,14 @@ export const useClubStore = create((set, get) => ({
       }));
       return data.club;
     } catch (error) {
-      const message = error.response?.data?.message || 'Não foi possível abrir este clube.';
-      set({ error: message, isLoading: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível abrir este clube.');
+      set({ activeClub: null, error: failure.message, errorCode: failure.code, isLoading: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
   createClub: async (payload) => {
-    set({ isMutating: true, error: null });
+    set({ isMutating: true, error: null, errorCode: null });
     try {
       const { data } = await api.post('/clubs', payload);
       set((state) => ({
@@ -49,32 +57,31 @@ export const useClubStore = create((set, get) => ({
       }));
       return data.club;
     } catch (error) {
-      const validationMessage = error.response?.data?.errors?.[0]?.msg;
-      const message = validationMessage || error.response?.data?.message || 'Não foi possível criar o clube.';
-      set({ error: message, isMutating: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível criar o clube.');
+      set({ error: failure.message, errorCode: failure.code, isMutating: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
   joinClub: async (clubId, inviteCode = '') => {
-    set({ isMutating: true, error: null });
+    set({ isMutating: true, error: null, errorCode: null });
     try {
       const { data } = await api.post(`/clubs/${clubId}/join`, { inviteCode });
       set((state) => ({
         clubs: state.clubs.map((club) => (club._id === clubId ? { ...club, ...data.club } : club)),
-        activeClub: state.activeClub?._id === clubId ? { ...state.activeClub, ...data.club } : state.activeClub,
+        activeClub: state.activeClub?._id === clubId ? { ...state.activeClub, ...data.club } : data.club,
         isMutating: false,
       }));
       return data.club;
     } catch (error) {
-      const message = error.response?.data?.message || 'Não foi possível entrar no clube.';
-      set({ error: message, isMutating: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível entrar no clube.');
+      set({ error: failure.message, errorCode: failure.code, isMutating: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
   leaveClub: async (clubId) => {
-    set({ isMutating: true, error: null });
+    set({ isMutating: true, error: null, errorCode: null });
     try {
       await api.delete(`/clubs/${clubId}/leave`);
       set((state) => ({
@@ -83,14 +90,14 @@ export const useClubStore = create((set, get) => ({
         isMutating: false,
       }));
     } catch (error) {
-      const message = error.response?.data?.message || 'Não foi possível sair do clube.';
-      set({ error: message, isMutating: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível sair do clube.');
+      set({ error: failure.message, errorCode: failure.code, isMutating: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
   updateProgress: async (clubId, currentPage) => {
-    set({ isMutating: true, error: null });
+    set({ isMutating: true, error: null, errorCode: null });
     try {
       const { data } = await api.patch(`/clubs/${clubId}/progress`, { currentPage });
       const updated = {
@@ -108,14 +115,14 @@ export const useClubStore = create((set, get) => ({
       }));
       return updated;
     } catch (error) {
-      const message = error.response?.data?.message || 'Não foi possível atualizar o progresso.';
-      set({ error: message, isMutating: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível atualizar o progresso.');
+      set({ error: failure.message, errorCode: failure.code, isMutating: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
   createDiscussion: async (clubId, payload) => {
-    set({ isMutating: true, error: null });
+    set({ isMutating: true, error: null, errorCode: null });
     try {
       const { data } = await api.post(`/clubs/${clubId}/discussions`, payload);
       set((state) => ({
@@ -133,13 +140,19 @@ export const useClubStore = create((set, get) => ({
       }));
       return data.discussion;
     } catch (error) {
-      const validationMessage = error.response?.data?.errors?.[0]?.msg;
-      const message = validationMessage || error.response?.data?.message || 'Não foi possível publicar no clube.';
-      set({ error: message, isMutating: false });
-      throw new Error(message);
+      const failure = apiError(error, 'Não foi possível publicar no clube.');
+      set({ error: failure.message, errorCode: failure.code, isMutating: false });
+      throw Object.assign(new Error(failure.message), { code: failure.code });
     }
   },
 
-  clearActiveClub: () => set({ activeClub: null, error: null }),
-  resetClubs: () => set({ clubs: [], activeClub: null, isLoading: false, isMutating: false, error: null }),
+  clearActiveClub: () => set({ activeClub: null, error: null, errorCode: null }),
+  resetClubs: () => set({
+    clubs: [],
+    activeClub: null,
+    isLoading: false,
+    isMutating: false,
+    error: null,
+    errorCode: null,
+  }),
 }));

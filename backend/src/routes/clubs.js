@@ -1,55 +1,58 @@
 const express = require('express');
-const { body, param } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const authMiddleware = require('../middleware/auth');
 const clubController = require('../controllers/clubController');
 
 const router = express.Router();
 
 const validateRequest = (req, res, next) => {
-  const { validationResult } = require('express-validator');
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ message: errors.array()[0].msg, errors: errors.array() });
+    return res.status(400).json({
+      message: errors.array()[0].msg,
+      code: 'CLUB_VALIDATION_FAILED',
+      errors: errors.array(),
+    });
   }
   return next();
 };
 
-const mongoIdValidator = param('id').isMongoId().withMessage('Invalid reading club id');
+const mongoIdValidator = param('id').isMongoId().withMessage('O identificador do clube é inválido.');
 
 router.use(authMiddleware);
 
 router.get('/', clubController.listClubs);
 
 router.post('/', [
-  body('name').trim().isLength({ min: 3, max: 80 }).withMessage('Club name must be 3-80 characters'),
-  body('description').optional().trim().isLength({ max: 600 }).withMessage('Description must have at most 600 characters'),
-  body('bookId').isMongoId().withMessage('A valid book is required'),
-  body('visibility').optional().isIn(['public', 'private']).withMessage('Visibility must be public or private'),
-  body('startDate').optional({ checkFalsy: true }).isISO8601().withMessage('Start date must be valid'),
-  body('targetDate').optional({ checkFalsy: true }).isISO8601().withMessage('Target date must be valid'),
-  body('memberLimit').optional().isInt({ min: 2, max: 100 }).withMessage('Member limit must be between 2 and 100'),
-  validateRequest
+  body('name').trim().isLength({ min: 3, max: 80 }).withMessage('O nome do clube deve ter entre 3 e 80 caracteres.'),
+  body('description').optional().trim().isLength({ max: 600 }).withMessage('A descrição deve ter no máximo 600 caracteres.'),
+  body('bookId').isMongoId().withMessage('Selecione um livro válido do seu acervo.'),
+  body('visibility').optional().isIn(['public', 'private']).withMessage('A visibilidade precisa ser pública ou privada.'),
+  body('startDate').optional({ checkFalsy: true }).isISO8601().withMessage('A data de início é inválida.'),
+  body('targetDate').optional({ checkFalsy: true }).isISO8601().withMessage('A data de conclusão é inválida.'),
+  body('memberLimit').optional().isInt({ min: 2, max: 100 }).withMessage('O limite de membros deve ficar entre 2 e 100.'),
+  validateRequest,
 ], clubController.createClub);
 
 router.get('/:id', [mongoIdValidator, validateRequest], clubController.getClub);
 router.post('/:id/join', [
   mongoIdValidator,
-  body('inviteCode').optional().trim().isLength({ min: 6, max: 12 }).withMessage('Invitation code must be 6-12 characters'),
-  validateRequest
+  body('inviteCode').optional().trim().isLength({ min: 6, max: 12 }).withMessage('O código de convite deve ter entre 6 e 12 caracteres.'),
+  validateRequest,
 ], clubController.joinClub);
 router.delete('/:id/leave', [mongoIdValidator, validateRequest], clubController.leaveClub);
 router.patch('/:id/progress', [
   mongoIdValidator,
-  body('currentPage').isInt({ min: 0 }).withMessage('Current page must be zero or greater'),
-  validateRequest
+  body('currentPage').isInt({ min: 0 }).withMessage('A página atual precisa ser zero ou maior.'),
+  validateRequest,
 ], clubController.updateProgress);
 router.post('/:id/discussions', [
   mongoIdValidator,
-  body('body').trim().isLength({ min: 1, max: 2000 }).withMessage('Discussion must have 1-2000 characters'),
-  body('insight').optional().trim().isLength({ max: 500 }).withMessage('Insight must have at most 500 characters'),
-  body('pageFrom').optional({ checkFalsy: true }).isInt({ min: 0 }).withMessage('Initial page must be zero or greater'),
-  body('pageTo').optional({ checkFalsy: true }).isInt({ min: 0 }).withMessage('Final page must be zero or greater'),
-  validateRequest
+  body('body').trim().isLength({ min: 1, max: 2000 }).withMessage('A contribuição deve ter entre 1 e 2000 caracteres.'),
+  body('insight').optional().trim().isLength({ max: 500 }).withMessage('O insight deve ter no máximo 500 caracteres.'),
+  body('pageFrom').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('A página inicial precisa ser maior que zero.'),
+  body('pageTo').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('A página final precisa ser maior que zero.'),
+  validateRequest,
 ], clubController.createDiscussion);
 
 module.exports = router;
