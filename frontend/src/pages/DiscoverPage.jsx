@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
+  AlertCircle,
   BookOpen,
   Check,
-  CircleAlert,
-  CircleCheck,
+  CheckCircle2,
   Database,
   ExternalLink,
   Search,
@@ -172,7 +172,7 @@ export default function DiscoverPage() {
       {searchMeta && (
         <div className={`flex flex-col gap-3 rounded-[var(--bubo-radius-lg)] border p-4 sm:flex-row sm:items-center sm:justify-between ${searchMeta.partial ? 'border-[rgb(var(--bubo-color-warning)/0.3)] bg-[rgb(var(--bubo-color-warning)/0.07)]' : 'border-[rgb(var(--bubo-color-success)/0.24)] bg-[rgb(var(--bubo-color-success)/0.06)]'}`}>
           <div className="flex items-start gap-3">
-            {searchMeta.partial ? <CircleAlert size={20} className="mt-0.5 shrink-0 text-[rgb(var(--bubo-color-warning))]" aria-hidden="true" /> : <CircleCheck size={20} className="mt-0.5 shrink-0 text-[rgb(var(--bubo-color-success))]" aria-hidden="true" />}
+            {searchMeta.partial ? <AlertCircle size={20} className="mt-0.5 shrink-0 text-[rgb(var(--bubo-color-warning))]" aria-hidden="true" /> : <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-[rgb(var(--bubo-color-success))]" aria-hidden="true" />}
             <div>
               <p className="font-extrabold">{searchMeta.partial ? 'Busca concluída com uma fonte indisponível' : 'Metadados cruzados com sucesso'}</p>
               <p className="mt-1 text-sm text-[rgb(var(--bubo-color-text-muted))]">Fontes ativas: {availableSources.join(' e ') || 'nenhuma fonte confirmou resposta'}.</p>
