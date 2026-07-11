@@ -236,7 +236,7 @@ jobs:
             http://localhost:8080/api/auth/profile \
             | jq -e '.user.email == "demo@bubo.local" and .user.onboardingCompleted == true'
 
-      - name: Verify complete library lifecycle
+      - name: Verify complete reading lifecycle
         shell: bash
         run: |
           BOOK_PAYLOAD=$(jq -n \
@@ -269,10 +269,36 @@ jobs:
             "http://localhost:8080/api/books/library/$USER_BOOK_ID")
           printf '%s' "$UPDATE_RESPONSE" | jq -e '.userBook.status == "reading" and .userBook.currentPage == 12 and .userBook.totalPagesOverride == 240'
 
+          SESSION_RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"pageFrom":13,"pageTo":28,"durationMinutes":35,"focus":"high","note":"Sessão de validação do CI","readAt":"2026-07-10T00:00:00.000Z"}' \
+            "http://localhost:8080/api/books/library/$USER_BOOK_ID/sessions")
+          SESSION_ID=$(printf '%s' "$SESSION_RESPONSE" | jq -r '.session._id')
+          test -n "$SESSION_ID"
+          test "$SESSION_ID" != "null"
+          printf '%s' "$SESSION_RESPONSE" | jq -e '.session.pagesRead == 16 and .session.durationMinutes == 35 and .userBook.status == "reading" and .userBook.currentPage == 28'
+
+          DETAIL_RESPONSE=$(curl -fsS \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            "http://localhost:8080/api/books/library/$USER_BOOK_ID")
+          printf '%s' "$DETAIL_RESPONSE" | jq -e --arg sessionId "$SESSION_ID" '.userBook.currentPage == 28 and .summary.sessionCount == 1 and .summary.pagesReadInSessions == 16 and .summary.durationMinutes == 35 and (.sessions | any(._id == $sessionId and .pageFrom == 13 and .pageTo == 28))'
+
+          curl -fsS \
+            -X DELETE \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            "http://localhost:8080/api/books/library/$USER_BOOK_ID/sessions/$SESSION_ID"
+
+          curl -fsS \
+            -H "Authorization: Bearer $SMOKE_TOKEN" \
+            "http://localhost:8080/api/books/library/$USER_BOOK_ID" \
+            | jq -e '.userBook.currentPage == 28 and .summary.sessionCount == 0 and (.sessions | length) == 0'
+
           curl -fsS \
             -H "Authorization: Bearer $SMOKE_TOKEN" \
             http://localhost:8080/api/books/library \
-            | jq -e --arg id "$USER_BOOK_ID" '.userBooks | any(._id == $id and .status == "reading" and .currentPage == 12)'
+            | jq -e --arg id "$USER_BOOK_ID" '.userBooks | any(._id == $id and .status == "reading" and .currentPage == 28)'
 
           curl -fsS \
             -X DELETE \
