@@ -1,0 +1,40 @@
+name: Redis dependency lock
+
+on:
+  pull_request:
+    paths:
+      - 'backend/package.json'
+      - '.github/workflows/redis-lock.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lock:
+    name: Generate backend package lock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Generate package lock
+        working-directory: backend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Validate clean install
+        working-directory: backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Upload generated lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-backend-package-lock
+          path: backend/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
