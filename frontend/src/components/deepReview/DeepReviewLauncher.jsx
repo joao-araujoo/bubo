@@ -49,7 +49,7 @@ export default function DeepReviewLauncher() {
         return;
       }
 
-      if (eligibleBooks.length === 1) {
+      if (eligibleBooks.length === 1 && eligibleBooks[0].status === 'reading') {
         setSelectedBook(eligibleBooks[0]);
         setIsOpen(true);
         return;
@@ -116,7 +116,7 @@ export default function DeepReviewLauncher() {
                       <ProgressBar className="mt-1.5" value={current} max={total || Math.max(current, 1)} />
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs font-bold text-[rgb(var(--bubo-color-primary))]">Será marcado como “Lendo” ao continuar.</p>
+                    <p className="mt-2 text-xs font-bold text-[rgb(var(--bubo-color-primary))]">Será marcado como “Lendo” somente após sua confirmação.</p>
                   )}
                 </div>
                 <Button
