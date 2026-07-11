@@ -24,42 +24,44 @@ const observabilityMiddleware = (req, res, next) => {
   res.setHeader('x-request-id', requestId);
   applySecurityHeaders(res);
 
-  const finalize = ({ aborted = false } = {}) => {
-    if (finished) return;
-    finished = true;
-    const durationMs = Date.now() - startedAt;
-    const path = req.originalUrl.split('?')[0];
-    const context = getRequestContext();
-
-    completeMetric({
-      method: req.method,
-      path,
-      statusCode: res.statusCode,
-      durationMs,
-      aborted,
-    });
-
-    logger.info(aborted ? 'http_request_aborted' : 'http_request', {
-      method: req.method,
-      path,
-      status: res.statusCode,
-      durationMs,
-      responseBytes: Number(res.getHeader('content-length')) || undefined,
-      userId: context.userId,
-    });
-  };
-
-  res.once('finish', () => finalize());
-  res.once('close', () => {
-    if (!res.writableEnded) finalize({ aborted: true });
-  });
-
   runWithRequestContext({
     requestId,
     method: req.method,
     path: req.originalUrl.split('?')[0],
     startedAt,
-  }, next);
+  }, () => {
+    const finalize = ({ aborted = false } = {}) => {
+      if (finished) return;
+      finished = true;
+      const durationMs = Date.now() - startedAt;
+      const path = req.originalUrl.split('?')[0];
+      const context = getRequestContext();
+
+      completeMetric({
+        method: req.method,
+        path,
+        statusCode: res.statusCode,
+        durationMs,
+        aborted,
+      });
+
+      logger.info(aborted ? 'http_request_aborted' : 'http_request', {
+        method: req.method,
+        path,
+        status: res.statusCode,
+        durationMs,
+        responseBytes: Number(res.getHeader('content-length')) || undefined,
+        userId: context.userId,
+      });
+    };
+
+    res.once('finish', () => finalize());
+    res.once('close', () => {
+      if (!res.writableEnded) finalize({ aborted: true });
+    });
+
+    next();
+  });
 };
 
 module.exports = observabilityMiddleware;
