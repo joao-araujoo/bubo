@@ -104,15 +104,16 @@ export const useLibraryStore = create((set, get) => ({
     const payload = Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== undefined),
     );
-    const previous = get().books.find((book) => book._id === userBookId);
-    if (!previous) throw new Error('Livro não encontrado no acervo atual.');
+    const previous = get().books.find((book) => book._id === userBookId) || null;
 
     set((state) => ({
-      books: state.books.map((book) => (
-        book._id === userBookId
-          ? normalizeUserBook({ ...book, ...payload, updatedAt: new Date().toISOString() })
-          : book
-      )),
+      books: previous
+        ? state.books.map((book) => (
+          book._id === userBookId
+            ? normalizeUserBook({ ...book, ...payload, updatedAt: new Date().toISOString() })
+            : book
+        ))
+        : state.books,
       updatingIds: [...new Set([...state.updatingIds, userBookId])],
       isUpdating: true,
       error: null,
@@ -123,10 +124,14 @@ export const useLibraryStore = create((set, get) => ({
       const userBook = normalizeUserBook(data.userBook);
       set((state) => {
         const updatingIds = state.updatingIds.filter((id) => id !== userBookId);
+        const alreadyLoaded = state.books.some((book) => book._id === userBookId);
         return {
-          books: state.books.map((book) => (book._id === userBookId ? userBook : book)),
+          books: alreadyLoaded
+            ? state.books.map((book) => (book._id === userBookId ? userBook : book))
+            : [userBook, ...state.books],
           updatingIds,
           isUpdating: updatingIds.length > 0,
+          hasLoaded: true,
           lastFetchedAt: Date.now(),
         };
       });
@@ -136,7 +141,9 @@ export const useLibraryStore = create((set, get) => ({
       set((state) => {
         const updatingIds = state.updatingIds.filter((id) => id !== userBookId);
         return {
-          books: state.books.map((book) => (book._id === userBookId ? previous : book)),
+          books: previous
+            ? state.books.map((book) => (book._id === userBookId ? previous : book))
+            : state.books,
           error: message,
           updatingIds,
           isUpdating: updatingIds.length > 0,
@@ -149,7 +156,6 @@ export const useLibraryStore = create((set, get) => ({
   removeBook: async (userBookId) => {
     const previousBooks = get().books;
     const removed = previousBooks.find((book) => book._id === userBookId);
-    if (!removed) return;
 
     set((state) => ({
       books: state.books.filter((book) => book._id !== userBookId),
@@ -173,7 +179,7 @@ export const useLibraryStore = create((set, get) => ({
       set((state) => {
         const updatingIds = state.updatingIds.filter((id) => id !== userBookId);
         return {
-          books: previousBooks,
+          books: removed ? previousBooks : state.books,
           error: message,
           updatingIds,
           isUpdating: updatingIds.length > 0,
