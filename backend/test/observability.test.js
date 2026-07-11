@@ -73,7 +73,7 @@ test('external error payloads inherit context without leaking credentials', asyn
   });
 });
 
-test('http metrics normalize identifiers and aggregate bounded latency data', () => {
+test('http metrics normalize identifiers and include shared dependency state', () => {
   resetMetrics();
   assert.equal(
     normalizePath('/api/books/library/507f1f77bcf86cd799439011/sessions/42?draft=true'),
@@ -88,8 +88,17 @@ test('http metrics normalize identifiers and aggregate bounded latency data', ()
     durationMs: 120,
   });
 
+  const redis = {
+    enabled: true,
+    required: false,
+    ready: true,
+    status: 'ready',
+    commands: 8,
+    failures: 0,
+  };
   const snapshot = getMetricsSnapshot({
     database: 'connected',
+    redis,
     runtime: { acceptingTraffic: true },
     service: 'bubo-api-test',
     release: 'test-release',
@@ -97,6 +106,7 @@ test('http metrics normalize identifiers and aggregate bounded latency data', ()
 
   assert.equal(snapshot.service, 'bubo-api-test');
   assert.equal(snapshot.release, 'test-release');
+  assert.deepEqual(snapshot.redis, redis);
   assert.equal(snapshot.http.totalRequests, 1);
   assert.equal(snapshot.http.statusClasses['2xx'], 1);
   assert.equal(snapshot.http.latencyBuckets[100], 0);
@@ -106,23 +116,45 @@ test('http metrics normalize identifiers and aggregate bounded latency data', ()
   resetMetrics();
 });
 
-test('health contracts distinguish process liveness from service readiness', () => {
+test('health contracts distinguish optional and required redis availability', () => {
   const runtime = {
     acceptingTraffic: true,
     shuttingDown: false,
     uptimeSeconds: 12,
   };
   const liveness = buildLiveness({ requestId: 'request-live-1234', runtime });
-  const ready = buildReadiness({ requestId: 'request-ready-1234', runtime, databaseReady: true });
-  const degraded = buildReadiness({
-    requestId: 'request-degraded-1234',
-    runtime: { ...runtime, acceptingTraffic: false },
+  const withoutRedis = buildReadiness({
+    requestId: 'request-ready-1234',
+    runtime,
     databaseReady: true,
+    redis: { enabled: false, required: false, ready: false, status: 'disabled' },
+  });
+  const optionalRedisDown = buildReadiness({
+    requestId: 'request-optional-1234',
+    runtime,
+    databaseReady: true,
+    redis: { enabled: true, required: false, ready: false, status: 'degraded' },
+  });
+  const requiredRedisDown = buildReadiness({
+    requestId: 'request-required-1234',
+    runtime,
+    databaseReady: true,
+    redis: { enabled: true, required: true, ready: false, status: 'degraded' },
+  });
+  const requiredRedisReady = buildReadiness({
+    requestId: 'request-redis-ready-1234',
+    runtime,
+    databaseReady: true,
+    redis: { enabled: true, required: true, ready: true, status: 'ready' },
   });
 
   assert.equal(liveness.status, 'ok');
-  assert.equal(ready.ready, true);
-  assert.equal(ready.checks.database, 'connected');
-  assert.equal(degraded.ready, false);
-  assert.equal(degraded.checks.process, 'not-ready');
+  assert.equal(withoutRedis.ready, true);
+  assert.equal(withoutRedis.redis, 'disabled');
+  assert.equal(optionalRedisDown.ready, true);
+  assert.equal(optionalRedisDown.status, 'degraded');
+  assert.equal(requiredRedisDown.ready, false);
+  assert.equal(requiredRedisDown.dependencies.redis.required, true);
+  assert.equal(requiredRedisReady.ready, true);
+  assert.equal(requiredRedisReady.status, 'ok');
 });
