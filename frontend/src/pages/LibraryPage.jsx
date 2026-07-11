@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRight,
   BookOpen,
   Library,
-  MoreHorizontal,
   Play,
   Plus,
   Search,
   Sparkles,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BookCover from '../components/books/BookCover';
-import LibraryBookModal from '../components/books/LibraryBookModal';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import ProgressBar from '../components/ui/ProgressBar';
@@ -28,11 +27,13 @@ const filters = [
   { key: 'abandoned', label: 'Abandonados' },
 ];
 
-const getEffectiveTotal = (userBook) => Number(userBook.totalPagesOverride)
+const getEffectiveTotal = (userBook) => Number(userBook.effectiveTotalPages)
+  || Number(userBook.totalPagesOverride)
   || Number(userBook.bookId?.totalPages)
   || 0;
 
 export default function LibraryPage() {
+  const navigate = useNavigate();
   const {
     books,
     error,
@@ -44,13 +45,10 @@ export default function LibraryPage() {
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('recent');
-  const [selectedBookId, setSelectedBookId] = useState(null);
 
   useEffect(() => {
     fetchLibrary().catch(() => {});
   }, [fetchLibrary]);
-
-  const selectedBook = books.find((book) => book._id === selectedBookId) || null;
 
   const visibleBooks = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -80,6 +78,7 @@ export default function LibraryPage() {
     try {
       await updateBookStatus(userBook._id, { status: 'reading' });
       toast.success(`Você começou “${userBook.bookId?.title || 'esta leitura'}”.`);
+      navigate(`/library/${userBook._id}`);
     } catch (statusError) {
       toast.error(statusError.message);
     }
@@ -99,7 +98,7 @@ export default function LibraryPage() {
             </div>
             <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] sm:text-4xl">Sua leitura, organizada para avançar.</h1>
             <p className="mt-2 max-w-2xl leading-7 text-[rgb(var(--bubo-color-text-muted))]">
-              Comece livros, ajuste a edição, registre páginas e abra uma Deep Review sem procurar ações escondidas.
+              Abra um livro para registrar sessões, acompanhar a evolução e revisar tudo o que você construiu durante a leitura.
             </p>
           </div>
           <Button as={Link} to="/discover" size="lg" leftIcon={<Plus size={18} aria-hidden="true" />}>Adicionar livro</Button>
@@ -173,20 +172,14 @@ export default function LibraryPage() {
           ))}
         </section>
       ) : error && books.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="Não foi possível carregar seu acervo"
-          description={error}
-          actionLabel="Tentar novamente"
-          onAction={() => fetchLibrary({ force: true }).catch(() => {})}
-        />
+        <EmptyState icon={BookOpen} title="Não foi possível carregar seu acervo" description={error} actionLabel="Tentar novamente" onAction={() => fetchLibrary({ force: true }).catch(() => {})} />
       ) : visibleBooks.length === 0 ? (
         <EmptyState
           icon={BookOpen}
           title={books.length === 0 ? 'Seu acervo ainda está vazio' : 'Nenhum livro encontrado'}
           description={books.length === 0 ? 'Adicione seu primeiro livro e escolha se quer começar agora ou guardar para depois.' : 'Altere o filtro ou a pesquisa para encontrar outro livro.'}
           actionLabel={books.length === 0 ? 'Descobrir livros' : undefined}
-          onAction={books.length === 0 ? () => window.location.assign('/discover') : undefined}
+          onAction={books.length === 0 ? () => navigate('/discover') : undefined}
         />
       ) : (
         <section className="grid grid-cols-1 gap-4 min-[430px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -198,12 +191,14 @@ export default function LibraryPage() {
             return (
               <article key={userBook._id} className="flex min-w-0 flex-col rounded-[1.25rem] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] p-4 shadow-[var(--bubo-shadow-sm)] transition hover:border-[rgb(var(--bubo-color-primary)/0.28)] hover:shadow-[var(--bubo-shadow-md)]">
                 <div className="flex min-w-0 gap-4">
-                  <div className="w-24 shrink-0"><BookCover title={book.title} author={book.author} src={book.coverImage} /></div>
+                  <Link to={`/library/${userBook._id}`} className="w-24 shrink-0 rounded-[var(--bubo-radius-md)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]">
+                    <BookCover title={book.title} author={book.author} src={book.coverImage} />
+                  </Link>
                   <div className="min-w-0 flex-1">
-                    <span className="inline-flex rounded-full bg-[rgb(var(--bubo-color-primary)/0.09)] px-2.5 py-1 text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--bubo-color-primary))]">
-                      {getBookStatusLabel(userBook.status)}
-                    </span>
-                    <h2 className="mt-2 line-clamp-2 font-extrabold leading-5">{book.title || 'Livro sem título'}</h2>
+                    <span className="inline-flex rounded-full bg-[rgb(var(--bubo-color-primary)/0.09)] px-2.5 py-1 text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--bubo-color-primary))]">{getBookStatusLabel(userBook.status)}</span>
+                    <h2 className="mt-2 line-clamp-2 font-extrabold leading-5">
+                      <Link to={`/library/${userBook._id}`} className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]">{book.title || 'Livro sem título'}</Link>
+                    </h2>
                     <p className="mt-1 line-clamp-2 text-sm leading-5 text-[rgb(var(--bubo-color-text-muted))]">{book.author || 'Autor não informado'}</p>
                   </div>
                 </div>
@@ -211,41 +206,31 @@ export default function LibraryPage() {
                 <div className="mt-4 min-h-12">
                   {userBook.status === 'reading' ? (
                     <>
-                      <div className="flex items-center justify-between gap-3 text-xs text-[rgb(var(--bubo-color-text-muted))]">
-                        <span>Página {currentPage}</span><span>{totalPages > 0 ? `${totalPages} no total` : 'total não informado'}</span>
-                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs text-[rgb(var(--bubo-color-text-muted))]"><span>Página {currentPage}</span><span>{totalPages > 0 ? `${totalPages} no total` : 'total não informado'}</span></div>
                       <ProgressBar className="mt-2" value={currentPage} max={totalPages || Math.max(currentPage, 1)} />
                     </>
                   ) : (
-                    <p className="text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
-                      {userBook.status === 'to-read' ? 'Pronto para começar quando você quiser.' : userBook.status === 'read' ? 'Leitura concluída.' : 'Leitura pausada no acervo.'}
-                    </p>
+                    <p className="text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">{userBook.status === 'to-read' ? 'Pronto para começar quando você quiser.' : userBook.status === 'read' ? 'Leitura concluída e disponível no histórico.' : 'Leitura pausada no acervo.'}</p>
                   )}
                 </div>
 
                 <div className="mt-auto grid grid-cols-[1fr_auto] gap-2 pt-4">
-                  {userBook.status === 'reading' ? (
-                    <Button size="sm" onClick={() => openReview(userBook)} disabled={isUpdating} leftIcon={<Sparkles size={16} aria-hidden="true" />}>Deep Review</Button>
-                  ) : userBook.status === 'to-read' ? (
+                  {userBook.status === 'to-read' ? (
                     <Button size="sm" onClick={() => startReading(userBook)} isLoading={isUpdating} leftIcon={<Play size={16} aria-hidden="true" />}>Começar</Button>
                   ) : (
-                    <Button size="sm" variant="secondary" onClick={() => setSelectedBookId(userBook._id)}>Ver leitura</Button>
+                    <Button as={Link} to={`/library/${userBook._id}`} size="sm" rightIcon={<ArrowRight size={16} aria-hidden="true" />}>Abrir leitura</Button>
                   )}
-                  <Button size="sm" variant="secondary" onClick={() => setSelectedBookId(userBook._id)} aria-label={`Gerenciar ${book.title || 'livro'}`} className="w-10 px-0">
-                    <MoreHorizontal size={18} aria-hidden="true" />
-                  </Button>
+                  {userBook.status === 'reading' ? (
+                    <Button size="sm" variant="secondary" onClick={() => openReview(userBook)} aria-label={`Fazer Deep Review de ${book.title || 'livro'}`} className="w-10 px-0"><Sparkles size={17} aria-hidden="true" /></Button>
+                  ) : (
+                    <Button as={Link} to={`/library/${userBook._id}`} size="sm" variant="secondary" aria-label={`Ver detalhes de ${book.title || 'livro'}`} className="w-10 px-0"><ArrowRight size={17} aria-hidden="true" /></Button>
+                  )}
                 </div>
               </article>
             );
           })}
         </section>
       )}
-
-      <LibraryBookModal
-        isOpen={Boolean(selectedBook)}
-        userBook={selectedBook}
-        onClose={() => setSelectedBookId(null)}
-      />
     </div>
   );
 }
