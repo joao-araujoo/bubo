@@ -8,6 +8,7 @@ const {
 const {
   LazyRedisStore,
   ResilientRateLimitStore,
+  createRateLimitStore,
   sanitizeNamespace,
 } = require('../src/infrastructure/redis/rateLimitStore');
 
@@ -269,6 +270,39 @@ test('optional rate-limit store counts locally during outage and returns to prim
   primary.fail = true;
   const newLocalWindow = await store.increment('reader');
   assert.equal(newLocalWindow.totalHits, 1, 'A later outage starts a fresh local fallback');
+});
+
+test('rate-limit store factory chooses memory, resilient or required policy', () => {
+  const memoryOnly = createRateLimitStore({
+    namespace: 'api',
+    config: { redisEnabled: false },
+  });
+  assert.equal(memoryOnly.store, undefined);
+  assert.equal(memoryOnly.distributed, false);
+
+  const optional = createRateLimitStore({
+    namespace: 'auth',
+    config: {
+      redisEnabled: true,
+      redisRequired: false,
+      redisKeyPrefix: 'bubo:test',
+    },
+  });
+  assert.ok(optional.store instanceof ResilientRateLimitStore);
+  assert.equal(optional.passOnStoreError, false);
+  assert.equal(optional.distributed, true);
+
+  const required = createRateLimitStore({
+    namespace: 'book-search',
+    config: {
+      redisEnabled: true,
+      redisRequired: true,
+      redisKeyPrefix: 'bubo:test',
+    },
+  });
+  assert.ok(required.store instanceof LazyRedisStore);
+  assert.equal(required.passOnStoreError, false);
+  assert.equal(required.distributed, true);
 });
 
 test('rate-limit namespaces are deterministic and bounded', () => {
