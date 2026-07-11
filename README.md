@@ -1,27 +1,30 @@
 # Bubo — Read Deeply
 
-Bubo é uma plataforma de leitura profunda que combina acervo, progresso, Deep Reviews avaliadas por IA, memória cognitiva, rede social e clubes de leitura.
+Bubo é uma plataforma de leitura profunda que combina biblioteca, progresso, Deep Reviews avaliadas por IA, memória cognitiva, rede social, recomendações por grafo e clubes de leitura.
 
-A aplicação foi desenhada para não substituir o pensamento do leitor. A IA atua como tutora socrática: avalia evidências e conexões, explica critérios e sugere perguntas para aprofundar a reflexão.
+A IA atua como tutora socrática: avalia compreensão, especificidade, conexões e reflexão sem substituir o pensamento do leitor.
 
 ## Estado atual
 
-O produto inclui:
+O Bubo 3.0 inclui:
 
 - autenticação, perfil e onboarding personalizado;
-- biblioteca com status e progresso por livro;
-- pesquisa no Google Books e adição ao acervo;
-- Deep Review com OpenAI, Gemini ou avaliador local;
-- mapa cognitivo com compreensão, especificidade, conexões e reflexão;
-- prompts de retenção por livro;
-- feed persistente com posts, curtidas, comentários, salvos e seguidores;
-- notificações sociais;
+- tema claro como padrão e opção de tema escuro;
+- biblioteca com status, edição e progresso por páginas;
+- pesquisa enriquecida usando Google Books e Open Library;
+- capas, ISBN, autor, editora, categorias e páginas com origem e confiança;
+- entrada manual de páginas quando nenhuma fonte consegue confirmá-las;
+- Deep Review em etapas, com editor amplo e resultado separado;
+- integração real com OpenAI ou Gemini, sem avaliação local simulada;
+- mapa cognitivo por dimensão e histórico por livro;
+- feed com posts, curtidas, comentários, salvos, seguidores e notificações;
+- recomendações de leitores por Dijkstra e sinais de afinidade;
 - clubes públicos e privados, membros, progresso e discussões por páginas;
 - conquistas, metas e XP;
-- temas claro e escuro;
-- interface responsiva, acessível e instalável como PWA;
-- testes automatizados e Quality Gates de frontend e backend;
-- Docker Compose, health checks e seed demonstrativo.
+- componentes mobile-first, Select personalizado e PWA;
+- Lucide React como biblioteca única de ícones funcionais;
+- política automática que bloqueia emojis e SVGs manuais na interface;
+- testes, lint, build, Docker Compose e smoke test clone-ready.
 
 ## Início rápido com Docker
 
@@ -51,15 +54,52 @@ PowerShell:
 Copy-Item .env.example .env
 ```
 
-Para uso local, os valores padrão já funcionam. Antes de publicar a aplicação, substitua obrigatoriamente `JWT_SECRET`.
+Abra `.env` e substitua obrigatoriamente:
 
-### 3. Inicie a aplicação com dados de demonstração
+```env
+JWT_SECRET=uma-chave-longa-e-aleatoria-com-pelo-menos-24-caracteres
+SEED_DEMO_PASSWORD=uma-senha-local-escolhida-por-voce
+```
+
+Para gerar um segredo no PowerShell:
+
+```powershell
+[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLower()
+```
+
+### 3. Configure a IA real
+
+A Deep Review exige OpenAI ou Gemini. O restante do aplicativo funciona sem chave, mas a validação por IA ficará explicitamente indisponível.
+
+OpenAI:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=sua_chave
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Gemini:
+
+```env
+AI_PROVIDER=gemini
+GEMINI_API_KEY=sua_chave
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+Seleção automática da primeira chave disponível:
+
+```env
+AI_PROVIDER=auto
+```
+
+As chaves permanecem somente no backend.
+
+### 4. Inicie com dados demonstrativos
 
 ```bash
 docker compose --profile demo up --build
 ```
-
-Na primeira execução, o Docker baixa as imagens, compila frontend e backend, inicia o MongoDB e executa o seed idempotente.
 
 Acesse:
 
@@ -70,11 +110,19 @@ Acesse:
 Conta demonstrativa:
 
 ```text
-E-mail: demo@bubo.local
-Senha: BuboDemo123!
+E-mail: o valor de SEED_DEMO_EMAIL no seu .env
+Senha: o valor de SEED_DEMO_PASSWORD no seu .env
 ```
 
-O seed contém livros, progresso, Deep Reviews, mapa cognitivo, publicação social e clube de leitura. Ele pode ser executado novamente sem duplicar os registros principais.
+O seed é idempotente e inclui:
+
+- quatro livros com capas reais;
+- progresso e Deep Reviews demonstrativas;
+- cinco leitores com avatares fotográficos;
+- publicações e interações sociais;
+- uma rede de segundo e terceiro grau;
+- recomendações por grafo;
+- clube de leitura com membros e discussão.
 
 Para iniciar sem dados demonstrativos:
 
@@ -94,43 +142,90 @@ Para encerrar:
 docker compose down
 ```
 
-Para apagar também o banco local e recomeçar do zero:
+Para apagar o banco e recriar toda a demonstração:
 
 ```bash
 docker compose down --volumes --remove-orphans
+docker compose --profile demo up --build
 ```
 
-## Configuração da IA
+## Atualizando uma instalação existente
 
-O modo padrão do Docker é `local`: nenhuma síntese é enviada a serviços externos.
-
-### OpenAI
-
-No arquivo `.env`:
-
-```env
-AI_PROVIDER=openai
-OPENAI_API_KEY=sua_chave
-OPENAI_MODEL=gpt-4o-mini
+```bash
+git pull origin main
+docker compose down --volumes --remove-orphans
+docker compose --profile demo up --build
 ```
 
-### Google Gemini
+O reset de volumes é recomendado nesta atualização porque os modelos de livros, IA e dados demonstrativos foram ampliados.
 
-```env
-AI_PROVIDER=gemini
-GEMINI_API_KEY=sua_chave
-GEMINI_MODEL=gemini-2.0-flash
+O tema claro é o padrão para novas preferências. Se o navegador já guardou o tema escuro, altere pelo botão de tema ou remova a chave `bubo-theme` do armazenamento local.
+
+## Marca oficial
+
+O código não desenha corujas nem tenta recriar a marca com SVG manual. Os ativos oficiais devem ser colocados em:
+
+```text
+frontend/public/brand/bubo-logo.png
+frontend/public/brand/bubo-wordmark.png
+frontend/public/brand/bubo-mascot.png
 ```
 
-### Seleção automática
+Recomendações:
 
-```env
-AI_PROVIDER=auto
-```
+- PNG ou WebP com fundo transparente;
+- resolução mínima de 512 × 512 para símbolo e mascote;
+- wordmark horizontal com boa legibilidade em fundo claro;
+- sem margens transparentes excessivas.
 
-A ordem é OpenAI, Gemini e avaliador local. Com `AI_ALLOW_LOCAL_FALLBACK=true`, uma indisponibilidade externa usa o avaliador local e informa isso na interface. Nenhuma chave é enviada ao navegador.
+Enquanto os arquivos não existirem, o app mostra um fallback tipográfico neutro. Consulte `frontend/public/brand/README.md`.
 
-Mais detalhes: [`docs/AI_READING_COACH.md`](docs/AI_READING_COACH.md).
+## Catálogo de livros
+
+A busca consulta Google Books e Open Library de forma independente. Os resultados são combinados por ISBN ou por título e autor.
+
+O Bubo prioriza:
+
+1. número de páginas confirmado;
+2. capa de maior resolução;
+3. ISBN;
+4. autor e editora;
+5. categorias e data de publicação.
+
+Quando uma fonte falha, a outra continua sendo usada. Quando nenhuma confirma as páginas, o usuário informa o total da própria edição antes de adicionar o livro.
+
+`GOOGLE_BOOKS_API_KEY` é opcional, mas aumenta a cota da busca no Google Books.
+
+## Deep Review 3.0
+
+O fluxo possui quatro momentos:
+
+1. seleção do trecho;
+2. escrita em editor amplo;
+3. revisão antes do envio;
+4. resultado separado da escrita.
+
+A avaliação considera:
+
+- compreensão;
+- especificidade;
+- conexões;
+- reflexão.
+
+O texto permanece na interface quando há falha de conexão, provedor indisponível ou resposta incompleta. O backend nunca inventa uma nota local.
+
+## Recomendações sociais
+
+As sugestões de leitores usam um ranking híbrido:
+
+- menor caminho na rede de seguidores calculado por Dijkstra;
+- conexões em comum;
+- clubes compartilhados;
+- livros em comum;
+- gêneros de interesse;
+- atividade recente.
+
+Cada recomendação apresenta motivos legíveis em vez de uma pontuação opaca.
 
 ## Desenvolvimento sem Docker
 
@@ -152,13 +247,13 @@ Copie e configure o ambiente do backend:
 cp backend/.env.example backend/.env
 ```
 
-No PowerShell:
+PowerShell:
 
 ```powershell
 Copy-Item backend/.env.example backend/.env
 ```
 
-Use um segredo JWT com pelo menos 24 caracteres. Depois, em terminais separados:
+Depois, em terminais separados:
 
 ```bash
 npm run dev --prefix backend
@@ -178,188 +273,120 @@ npm run seed --prefix backend
 
 ## Validação local
 
-Execute a suíte completa:
-
 ```bash
 npm run check
 ```
 
-Ela executa:
+O Quality Gate executa:
 
-1. testes do backend;
-2. ESLint do frontend;
+1. política visual sem emojis ou SVGs manuais;
+2. ESLint;
 3. testes do frontend;
-4. build de produção.
+4. build de produção;
+5. testes do backend;
+6. carregamento integral dos módulos.
 
-O GitHub Actions executa os mesmos gates em cada pull request. A etapa clone-ready também compila as imagens Docker, inicia a stack, executa o seed e verifica os health checks.
+No GitHub Actions, um smoke test adicional constrói as imagens, inicia MongoDB, API e frontend, executa o seed com credenciais efêmeras, autentica uma conta e valida uma rota protegida.
 
 ## Arquitetura
 
 ```text
 bubo/
 ├── backend/
-│   ├── scripts/              # seed idempotente
+│   ├── scripts/                  # seed idempotente
 │   ├── src/
-│   │   ├── config/           # ambiente validado
-│   │   ├── controllers/      # contratos HTTP
-│   │   ├── middleware/       # autenticação
-│   │   ├── models/           # schemas e índices MongoDB
-│   │   ├── routes/           # rotas Express
-│   │   ├── services/ai/      # AI Reading Coach
-│   │   └── utils/            # logger estruturado
-│   └── test/                 # testes com Node Test Runner
+│   │   ├── config/               # ambiente validado
+│   │   ├── controllers/          # contratos HTTP
+│   │   ├── middleware/           # autenticação e proteção
+│   │   ├── models/               # schemas e índices MongoDB
+│   │   ├── routes/               # rotas Express
+│   │   └── services/
+│   │       ├── ai/               # AI Reading Coach
+│   │       ├── books/            # enriquecimento de metadados
+│   │       └── social/           # recomendação por grafo
+│   └── test/                     # Node Test Runner
 ├── frontend/
-│   ├── public/               # PWA e assets públicos
+│   ├── public/brand/             # ativos oficiais do Bubo
 │   └── src/
-│       ├── components/       # design system e componentes de domínio
-│       ├── pages/            # áreas do produto
-│       ├── services/         # cliente HTTP
-│       ├── stores/           # estado Zustand
-│       ├── theme/            # temas e tokens
-│       └── test/             # configuração do Vitest
+│       ├── components/           # design system e domínios
+│       ├── pages/                # áreas do produto
+│       ├── services/             # cliente HTTP
+│       ├── stores/               # Zustand
+│       └── theme/                # temas e tokens
 ├── docs/
 ├── docker-compose.yml
 └── package.json
 ```
 
-### Stack
-
-Frontend:
-
-- React 18;
-- Vite 5;
-- Tailwind CSS;
-- Zustand;
-- React Query;
-- Framer Motion;
-- Lucide React;
-- Vitest e Testing Library.
-
-Backend:
-
-- Node.js 24;
-- Express;
-- MongoDB e Mongoose;
-- JWT e bcryptjs;
-- OpenAI ou Gemini;
-- Node Test Runner.
-
-Infraestrutura local:
-
-- Nginx;
-- Docker Compose;
-- MongoDB 7.
-
 ## Variáveis principais
 
-| Variável | Finalidade | Padrão local |
-|---|---|---|
-| `BUBO_PORT` | Porta pública do frontend | `8080` |
-| `API_PORT` | Porta pública da API | `3001` |
-| `JWT_SECRET` | Assinatura dos tokens | deve ser substituída em produção |
-| `AI_PROVIDER` | `auto`, `openai`, `gemini` ou `local` | `local` |
-| `AI_ALLOW_LOCAL_FALLBACK` | Mantém o fluxo quando o provedor falha | `true` |
-| `OPENAI_API_KEY` | Credencial OpenAI | vazia |
-| `GEMINI_API_KEY` | Credencial Gemini | vazia |
-| `GOOGLE_BOOKS_API_KEY` | Cota opcional do Google Books | vazia |
-| `SEED_DEMO_EMAIL` | Login do seed | `demo@bubo.local` |
-| `SEED_DEMO_PASSWORD` | Senha do seed | `BuboDemo123!` |
-
-Veja todos os valores em [`.env.example`](.env.example) e [`backend/.env.example`](backend/.env.example).
+| Variável | Finalidade |
+|---|---|
+| `BUBO_PORT` | Porta pública do frontend |
+| `API_PORT` | Porta pública da API |
+| `JWT_SECRET` | Assinatura dos tokens; obrigatória |
+| `AI_PROVIDER` | `auto`, `openai` ou `gemini` |
+| `OPENAI_API_KEY` | Credencial OpenAI |
+| `GEMINI_API_KEY` | Credencial Gemini |
+| `GOOGLE_BOOKS_API_KEY` | Cota opcional do Google Books |
+| `SEED_DEMO_EMAIL` | E-mail da conta demonstrativa |
+| `SEED_DEMO_PASSWORD` | Senha escolhida para o seed; obrigatória ao usar o perfil `demo` |
 
 ## Segurança
 
 - segredos permanecem no backend;
-- o servidor não inicia com `JWT_SECRET` inválido ou MongoDB indisponível;
+- Compose não fornece senhas demonstrativas ou JWT padrão;
+- o servidor rejeita `JWT_SECRET` inválido;
+- o CI gera credenciais efêmeras em cada execução;
 - CORS usa allowlist por ambiente;
 - endpoints possuem rate limit;
 - payloads têm limite configurável;
 - entradas MongoDB são sanitizadas;
-- erros de produção não retornam stack ou mensagem interna;
+- erros de produção não expõem stack interna;
 - respostas possuem request ID;
 - containers possuem health checks;
-- o backend executa com usuário sem privilégios;
-- o MongoDB não é exposto publicamente pelo Compose.
-
-O segredo padrão do Docker existe apenas para desenvolvimento local. Nunca o reutilize em produção.
+- o backend executa sem privilégios;
+- MongoDB não é exposto publicamente pelo Compose.
 
 ## Solução de problemas
 
-### A porta já está em uso
+### O Compose informa que uma variável é obrigatória
 
-Altere no `.env`:
+Confira se `.env` contém valores reais para:
 
 ```env
-BUBO_PORT=8081
-API_PORT=3002
+JWT_SECRET=...
+SEED_DEMO_PASSWORD=...
 ```
 
-Depois reinicie o Compose.
-
 ### O backend está `unhealthy`
-
-Veja os logs:
 
 ```bash
 docker compose logs backend
 ```
 
-Confira também:
-
 ```bash
 curl http://localhost:3001/api/health
 ```
 
-No PowerShell:
+PowerShell:
 
 ```powershell
 Invoke-RestMethod http://localhost:3001/api/health
 ```
 
-### O seed não apareceu
+### A IA não está disponível
 
-Execute manualmente:
+Confirme que `AI_PROVIDER` corresponde a uma chave preenchida. Não existe modo local de avaliação.
 
-```bash
-docker compose --profile demo run --rm seed
-```
-
-Atualize a página depois que a execução terminar.
-
-### A IA externa não responde
-
-Confirme a chave e o nome do modelo no `.env`. Para continuar sem custo externo:
-
-```env
-AI_PROVIDER=local
-```
-
-### Alterei o frontend, mas o navegador mostra a versão anterior
-
-O Bubo possui service worker. Em desenvolvimento normal ele não é registrado. Para uma imagem Docker antiga:
+### O navegador mostra uma versão anterior
 
 ```bash
 docker compose build --no-cache frontend
 docker compose up -d frontend
 ```
 
-Depois, recarregue a página ignorando o cache ou remova os dados do site no navegador.
-
-### Quero zerar tudo
-
-```bash
-docker compose down --volumes --remove-orphans
-docker compose --profile demo up --build
-```
-
-## Fluxo de contribuição
-
-1. crie uma branch curta;
-2. implemente uma entrega vertical;
-3. execute `npm run check`;
-4. abra um pull request;
-5. aguarde os Quality Gates;
-6. faça merge somente com frontend e backend verdes.
+Depois, recarregue ignorando o cache ou remova os dados do site.
 
 ## Licença e uso
 

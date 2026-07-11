@@ -178,13 +178,17 @@ jobs:
     env:
       BUBO_PORT: 8080
       API_PORT: 3001
-      JWT_SECRET: ci-smoke-test-secret-with-more-than-24-characters
       AI_PROVIDER: auto
       SEED_DEMO_EMAIL: demo@bubo.local
-      SEED_DEMO_PASSWORD: BuboDemo123!
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Generate ephemeral smoke-test credentials
+        shell: bash
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "SEED_DEMO_PASSWORD=$(openssl rand -base64 30 | tr -d '\n')" >> "$GITHUB_ENV"
 
       - name: Validate Compose configuration
         run: docker compose config --quiet
@@ -214,10 +218,14 @@ jobs:
       - name: Authenticate demo account and verify protected API
         shell: bash
         run: |
+          LOGIN_PAYLOAD=$(jq -n \
+            --arg email "$SEED_DEMO_EMAIL" \
+            --arg password "$SEED_DEMO_PASSWORD" \
+            '{email: $email, password: $password}')
           LOGIN_RESPONSE=$(curl -fsS \
             -X POST \
             -H 'Content-Type: application/json' \
-            -d '{"email":"demo@bubo.local","password":"BuboDemo123!"}' \
+            -d "$LOGIN_PAYLOAD" \
             http://localhost:8080/api/auth/login)
           TOKEN=$(printf '%s' "$LOGIN_RESPONSE" | jq -r '.token')
           test -n "$TOKEN"

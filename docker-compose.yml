@@ -22,7 +22,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       MONGODB_URI: mongodb://mongo:27017/bubo
-      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-production-12345}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CLIENT_URL: http://localhost:${BUBO_PORT:-8080}
       TRUST_PROXY: "true"
       BODY_LIMIT: 1mb
@@ -62,9 +62,9 @@ services:
     environment:
       NODE_ENV: development
       MONGODB_URI: mongodb://mongo:27017/bubo
-      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-production-12345}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       SEED_DEMO_EMAIL: ${SEED_DEMO_EMAIL:-demo@bubo.local}
-      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-BuboDemo123!}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:?SEED_DEMO_PASSWORD is required for the demo seed}
       SEED_RESET_PASSWORD: ${SEED_RESET_PASSWORD:-false}
     command: ["npm", "run", "seed"]
     depends_on:
