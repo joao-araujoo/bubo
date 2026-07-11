@@ -13,6 +13,7 @@ const main = async () => {
   const mode = process.env.REDIS_VERIFICATION_MODE || 'increment';
   const keyPrefix = process.env.REDIS_KEY_PREFIX || 'bubo:verification';
   const clientKey = 'shared-client';
+  let output;
 
   assert.ok(redisUrl, 'REDIS_URL is required');
   assert.ok(verificationId, 'REDIS_VERIFICATION_ID is required');
@@ -41,23 +42,24 @@ const main = async () => {
 
     if (mode === 'reset') {
       await store.resetKey(clientKey);
-      console.log(JSON.stringify({ status: 'ok', mode, totalHits: 0 }));
-      return;
+      output = { status: 'ok', mode, totalHits: 0 };
+    } else {
+      const result = mode === 'increment'
+        ? await store.increment(clientKey)
+        : await store.get(clientKey);
+
+      output = {
+        status: 'ok',
+        mode,
+        totalHits: result?.totalHits || 0,
+        resetTime: result?.resetTime?.toISOString?.() || null,
+      };
     }
-
-    const result = mode === 'increment'
-      ? await store.increment(clientKey)
-      : await store.get(clientKey);
-
-    console.log(JSON.stringify({
-      status: 'ok',
-      mode,
-      totalHits: result?.totalHits || 0,
-      resetTime: result?.resetTime?.toISOString?.() || null,
-    }));
   } finally {
     await disconnectRedis();
   }
+
+  console.log(JSON.stringify(output));
 };
 
 main().catch((error) => {
