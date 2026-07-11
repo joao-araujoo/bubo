@@ -35,14 +35,20 @@ const ttlFromEnv = (name, fallback) => {
 };
 
 const normalizePayload = (payload) => {
-  if (!payload || typeof payload !== 'object') return null;
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.books)) return null;
   return {
-    books: Array.isArray(payload.books) ? payload.books : [],
+    books: payload.books,
     sourceStatus: payload.sourceStatus && typeof payload.sourceStatus === 'object'
       ? payload.sourceStatus
       : {},
     partial: Boolean(payload.partial),
   };
+};
+
+const invalidPayloadError = () => {
+  const error = new Error('Book search returned an invalid cache payload');
+  error.code = 'BOOK_SEARCH_INVALID_PAYLOAD';
+  return error;
 };
 
 const pruneMemory = () => {
@@ -71,6 +77,7 @@ const readMemory = (key) => {
 };
 
 const writeMemory = (key, payload) => {
+  if (!payload) return;
   memoryCache.delete(key);
   memoryCache.set(key, {
     payload,
@@ -90,12 +97,12 @@ const readRedis = async (key) => {
 };
 
 const writeRedis = async (key, payload) => {
-  if (!getRedisState().ready) return;
+  if (!payload || !getRedisState().ready) return;
   try {
     await setRedisJson(
       REDIS_SCOPE,
       key,
-      normalizePayload(payload),
+      payload,
       ttlFromEnv('REDIS_CACHE_TTL_MS', DEFAULT_REDIS_TTL_MS),
     );
   } catch (error) {
@@ -122,16 +129,16 @@ const readDatabase = async (key) => {
 };
 
 const writeDatabase = async (key, query, payload) => {
-  if (!canUseDatabase()) return;
+  if (!payload || !canUseDatabase()) return;
   try {
     await BookSearchCache.findOneAndUpdate(
       { key },
       {
         $set: {
           query: String(query).trim(),
-          books: payload.books || [],
-          sourceStatus: payload.sourceStatus || {},
-          partial: Boolean(payload.partial),
+          books: payload.books,
+          sourceStatus: payload.sourceStatus,
+          partial: payload.partial,
           expiresAt: new Date(Date.now() + ttlFromEnv('BOOK_SEARCH_CACHE_TTL_MS', DEFAULT_TTL_MS)),
         },
       },
@@ -164,13 +171,16 @@ const getCachedBookSearch = async (query) => {
 };
 
 const setCachedBookSearch = async (query, payload) => {
-  const key = cacheKeyFor(query);
   const normalized = normalizePayload(payload);
+  if (!normalized) throw invalidPayloadError();
+
+  const key = cacheKeyFor(query);
   writeMemory(key, normalized);
   await Promise.all([
     writeRedis(key, normalized),
     writeDatabase(key, query, normalized),
   ]);
+  return normalized;
 };
 
 const loadBookSearch = async (query, loader) => {
@@ -185,10 +195,7 @@ const loadBookSearch = async (query, loader) => {
 
   const request = Promise.resolve()
     .then(loader)
-    .then(async (payload) => {
-      await setCachedBookSearch(query, payload);
-      return normalizePayload(payload);
-    })
+    .then((payload) => setCachedBookSearch(query, payload))
     .finally(() => inFlight.delete(key));
 
   inFlight.set(key, request);
