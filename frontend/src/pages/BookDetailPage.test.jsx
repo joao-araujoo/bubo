@@ -80,12 +80,19 @@ const renderPage = () => {
 };
 
 describe('BookDetailPage', () => {
+  const fetchLibrary = vi.fn().mockResolvedValue([userBook]);
+  const removeBook = vi.fn().mockResolvedValue(undefined);
+  const updateBookStatus = vi.fn().mockResolvedValue(userBook);
+
   beforeEach(() => {
     vi.clearAllMocks();
     api.get.mockResolvedValue({ data: detail });
     useLibraryStore.mockReturnValue({
       books: [userBook],
-      fetchLibrary: vi.fn().mockResolvedValue([userBook]),
+      fetchLibrary,
+      removeBook,
+      updateBookStatus,
+      updatingIds: [],
     });
     useLibraryStore.getState = vi.fn(() => ({ books: [userBook] }));
   });
