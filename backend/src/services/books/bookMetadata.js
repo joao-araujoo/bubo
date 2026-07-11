@@ -4,7 +4,8 @@ const REQUEST_TIMEOUT_MS = 12000;
 
 const normalizeImageUrl = (url) => String(url || '')
   .replace(/^http:\/\//i, 'https://')
-  .replace('&zoom=1', '&zoom=2');
+  .replace(/([?&])zoom=1(?:&|$)/i, '$1zoom=2&')
+  .replace(/&$/, '');
 
 const normalizeText = (value) => String(value || '')
   .normalize('NFD')
