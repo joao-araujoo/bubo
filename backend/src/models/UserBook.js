@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
 const deepReviewEmbedSchema = new mongoose.Schema({
+  submissionId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeepReviewSubmission', default: null },
+  reviewId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeepReview', default: null },
   pageFrom: Number,
   pageTo: Number,
   reviewText: String,
