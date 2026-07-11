@@ -7,15 +7,19 @@ on:
       - '.github/workflows/redis-lock.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate-lock:
     name: Generate backend package lock
     runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
-      - name: Checkout repository
+      - name: Checkout pull request branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -31,10 +35,15 @@ jobs:
         working-directory: backend
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Upload generated lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: redis-backend-package-lock
-          path: backend/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit generated lock
+        shell: bash
+        run: |
+          if git diff --quiet -- backend/package-lock.json; then
+            echo "Package lock is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/package-lock.json
+          git commit -m "build(redis): refresh backend dependency lock"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
