@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ArrowRight, BookOpen, Brain, Gem, Plus, Sparkles, Target } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import BookCover from '../components/books/BookCover';
 import BuboMascot from '../components/owl/BuboMascot';
 import ReaderRecommendationsSection from '../components/social/ReaderRecommendationsSection';
@@ -22,6 +22,11 @@ const challengeIcons = {
   premium_synthesis: Gem,
 };
 
+const effectiveTotalPages = (userBook) => Number(userBook.effectiveTotalPages)
+  || Number(userBook.totalPagesOverride)
+  || Number(userBook.bookId?.totalPages)
+  || 0;
+
 function GuestHero() {
   return (
     <Card className="mx-auto max-w-4xl overflow-hidden" padding="lg">
@@ -29,7 +34,7 @@ function GuestHero() {
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-[rgb(var(--bubo-color-primary)/0.22)] bg-[rgb(var(--bubo-color-primary)/0.08)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-[rgb(var(--bubo-color-primary))]">
             <span className="h-2 w-2 rounded-full bg-[rgb(var(--bubo-color-success))]" />
-            Bubo 3.0
+            Bubo 3.2
           </span>
           <h1 className="mt-6 max-w-xl text-4xl font-black leading-[1.06] tracking-[-0.04em] sm:text-5xl">
             Leia menos no automático. <span className="text-[rgb(var(--bubo-color-primary))]">Retenha mais.</span>
@@ -58,6 +63,7 @@ function GuestHero() {
 }
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const { token, user } = useAuthStore();
   const { books, fetchLibrary, isLoading: libraryLoading } = useLibraryStore();
   const { dashboard, fetchDashboard, isLoading: dashboardLoading } = useDashboardStore();
@@ -70,10 +76,12 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!token) return;
-    fetchLibrary().catch(() => {});
-    fetchDashboard().catch(() => {});
-    fetchFeed().catch(() => {});
-    fetchReaderRecommendations().catch(() => {});
+    Promise.allSettled([
+      fetchLibrary(),
+      fetchDashboard(),
+      fetchFeed(),
+      fetchReaderRecommendations(),
+    ]);
   }, [fetchDashboard, fetchFeed, fetchLibrary, fetchReaderRecommendations, token]);
 
   if (!token) return <GuestHero />;
@@ -93,7 +101,7 @@ export default function HomePage() {
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[rgb(var(--bubo-color-primary))]">Agora</p>
           <h1 className="mt-1 text-2xl font-black tracking-[-0.025em] sm:text-3xl">Lendo no momento</h1>
-          <p className="mt-2 text-sm text-[rgb(var(--bubo-color-text-muted))]">Continue de onde parou e registre o que realmente ficou.</p>
+          <p className="mt-2 text-sm text-[rgb(var(--bubo-color-text-muted))]">Continue de onde parou, registre uma sessão e preserve o que realmente ficou.</p>
         </div>
         <Button as={Link} to="/discover" variant="secondary" leftIcon={<Plus size={17} aria-hidden="true" />}>Adicionar livro</Button>
       </section>
@@ -108,17 +116,30 @@ export default function HomePage() {
           {readingBooks.map((userBook) => {
             const book = userBook.bookId || {};
             const currentPage = Number(userBook.currentPage) || 0;
-            const totalPages = Number(book.totalPages) || Math.max(currentPage, 1);
+            const totalPages = effectiveTotalPages(userBook);
             return (
-              <Card key={userBook._id} interactive className="grid grid-cols-[6.5rem_1fr] gap-4">
-                <BookCover title={book.title} author={book.author} src={book.coverImage} />
+              <Card key={userBook._id} className="grid grid-cols-[6.5rem_1fr] gap-4">
+                <Link to={`/library/${userBook._id}`} className="rounded-[var(--bubo-radius-md)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]" aria-label={`Abrir ${book.title || 'leitura'}`}>
+                  <BookCover title={book.title} author={book.author} src={book.coverImage} />
+                </Link>
                 <div className="flex min-w-0 flex-col">
                   <div>
-                    <h2 className="truncate text-lg font-extrabold">{book.title || 'Livro sem título'}</h2>
+                    <h2 className="truncate text-lg font-extrabold">
+                      <Link to={`/library/${userBook._id}`} className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--bubo-color-primary))]">{book.title || 'Livro sem título'}</Link>
+                    </h2>
                     <p className="mt-1 truncate text-sm text-[rgb(var(--bubo-color-text-muted))]">{book.author || 'Autor não informado'}</p>
                   </div>
-                  <ProgressBar className="mt-5" value={currentPage} max={totalPages} label={`Página ${currentPage}`} showValue />
-                  <Button className="mt-auto w-full" variant="secondary" size="sm" onClick={() => openReview(userBook)}>Fazer review</Button>
+                  <div className="mt-5">
+                    <div className="flex justify-between gap-3 text-xs text-[rgb(var(--bubo-color-text-muted))]">
+                      <span>Página {currentPage}</span>
+                      <span>{totalPages > 0 ? `${totalPages} no total` : 'total não informado'}</span>
+                    </div>
+                    <ProgressBar className="mt-2" value={currentPage} max={totalPages || Math.max(currentPage, 1)} />
+                  </div>
+                  <div className="mt-auto grid grid-cols-[1fr_auto] gap-2 pt-4">
+                    <Button as={Link} to={`/library/${userBook._id}`} variant="secondary" size="sm" rightIcon={<ArrowRight size={16} aria-hidden="true" />}>Continuar</Button>
+                    <Button variant="ghost" size="sm" onClick={() => openReview(userBook)} aria-label={`Fazer Deep Review de ${book.title || 'livro'}`} className="w-10 px-0"><Sparkles size={17} aria-hidden="true" /></Button>
+                  </div>
                 </div>
               </Card>
             );
@@ -128,9 +149,11 @@ export default function HomePage() {
         <EmptyState
           icon={BookOpen}
           title="Nenhuma leitura em andamento"
-          description="Adicione um livro e marque como “Lendo” para acompanhar o progresso aqui."
+          description="Adicione um livro ou abra seu acervo para começar uma leitura salva."
           actionLabel="Descobrir livros"
-          onAction={() => window.location.assign('/discover')}
+          onAction={() => navigate('/discover')}
+          secondaryActionLabel={books.length > 0 ? 'Abrir acervo' : undefined}
+          onSecondaryAction={books.length > 0 ? () => navigate('/library') : undefined}
         />
       )}
 
@@ -149,6 +172,14 @@ export default function HomePage() {
               <CardSkeleton />
               <CardSkeleton />
             </div>
+          ) : challenges.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="Nenhuma missão disponível agora"
+              description="Atualize o painel ou avance nas suas leituras para gerar novas metas."
+              actionLabel="Ver conquistas"
+              onAction={() => navigate('/achievements')}
+            />
           ) : (
             <div className="space-y-3">
               {challenges.map((challenge) => {
@@ -204,7 +235,7 @@ export default function HomePage() {
               )}
             </>
           ) : (
-            <EmptyState className="mt-5" title="O feed está começando" description="Compartilhe o primeiro insight da comunidade Bubo." />
+            <EmptyState className="mt-5" title="O feed está começando" description="Compartilhe o primeiro insight da comunidade Bubo." actionLabel="Abrir feed" onAction={() => navigate('/feed')} />
           )}
         </Card>
       </section>
