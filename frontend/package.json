@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
+    "check:ui-policy": "node scripts/check-ui-policy.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
