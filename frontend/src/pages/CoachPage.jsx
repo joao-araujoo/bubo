@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ArrowRight, BookOpen, Brain, RefreshCw, Sparkles, WifiOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import CognitiveProfileCard from '../components/deepReview/CognitiveProfileCard';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -16,6 +16,7 @@ const providerLabels = {
 };
 
 export default function CoachPage() {
+  const navigate = useNavigate();
   const { error, fetchProfile, isLoadingProfile, profile } = useCoachStore();
   const { books: libraryBooks, fetchLibrary } = useLibraryStore();
 
@@ -71,26 +72,35 @@ export default function CoachPage() {
             </div>
           </div>
 
-          <div className={`rounded-[var(--bubo-radius-lg)] border p-5 ${connected ? 'border-[rgb(var(--bubo-color-success)/0.28)] bg-[rgb(var(--bubo-color-success)/0.06)]' : 'border-[rgb(var(--bubo-color-warning)/0.32)] bg-[rgb(var(--bubo-color-warning)/0.07)]'}`}>
-            <div className="flex items-center gap-3">
-              <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl ${connected ? 'bg-[rgb(var(--bubo-color-success)/0.13)] text-[rgb(var(--bubo-color-success))]' : 'bg-[rgb(var(--bubo-color-warning)/0.13)] text-[rgb(var(--bubo-color-warning))]'}`}>
-                {connected ? <Brain size={21} aria-hidden="true" /> : <WifiOff size={21} aria-hidden="true" />}
-              </span>
-              <div>
-                <strong className="block">{connected ? 'IA conectada' : 'IA não configurada'}</strong>
-                <span className="text-sm text-[rgb(var(--bubo-color-text-muted))]">
-                  {connected
-                    ? `${providerLabels[coach?.provider] || coach?.provider || 'Provedor'} · ${coach?.model || 'modelo configurado'}`
-                    : 'Nenhuma avaliação simulada será criada'}
-                </span>
-              </div>
+          {isLoadingProfile && !profile ? (
+            <div className="rounded-[var(--bubo-radius-lg)] border border-[rgb(var(--bubo-color-border))] p-5">
+              <Skeleton className="h-11 w-11" rounded="lg" />
+              <Skeleton className="mt-4 h-5 w-1/2" />
+              <Skeleton className="mt-2 h-4 w-3/4" />
+              <Skeleton className="mt-5 h-14 w-full" />
             </div>
-            <p className="mt-4 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
-              {connected
-                ? 'Suas Deep Reviews são avaliadas pelo provedor configurado exclusivamente no servidor.'
-                : 'O acervo e a rede social continuam disponíveis, mas a Deep Review só será avaliada depois que OpenAI ou Gemini forem configurados no servidor.'}
-            </p>
-          </div>
+          ) : (
+            <div className={`rounded-[var(--bubo-radius-lg)] border p-5 ${connected ? 'border-[rgb(var(--bubo-color-success)/0.28)] bg-[rgb(var(--bubo-color-success)/0.06)]' : 'border-[rgb(var(--bubo-color-warning)/0.32)] bg-[rgb(var(--bubo-color-warning)/0.07)]'}`}>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl ${connected ? 'bg-[rgb(var(--bubo-color-success)/0.13)] text-[rgb(var(--bubo-color-success))]' : 'bg-[rgb(var(--bubo-color-warning)/0.13)] text-[rgb(var(--bubo-color-warning))]'}`}>
+                  {connected ? <Brain size={21} aria-hidden="true" /> : <WifiOff size={21} aria-hidden="true" />}
+                </span>
+                <div>
+                  <strong className="block">{connected ? 'IA conectada' : 'IA não configurada'}</strong>
+                  <span className="text-sm text-[rgb(var(--bubo-color-text-muted))]">
+                    {connected
+                      ? `${providerLabels[coach?.provider] || coach?.provider || 'Provedor'} · ${coach?.model || 'modelo configurado'}`
+                      : 'Nenhuma avaliação simulada será criada'}
+                  </span>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
+                {connected
+                  ? 'Suas Deep Reviews são avaliadas pelo provedor configurado exclusivamente no servidor.'
+                  : 'O acervo e a rede social continuam disponíveis, mas a Deep Review só será avaliada depois que OpenAI ou Gemini forem configurados no servidor.'}
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -121,7 +131,7 @@ export default function CoachPage() {
                 title="Nenhuma memória para revisar"
                 description="Conclua uma Deep Review aprovada para receber perguntas de retenção por livro."
                 actionLabel="Abrir acervo"
-                onAction={() => window.dispatchEvent(new CustomEvent('bubo:open-deep-review'))}
+                onAction={() => navigate('/library')}
               />
             </div>
           ) : (
@@ -142,9 +152,13 @@ export default function CoachPage() {
                     <p className="mt-3 text-sm leading-6 text-[rgb(var(--bubo-color-text-muted))]">
                       {book.retentionPrompt || 'Explique a ideia central da última leitura e cite uma evidência que sustenta sua interpretação.'}
                     </p>
-                    {reading && (
+                    {reading ? (
                       <Button as={Link} to={`/library/${reading._id}`} size="sm" variant="secondary" className="mt-4 w-full" rightIcon={<ArrowRight size={16} aria-hidden="true" />}>
                         Abrir leitura
+                      </Button>
+                    ) : (
+                      <Button as={Link} to="/library" size="sm" variant="ghost" className="mt-4 w-full" rightIcon={<ArrowRight size={16} aria-hidden="true" />}>
+                        Localizar no acervo
                       </Button>
                     )}
                   </article>
