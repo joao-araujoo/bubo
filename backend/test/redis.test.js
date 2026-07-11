@@ -256,8 +256,8 @@ test('optional rate-limit store counts locally during outage and returns to prim
   store.init({ windowMs: 10000 });
 
   const firstLocal = await store.increment('reader');
-  const secondLocal = await store.increment('reader');
   assert.equal(firstLocal.totalHits, 1);
+  const secondLocal = await store.increment('reader');
   assert.equal(secondLocal.totalHits, 2);
   assert.equal((await store.get('reader')).totalHits, 2);
   assert.equal(warnings.length, 1, 'Repeated failures should be log-rate-limited');
