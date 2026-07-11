@@ -24,6 +24,9 @@ const targetFromUrl = (value) => {
 
 const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logger } = {}) => {
   let client = null;
+  let connectingPromise = null;
+  let retryTimer = null;
+  let stopping = false;
   let config = {
     redisEnabled: false,
     redisRequired: false,
@@ -31,6 +34,7 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
     redisKeyPrefix: 'bubo:development',
     redisConnectTimeoutMs: 5000,
     redisCommandTimeoutMs: 1500,
+    redisReconnectDelayMs: 30000,
   };
   const state = {
     status: 'disabled',
@@ -42,6 +46,13 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
     lastErrorAt: null,
     lastReadyAt: null,
     lastPingAt: null,
+    nextRetryAt: null,
+  };
+
+  const clearRetry = () => {
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    state.nextRetryAt = null;
   };
 
   const markFailure = (error, operation) => {
@@ -56,12 +67,42 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
     });
   };
 
+  const scheduleReconnect = () => {
+    if (
+      stopping
+      || config.redisRequired
+      || !config.redisEnabled
+      || !config.redisUrl
+      || retryTimer
+      || client?.isReady
+    ) return;
+
+    const delayMs = config.redisReconnectDelayMs || 30000;
+    state.nextRetryAt = new Date(Date.now() + delayMs).toISOString();
+    retryTimer = setTimeout(async () => {
+      retryTimer = null;
+      state.nextRetryAt = null;
+      try {
+        await connect();
+      } catch (error) {
+        markFailure(error, 'scheduled_reconnect');
+        scheduleReconnect();
+      }
+    }, delayMs);
+    retryTimer.unref?.();
+    loggerImpl.info('redis_reconnect_scheduled', {
+      delayMs,
+      target: targetFromUrl(config.redisUrl),
+    });
+  };
+
   const attachLifecycle = () => {
     client.on('connect', () => {
       state.status = 'connecting';
       loggerImpl.info('redis_connecting', { target: targetFromUrl(config.redisUrl) });
     });
     client.on('ready', () => {
+      clearRetry();
       state.status = 'ready';
       state.lastReadyAt = new Date().toISOString();
       loggerImpl.info('redis_ready', {
@@ -79,7 +120,10 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
     });
     client.on('error', (error) => markFailure(error, 'connection'));
     client.on('end', () => {
-      if (state.status !== 'stopped') state.status = config.redisEnabled ? 'disconnected' : 'disabled';
+      if (!stopping) {
+        state.status = config.redisEnabled ? 'disconnected' : 'disabled';
+        scheduleReconnect();
+      }
       loggerImpl.info('redis_disconnected', { target: targetFromUrl(config.redisUrl) });
     });
   };
@@ -87,6 +131,7 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
   const configure = (nextConfig = {}) => {
     if (client) return getState();
     config = { ...config, ...nextConfig };
+    stopping = false;
 
     if (!config.redisEnabled || !config.redisUrl) {
       state.status = 'disabled';
@@ -128,7 +173,36 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
     lastErrorAt: state.lastErrorAt,
     lastReadyAt: state.lastReadyAt,
     lastPingAt: state.lastPingAt,
+    nextRetryAt: state.nextRetryAt,
   });
+
+  const waitForReady = async () => {
+    if (client.isReady) return;
+    let timeout;
+    await new Promise((resolve, reject) => {
+      const cleanup = () => {
+        client.off?.('ready', onReady);
+        client.off?.('end', onEnd);
+        if (timeout) clearTimeout(timeout);
+      };
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+      const onEnd = () => {
+        cleanup();
+        reject(unavailableError('Redis connection closed before becoming ready'));
+      };
+
+      client.once('ready', onReady);
+      client.once('end', onEnd);
+      timeout = setTimeout(() => {
+        cleanup();
+        reject(unavailableError('Redis did not become ready before timeout'));
+      }, config.redisConnectTimeoutMs);
+      timeout.unref?.();
+    });
+  };
 
   const connect = async () => {
     if (!config.redisEnabled || !config.redisUrl) {
@@ -137,21 +211,31 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
     }
     if (!client) configure(config);
     if (client.isReady) return getState();
+    if (connectingPromise) return connectingPromise;
 
-    state.status = 'connecting';
-    try {
-      if (!client.isOpen) await client.connect();
-      const pong = await sendCommand(['PING'], { operation: 'startup_ping' });
-      if (pong !== 'PONG') throw unavailableError('Redis ping returned an unexpected response');
-      state.status = 'ready';
-      state.lastReadyAt = new Date().toISOString();
-      state.lastPingAt = new Date().toISOString();
-      return getState();
-    } catch (error) {
-      markFailure(error, 'connect');
-      if (config.redisRequired) throw error;
-      return getState();
-    }
+    connectingPromise = (async () => {
+      state.status = 'connecting';
+      try {
+        if (!client.isOpen) await client.connect();
+        if (!client.isReady) await waitForReady();
+        const pong = await sendCommand(['PING'], { operation: 'startup_ping' });
+        if (pong !== 'PONG') throw unavailableError('Redis ping returned an unexpected response');
+        clearRetry();
+        state.status = 'ready';
+        state.lastReadyAt = new Date().toISOString();
+        state.lastPingAt = new Date().toISOString();
+        return getState();
+      } catch (error) {
+        markFailure(error, 'connect');
+        if (config.redisRequired) throw error;
+        scheduleReconnect();
+        return getState();
+      } finally {
+        connectingPromise = null;
+      }
+    })();
+
+    return connectingPromise;
   };
 
   const sendCommand = async (args, { operation = 'command' } = {}) => {
@@ -171,6 +255,7 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
       state.commands += 1;
       state.durationMsTotal += durationMs;
       state.durationMsMax = Math.max(state.durationMsMax, durationMs);
+      state.status = 'ready';
       if (args[0] === 'PING') state.lastPingAt = new Date().toISOString();
       return result;
     } catch (error) {
@@ -214,6 +299,8 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
   };
 
   const disconnect = async () => {
+    stopping = true;
+    clearRetry();
     if (!client) {
       state.status = 'disabled';
       return;
