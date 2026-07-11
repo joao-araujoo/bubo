@@ -12,6 +12,11 @@ const trendCopy = {
   declining: 'Há espaço para recuperar profundidade',
 };
 
+const providerLabels = {
+  openai: 'OpenAI',
+  gemini: 'Google Gemini',
+};
+
 export default function CognitiveProfileCard() {
   const { fetchProfile, isLoadingProfile, profile } = useCoachStore();
 
@@ -34,6 +39,7 @@ export default function CognitiveProfileCard() {
   const coach = profile?.coach;
   const summary = profile?.summary || {};
   const dimensions = Object.values(profile?.dimensions || {});
+  const connected = Boolean(coach?.connected);
 
   return (
     <Card>
@@ -47,9 +53,9 @@ export default function CognitiveProfileCard() {
             <h2 className="mt-1 text-xl font-black">Mapa cognitivo</h2>
           </div>
         </div>
-        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${coach?.connected ? 'bg-[rgb(var(--bubo-color-success)/0.1)] text-[rgb(var(--bubo-color-success))]' : 'bg-[rgb(var(--bubo-color-warning)/0.1)] text-[rgb(var(--bubo-color-warning))]'}`}>
-          {coach?.connected ? <Sparkles size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}
-          {coach?.connected ? `${coach.provider} conectado` : 'Avaliador local'}
+        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${connected ? 'bg-[rgb(var(--bubo-color-success)/0.1)] text-[rgb(var(--bubo-color-success))]' : 'bg-[rgb(var(--bubo-color-warning)/0.1)] text-[rgb(var(--bubo-color-warning))]'}`}>
+          {connected ? <Sparkles size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}
+          {connected ? `${providerLabels[coach?.provider] || coach?.provider || 'IA'} conectada` : 'IA não configurada'}
         </span>
       </div>
 
