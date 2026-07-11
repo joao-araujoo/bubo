@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   CheckCircle2,
   FileText,
   Lightbulb,
