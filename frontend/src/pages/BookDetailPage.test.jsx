@@ -114,8 +114,8 @@ describe('BookDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Registrar sessão' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Registrar sessão de leitura' });
-    const pageFromInput = await within(dialog).findByLabelText('Página inicial');
-    const pageToInput = await within(dialog).findByLabelText('Página final');
+    const pageFromInput = await within(dialog).findByLabelText(/Página inicial/i);
+    const pageToInput = await within(dialog).findByLabelText(/Página final/i);
 
     await waitFor(() => expect(pageFromInput).toHaveValue(121));
     expect(pageToInput).toHaveAttribute('max', '412');
