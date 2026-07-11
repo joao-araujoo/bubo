@@ -56,8 +56,6 @@ const createLimiter = ({ namespace, max, message }) => {
       message,
       code: 'RATE_LIMIT_EXCEEDED',
       requestId: req.requestId,
-      policy: namespace,
-      distributed: redisStore.distributed,
     }),
     skip: (req) => req.path.startsWith('/health'),
   });
