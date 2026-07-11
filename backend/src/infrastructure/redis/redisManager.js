@@ -11,6 +11,7 @@ const targetFromUrl = (value) => {
   if (!value) return null;
   try {
     const parsed = new URL(value);
+    if (!['redis:', 'rediss:'].includes(parsed.protocol) || !parsed.hostname) return null;
     return {
       protocol: parsed.protocol.replace(':', ''),
       host: parsed.hostname,
@@ -138,6 +139,11 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
       return getState();
     }
 
+    if (!targetFromUrl(config.redisUrl)) {
+      state.status = 'invalid';
+      return getState();
+    }
+
     client = createClientImpl({
       url: config.redisUrl,
       disableOfflineQueue: true,
@@ -210,6 +216,11 @@ const createRedisManager = ({ createClientImpl = createClient, loggerImpl = logg
       return getState();
     }
     if (!client) configure(config);
+    if (!client) {
+      const error = unavailableError('Redis client configuration is invalid');
+      if (config.redisRequired) throw error;
+      return getState();
+    }
     if (client.isReady) return getState();
     if (connectingPromise) return connectingPromise;
 
