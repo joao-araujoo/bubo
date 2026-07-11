@@ -2,6 +2,7 @@ const UserBook = require('../models/UserBook');
 const DeepReview = require('../models/DeepReview');
 const SocialActivity = require('../models/SocialActivity');
 const achievementController = require('./achievementController');
+const logger = require('../utils/logger');
 const {
   evaluateDeepReview,
   getReadingCoachStatus,
@@ -61,16 +62,22 @@ exports.submitReview = async (req, res) => {
     if (!userBook) return res.status(404).json({ message: 'Livro não encontrado no seu acervo.' });
 
     const book = userBook.bookId;
+    const totalPages = Number(userBook.totalPagesOverride)
+      || Number(book.totalPages)
+      || 0;
     const pageError = validatePages({
       pageFrom,
       pageTo,
       currentPage: Number(userBook.currentPage || 0),
-      totalPages: Number(book.totalPages || 0),
+      totalPages,
     });
     if (pageError) return res.status(400).json({ message: pageError });
 
     const { result: aiResult, meta } = await evaluateDeepReview({
-      book,
+      book: {
+        ...book.toObject(),
+        totalPages,
+      },
       pageFrom,
       pageTo,
       reviewText,
@@ -101,6 +108,7 @@ exports.submitReview = async (req, res) => {
       await UserBook.findByIdAndUpdate(userBookId, {
         $max: { currentPage: pageTo },
         $set: { updatedAt: new Date() },
+        $inc: { deepReviewCount: 1 },
         $push: {
           deepReviews: {
             pageFrom,
@@ -137,7 +145,12 @@ exports.submitReview = async (req, res) => {
       aiResult: responseResult,
     });
   } catch (err) {
-    console.error('Deep review error:', err);
+    logger.error('deep_review_failed', {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      userBookId,
+      error: err,
+    });
     if (err.code === 'AI_NOT_CONFIGURED') {
       return res.status(503).json({ message: err.message, code: err.code });
     }
@@ -287,7 +300,11 @@ exports.getCognitiveProfile = async (req, res) => {
       books,
     });
   } catch (err) {
-    console.error('Cognitive profile error:', err);
+    logger.error('cognitive_profile_failed', {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      error: err,
+    });
     res.status(500).json({ message: 'Não foi possível calcular seu perfil cognitivo.' });
   }
 };
