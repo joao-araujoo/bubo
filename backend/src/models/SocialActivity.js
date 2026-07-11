@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const socialActivitySchema = new mongoose.Schema({
+  sourceId: { type: String, default: '', trim: true, maxlength: 180 },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   type: {
     type: String,
@@ -20,6 +21,10 @@ const socialActivitySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+socialActivitySchema.index(
+  { sourceId: 1 },
+  { unique: true, partialFilterExpression: { sourceId: { $type: 'string', $gt: '' } } },
+);
 socialActivitySchema.index({ createdAt: -1 });
 socialActivitySchema.index({ userId: 1, createdAt: -1 });
 
