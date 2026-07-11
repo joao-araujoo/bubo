@@ -10,6 +10,11 @@ const { captureException } = require('./observability/errorReporter');
 const { buildLiveness, buildReadiness } = require('./observability/health');
 const { getMetricsSnapshot } = require('./observability/metrics');
 const { getRuntimeState } = require('./observability/runtimeState');
+const { createRateLimitStore } = require('./infrastructure/redis/rateLimitStore');
+const {
+  configureRedis,
+  getRedisState,
+} = require('./infrastructure/redis/redisManager');
 const logger = require('./utils/logger');
 
 const authRoutes = require('./routes/auth');
@@ -20,6 +25,7 @@ const achievementRoutes = require('./routes/achievements');
 const clubRoutes = require('./routes/clubs');
 
 const config = getEnvironment(process.env, { allowInvalid: true });
+configureRedis(config);
 const app = express();
 
 if (config.trustProxy) app.set('trust proxy', 1);
@@ -37,30 +43,40 @@ const corsOptions = {
   },
 };
 
-const createLimiter = ({ max, message }) => rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => res.status(429).json({
-    message,
-    code: 'RATE_LIMIT_EXCEEDED',
-    requestId: req.requestId,
-  }),
-  skip: (req) => req.path.startsWith('/health'),
-});
+const createLimiter = ({ namespace, max, message }) => {
+  const redisStore = createRateLimitStore({ namespace, config });
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: redisStore.passOnStoreError,
+    ...(redisStore.store ? { store: redisStore.store } : {}),
+    handler: (req, res) => res.status(429).json({
+      message,
+      code: 'RATE_LIMIT_EXCEEDED',
+      requestId: req.requestId,
+      policy: namespace,
+      distributed: redisStore.distributed,
+    }),
+    skip: (req) => req.path.startsWith('/health'),
+  });
+};
 
 const apiLimiter = createLimiter({
+  namespace: 'api',
   max: config.apiRateLimit,
   message: 'Muitas requisições. Aguarde alguns minutos e tente novamente.',
 });
 
 const authLimiter = createLimiter({
+  namespace: 'auth',
   max: config.authRateLimit,
   message: 'Muitas tentativas de autenticação. Aguarde e tente novamente.',
 });
 
 const bookSearchLimiter = createLimiter({
+  namespace: 'book-search',
   max: config.bookSearchRateLimit,
   message: 'Muitas buscas em pouco tempo. Aguarde alguns minutos antes de consultar o catálogo novamente.',
 });
@@ -72,6 +88,7 @@ const readinessHandler = (req, res) => {
     requestId: req.requestId,
     runtime: getRuntimeState(),
     databaseReady: databaseReady(),
+    redis: getRedisState(),
   });
   res.setHeader('Cache-Control', 'no-store');
   return res.status(payload.ready ? 200 : 503).json(payload);
@@ -123,6 +140,7 @@ app.get('/api/metrics', metricsAuthorized, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.json(getMetricsSnapshot({
     database: databaseReady() ? 'connected' : 'disconnected',
+    redis: getRedisState(),
     runtime: getRuntimeState(),
     service: config.serviceName,
     release: config.release,
