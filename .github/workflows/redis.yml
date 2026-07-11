@@ -97,7 +97,10 @@ jobs:
       - name: Verify Redis remains private
         shell: bash
         run: |
-          test -z "$(docker compose port redis 6379 2>/dev/null || true)"
+          REDIS_CONTAINER=$(docker compose ps -q redis)
+          test -n "$REDIS_CONTAINER"
+          docker inspect "$REDIS_CONTAINER" \
+            | jq -e '.[0].HostConfig.PortBindings == null or ((.[0].HostConfig.PortBindings // {}) | length == 0)'
 
       - name: Verify cache, TTL and shared store behavior
         run: docker compose exec -T backend npm run verify:redis
