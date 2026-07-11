@@ -8,12 +8,12 @@ const deepReviewSchema = new mongoose.Schema({
   reviewText: { type: String, required: true, trim: true, maxlength: 12000 },
   cognitiveDepth: { type: Number, default: 0, min: 0, max: 100 },
   status: { type: String, enum: ['approved', 'guiding'], default: 'guiding', index: true },
-  aiProvider: { type: String, enum: ['openai', 'gemini', 'local'], default: 'local' },
+  aiProvider: { type: String, enum: ['openai', 'gemini', 'seed'], required: true },
   aiModel: { type: String, default: '', trim: true, maxlength: 120 },
   evaluationVersion: { type: String, default: '1.0', trim: true, maxlength: 30 },
   wordCount: { type: Number, default: 0, min: 0 },
   aiResponse: { type: Object, default: {} },
-  createdAt: { type: Date, default: Date.now, index: true }
+  createdAt: { type: Date, default: Date.now, index: true },
 });
 
 deepReviewSchema.index({ userId: 1, createdAt: -1 });

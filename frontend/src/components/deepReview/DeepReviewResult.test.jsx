@@ -28,8 +28,8 @@ describe('DeepReviewResult', () => {
   it('shows dimensions, guidance and provider transparency', () => {
     render(<DeepReviewResult result={approvedResult} onSaveProgress={vi.fn()} />);
 
-    expect(screen.getByText('Aprovada')).toBeInTheDocument();
-    expect(screen.getByText('openai')).toBeInTheDocument();
+    expect(screen.getByText('Deep Review aprovada')).toBeInTheDocument();
+    expect(screen.getByText('OpenAI')).toBeInTheDocument();
     expect(screen.getByText('Compreensão')).toBeInTheDocument();
     expect(screen.getByText('Especificidade')).toBeInTheDocument();
     expect(screen.getByText(approvedResult.socraticQuestion)).toBeInTheDocument();
@@ -45,21 +45,22 @@ describe('DeepReviewResult', () => {
     expect(onSaveProgress).toHaveBeenCalledTimes(1);
   });
 
-  it('identifies a local fallback without showing a save action for guiding results', () => {
+  it('shows guidance without a save action or local fallback for non-approved results', () => {
     render(
       <DeepReviewResult
         result={{
           ...approvedResult,
           state: 'GUIDING',
           cognitiveDepth: 0,
-          meta: { provider: 'local', degraded: true },
+          meta: { provider: 'gemini', degraded: false },
         }}
         onSaveProgress={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('Vamos aprofundar')).toBeInTheDocument();
-    expect(screen.getByText('fallback local')).toBeInTheDocument();
+    expect(screen.getByText('Há espaço para aprofundar')).toBeInTheDocument();
+    expect(screen.getByText('Gemini')).toBeInTheDocument();
+    expect(screen.queryByText(/fallback local/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Salvar progresso' })).not.toBeInTheDocument();
   });
 });

@@ -13,6 +13,12 @@ const patchAuthor = (activities, userId, patch) => activities.map((activity) => 
     : activity
 ));
 
+const patchRecommendation = (recommendations, userId, patch) => recommendations.map((recommendation) => (
+  String(recommendation.user?._id) === String(userId)
+    ? { ...recommendation, ...patch }
+    : recommendation
+));
+
 const getMessage = (error, fallback) => error.response?.data?.message || fallback;
 
 export const useSocialStore = create((set, get) => ({
@@ -21,10 +27,15 @@ export const useSocialStore = create((set, get) => ({
   loadingComments: {},
   notifications: [],
   unreadNotifications: 0,
+  recommendations: [],
+  recommendationMeta: null,
+  recommendationError: null,
+  updatingRecommendationIds: {},
   scope: 'all',
   isLoading: false,
   isPublishing: false,
   isLoadingNotifications: false,
+  isLoadingRecommendations: false,
   error: null,
 
   fetchFeed: async (scope = get().scope) => {
@@ -40,6 +51,26 @@ export const useSocialStore = create((set, get) => ({
     }
   },
 
+  fetchReaderRecommendations: async ({ force = false } = {}) => {
+    if (get().isLoadingRecommendations) return get().recommendations;
+    if (!force && get().recommendations.length > 0) return get().recommendations;
+
+    set({ isLoadingRecommendations: true, recommendationError: null });
+    try {
+      const { data } = await api.get('/social/recommendations/readers');
+      set({
+        recommendations: data.recommendations || [],
+        recommendationMeta: data.meta || null,
+        isLoadingRecommendations: false,
+      });
+      return data.recommendations || [];
+    } catch (error) {
+      const message = getMessage(error, 'Não foi possível calcular leitores próximos agora.');
+      set({ recommendationError: message, isLoadingRecommendations: false });
+      throw new Error(message);
+    }
+  },
+
   createPost: async ({ message, insight = '', postType = 'free', bookId }) => {
     set({ isPublishing: true, error: null });
     try {
@@ -48,11 +79,11 @@ export const useSocialStore = create((set, get) => ({
         postType,
         message,
         insight,
-        bookId
+        bookId,
       });
       set((state) => ({
         activities: [data.activity, ...state.activities],
-        isPublishing: false
+        isPublishing: false,
       }));
       return data.activity;
     } catch (error) {
@@ -76,8 +107,8 @@ export const useSocialStore = create((set, get) => ({
       set((state) => ({
         activities: patchActivity(state.activities, activityId, {
           isLiked: data.active,
-          likesCount: data.count
-        })
+          likesCount: data.count,
+        }),
       }));
       return data;
     } catch (error) {
@@ -96,7 +127,7 @@ export const useSocialStore = create((set, get) => ({
     try {
       const { data } = await api.put(`/social/activity/${activityId}/save`);
       set((state) => ({
-        activities: patchActivity(state.activities, activityId, { isSaved: data.active })
+        activities: patchActivity(state.activities, activityId, { isSaved: data.active }),
       }));
       return data;
     } catch (error) {
@@ -106,27 +137,47 @@ export const useSocialStore = create((set, get) => ({
   },
 
   toggleFollow: async (userId) => {
-    const before = get().activities;
-    const authorActivity = before.find((item) => String(item.userId) === String(userId));
-    if (!authorActivity) return null;
+    const beforeActivities = get().activities;
+    const beforeRecommendations = get().recommendations;
+    const authorActivity = beforeActivities.find((item) => String(item.userId) === String(userId));
+    const recommendation = beforeRecommendations.find((item) => String(item.user?._id) === String(userId));
+    const currentFollowing = recommendation?.isFollowing ?? authorActivity?.isFollowing ?? false;
 
-    set({ activities: patchAuthor(before, userId, { isFollowing: !authorActivity.isFollowing }) });
+    set((state) => ({
+      activities: patchAuthor(state.activities, userId, { isFollowing: !currentFollowing }),
+      recommendations: patchRecommendation(state.recommendations, userId, { isFollowing: !currentFollowing }),
+      updatingRecommendationIds: { ...state.updatingRecommendationIds, [userId]: true },
+    }));
 
     try {
       const { data } = await api.put(`/social/users/${userId}/follow`);
-      set((state) => ({
-        activities: patchAuthor(state.activities, userId, { isFollowing: data.isFollowing })
-      }));
+      set((state) => {
+        const nextUpdating = { ...state.updatingRecommendationIds };
+        delete nextUpdating[userId];
+        return {
+          activities: patchAuthor(state.activities, userId, { isFollowing: data.isFollowing }),
+          recommendations: patchRecommendation(state.recommendations, userId, { isFollowing: data.isFollowing }),
+          updatingRecommendationIds: nextUpdating,
+        };
+      });
       return data;
     } catch (error) {
-      set({ activities: before });
+      set((state) => {
+        const nextUpdating = { ...state.updatingRecommendationIds };
+        delete nextUpdating[userId];
+        return {
+          activities: beforeActivities,
+          recommendations: beforeRecommendations,
+          updatingRecommendationIds: nextUpdating,
+        };
+      });
       throw new Error(getMessage(error, 'Não foi possível atualizar este vínculo.'));
     }
   },
 
   fetchComments: async (activityId) => {
     set((state) => ({
-      loadingComments: { ...state.loadingComments, [activityId]: true }
+      loadingComments: { ...state.loadingComments, [activityId]: true },
     }));
 
     try {
@@ -134,14 +185,14 @@ export const useSocialStore = create((set, get) => ({
       set((state) => ({
         commentsByActivity: {
           ...state.commentsByActivity,
-          [activityId]: data.comments || []
+          [activityId]: data.comments || [],
         },
-        loadingComments: { ...state.loadingComments, [activityId]: false }
+        loadingComments: { ...state.loadingComments, [activityId]: false },
       }));
       return data.comments || [];
     } catch (error) {
       set((state) => ({
-        loadingComments: { ...state.loadingComments, [activityId]: false }
+        loadingComments: { ...state.loadingComments, [activityId]: false },
       }));
       throw new Error(getMessage(error, 'Não foi possível carregar os comentários.'));
     }
@@ -153,13 +204,13 @@ export const useSocialStore = create((set, get) => ({
       set((state) => ({
         commentsByActivity: {
           ...state.commentsByActivity,
-          [activityId]: [...(state.commentsByActivity[activityId] || []), data.comment]
+          [activityId]: [...(state.commentsByActivity[activityId] || []), data.comment],
         },
         activities: patchActivity(state.activities, activityId, {
           commentsCount: Number(
-            state.activities.find((item) => String(item._id) === String(activityId))?.commentsCount || 0
-          ) + 1
-        })
+            state.activities.find((item) => String(item._id) === String(activityId))?.commentsCount || 0,
+          ) + 1,
+        }),
       }));
       return data.comment;
     } catch (error) {
@@ -174,13 +225,13 @@ export const useSocialStore = create((set, get) => ({
     set((state) => ({
       commentsByActivity: {
         ...state.commentsByActivity,
-        [activityId]: beforeComments.filter((comment) => String(comment._id) !== String(commentId))
+        [activityId]: beforeComments.filter((comment) => String(comment._id) !== String(commentId)),
       },
       activities: patchActivity(state.activities, activityId, {
         commentsCount: Math.max(0, Number(
-          state.activities.find((item) => String(item._id) === String(activityId))?.commentsCount || 0
-        ) - 1)
-      })
+          state.activities.find((item) => String(item._id) === String(activityId))?.commentsCount || 0,
+        ) - 1),
+      }),
     }));
 
     try {
@@ -189,9 +240,9 @@ export const useSocialStore = create((set, get) => ({
       set((state) => ({
         commentsByActivity: {
           ...state.commentsByActivity,
-          [activityId]: beforeComments
+          [activityId]: beforeComments,
         },
-        activities: beforeActivities
+        activities: beforeActivities,
       }));
       throw new Error(getMessage(error, 'Não foi possível remover o comentário.'));
     }
@@ -204,7 +255,7 @@ export const useSocialStore = create((set, get) => ({
       set({
         notifications: data.notifications || [],
         unreadNotifications: data.unreadCount || 0,
-        isLoadingNotifications: false
+        isLoadingNotifications: false,
       });
       return data.notifications || [];
     } catch (error) {
@@ -222,7 +273,7 @@ export const useSocialStore = create((set, get) => ({
         ids.length === 0 || idSet.has(String(notification._id))
           ? { ...notification, isRead: true }
           : notification
-      ))
+      )),
     }));
     return data;
   },
@@ -233,10 +284,15 @@ export const useSocialStore = create((set, get) => ({
     loadingComments: {},
     notifications: [],
     unreadNotifications: 0,
+    recommendations: [],
+    recommendationMeta: null,
+    recommendationError: null,
+    updatingRecommendationIds: {},
     scope: 'all',
     isLoading: false,
     isPublishing: false,
     isLoadingNotifications: false,
-    error: null
-  })
+    isLoadingRecommendations: false,
+    error: null,
+  }),
 }));

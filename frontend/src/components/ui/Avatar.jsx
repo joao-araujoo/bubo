@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const sizeClasses = {
   sm: 'h-8 w-8 text-xs',
@@ -14,6 +14,7 @@ export default function Avatar({
   size = 'md',
   src,
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const sizeClass = sizeClasses[size] ?? sizeClasses.md;
   const initials = name
     .split(' ')
@@ -23,21 +24,29 @@ export default function Avatar({
     .join('')
     .toUpperCase();
 
-  if (src) {
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
+
+  if (src && !imageFailed) {
     return (
       <img
         src={src}
         alt={alt || name}
-        className={`shrink-0 rounded-full border border-[rgb(var(--bubo-color-border))] object-cover ${sizeClass} ${className}`}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setImageFailed(true)}
+        className={`shrink-0 rounded-full border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface-muted))] object-cover shadow-[var(--bubo-shadow-sm)] ${sizeClass} ${className}`}
       />
     );
   }
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border border-[rgb(var(--bubo-color-primary)/0.25)] bg-[rgb(var(--bubo-color-primary)/0.12)] font-bold text-[rgb(var(--bubo-color-primary))] ${sizeClass} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border border-[rgb(var(--bubo-color-primary)/0.25)] bg-[rgb(var(--bubo-color-primary)/0.1)] font-extrabold text-[rgb(var(--bubo-color-primary))] ${sizeClass} ${className}`}
       aria-label={name}
-      title={name}
+      title={src && imageFailed ? `A imagem de ${name} não carregou; exibindo iniciais.` : name}
     >
       {initials || 'U'}
     </span>

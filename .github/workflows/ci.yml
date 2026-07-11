@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Enforce UI policy
+        id: frontend-policy
+        continue-on-error: true
+        shell: bash
+        run: npm run check:ui-policy > policy.log 2>&1
+
       - name: Lint source code
         id: frontend-lint
         continue-on-error: true
@@ -50,11 +56,13 @@ jobs:
       - name: Report quality gate failure
         if: >-
           github.event_name == 'pull_request' &&
-          (steps.frontend-lint.outcome == 'failure' ||
+          (steps.frontend-policy.outcome == 'failure' ||
+           steps.frontend-lint.outcome == 'failure' ||
            steps.frontend-test.outcome == 'failure' ||
            steps.frontend-build.outcome == 'failure')
         uses: actions/github-script@v7
         env:
+          POLICY_OUTCOME: ${{ steps.frontend-policy.outcome }}
           LINT_OUTCOME: ${{ steps.frontend-lint.outcome }}
           TEST_OUTCOME: ${{ steps.frontend-test.outcome }}
           BUILD_OUTCOME: ${{ steps.frontend-build.outcome }}
@@ -63,6 +71,7 @@ jobs:
             const fs = require('fs');
 
             const checks = [
+              ['UI policy', process.env.POLICY_OUTCOME, 'frontend/policy.log'],
               ['Lint', process.env.LINT_OUTCOME, 'frontend/lint.log'],
               ['Tests', process.env.TEST_OUTCOME, 'frontend/test.log'],
               ['Build', process.env.BUILD_OUTCOME, 'frontend/build.log'],
@@ -85,6 +94,7 @@ jobs:
 
       - name: Enforce frontend quality gate
         if: >-
+          steps.frontend-policy.outcome == 'failure' ||
           steps.frontend-lint.outcome == 'failure' ||
           steps.frontend-test.outcome == 'failure' ||
           steps.frontend-build.outcome == 'failure'
@@ -169,7 +179,7 @@ jobs:
       BUBO_PORT: 8080
       API_PORT: 3001
       JWT_SECRET: ci-smoke-test-secret-with-more-than-24-characters
-      AI_PROVIDER: local
+      AI_PROVIDER: auto
       SEED_DEMO_EMAIL: demo@bubo.local
       SEED_DEMO_PASSWORD: BuboDemo123!
     steps:

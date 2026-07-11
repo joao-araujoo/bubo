@@ -116,7 +116,7 @@ export default function OnboardingFlow() {
         };
       }
       if (current.favoriteGenres.length >= 6) {
-        toast('Escolha até 6 gêneros para manter seu perfil focado.', { icon: '📚' });
+        toast('Escolha até 6 gêneros para manter seu perfil focado.');
         return current;
       }
       return {
@@ -149,7 +149,7 @@ export default function OnboardingFlow() {
 
   const continueFlow = () => {
     if (step === 2 && form.favoriteGenres.length === 0) {
-      toast('Escolha ao menos um gênero ou avance usando “Configurar depois”.', { icon: '📚' });
+      toast('Escolha ao menos um gênero ou avance usando “Configurar depois”.');
       return;
     }
     if (step < stepCopy.length - 1) setStep((current) => current + 1);

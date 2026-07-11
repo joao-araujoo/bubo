@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, Brain, Gem, Plus, Sparkles, Target } from 'lucide
 import { Link } from 'react-router-dom';
 import BookCover from '../components/books/BookCover';
 import BuboMascot from '../components/owl/BuboMascot';
+import ReaderRecommendationsSection from '../components/social/ReaderRecommendationsSection';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -28,7 +29,7 @@ function GuestHero() {
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-[rgb(var(--bubo-color-primary)/0.22)] bg-[rgb(var(--bubo-color-primary)/0.08)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-[rgb(var(--bubo-color-primary))]">
             <span className="h-2 w-2 rounded-full bg-[rgb(var(--bubo-color-success))]" />
-            Bubo 2.0
+            Bubo 3.0
           </span>
           <h1 className="mt-6 max-w-xl text-4xl font-black leading-[1.06] tracking-[-0.04em] sm:text-5xl">
             Leia menos no automático. <span className="text-[rgb(var(--bubo-color-primary))]">Retenha mais.</span>
@@ -37,8 +38,8 @@ function GuestHero() {
             O Bubo une acervo, Deep Reviews, inteligência artificial e comunidade para transformar progresso de leitura em memória validada.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <Button as={Link} to="/auth" className="w-full sm:w-auto" leftIcon={<Sparkles size={18} />}>Começar agora</Button>
-            <Button as={Link} to="/auth" className="w-full sm:w-auto" variant="secondary" rightIcon={<ArrowRight size={17} />}>Conhecer a comunidade</Button>
+            <Button as={Link} to="/auth" className="w-full sm:w-auto" leftIcon={<Sparkles size={18} aria-hidden="true" />}>Começar agora</Button>
+            <Button as={Link} to="/auth" className="w-full sm:w-auto" variant="secondary" rightIcon={<ArrowRight size={17} aria-hidden="true" />}>Conhecer a comunidade</Button>
           </div>
         </div>
 
@@ -47,7 +48,7 @@ function GuestHero() {
             <BuboMascot state="approved" size={210} />
           </div>
           <div className="absolute bottom-5 right-4 rounded-[var(--bubo-radius-lg)] border border-[rgb(var(--bubo-color-border))] bg-[rgb(var(--bubo-color-surface))] px-5 py-3 shadow-[var(--bubo-shadow-md)]">
-            <span className="block text-2xl font-black text-[rgb(var(--bubo-color-primary))]">86%</span>
+            <span className="block text-2xl font-black text-[rgb(var(--bubo-color-primary))]">86</span>
             <span className="text-xs text-[rgb(var(--bubo-color-text-muted))]">profundidade</span>
           </div>
         </div>
@@ -60,14 +61,20 @@ export default function HomePage() {
   const { token, user } = useAuthStore();
   const { books, fetchLibrary, isLoading: libraryLoading } = useLibraryStore();
   const { dashboard, fetchDashboard, isLoading: dashboardLoading } = useDashboardStore();
-  const { activities, fetchFeed, isLoading: feedLoading } = useSocialStore();
+  const {
+    activities,
+    fetchFeed,
+    fetchReaderRecommendations,
+    isLoading: feedLoading,
+  } = useSocialStore();
 
   useEffect(() => {
     if (!token) return;
     fetchLibrary().catch(() => {});
     fetchDashboard().catch(() => {});
     fetchFeed().catch(() => {});
-  }, [fetchDashboard, fetchFeed, fetchLibrary, token]);
+    fetchReaderRecommendations().catch(() => {});
+  }, [fetchDashboard, fetchFeed, fetchLibrary, fetchReaderRecommendations, token]);
 
   if (!token) return <GuestHero />;
 
@@ -81,14 +88,14 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[rgb(var(--bubo-color-primary))]">Agora</p>
           <h1 className="mt-1 text-2xl font-black tracking-[-0.025em] sm:text-3xl">Lendo no momento</h1>
           <p className="mt-2 text-sm text-[rgb(var(--bubo-color-text-muted))]">Continue de onde parou e registre o que realmente ficou.</p>
         </div>
-        <Button as={Link} to="/discover" variant="secondary" leftIcon={<Plus size={17} />}>Adicionar livro</Button>
+        <Button as={Link} to="/discover" variant="secondary" leftIcon={<Plus size={17} aria-hidden="true" />}>Adicionar livro</Button>
       </section>
 
       {isLoading ? (
@@ -149,7 +156,7 @@ export default function HomePage() {
                 return (
                   <div key={challenge.id} className="rounded-[var(--bubo-radius-md)] border border-[rgb(var(--bubo-color-border))] p-4">
                     <div className="flex gap-3">
-                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--bubo-color-primary)/0.1)] text-[rgb(var(--bubo-color-primary))]"><Icon size={20} /></span>
+                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--bubo-color-primary)/0.1)] text-[rgb(var(--bubo-color-primary))]"><Icon size={20} aria-hidden="true" /></span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -201,6 +208,8 @@ export default function HomePage() {
           )}
         </Card>
       </section>
+
+      <ReaderRecommendationsSection />
     </div>
   );
 }
