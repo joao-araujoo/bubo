@@ -9,6 +9,7 @@
     "test": "node --test",
     "seed": "node scripts/seed.js",
     "verify:redis": "node scripts/verify-redis.js",
+    "verify:redis:counter": "node scripts/verify-redis-counter.js",
     "check": "npm test && node -e \"require('./src/app'); console.log('Backend modules loaded successfully')\""
   },
   "dependencies": {
