@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bubo-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ENV": "development"
+  }
+
+  // Add the existing R2 bucket after its exact name is confirmed:
+  // "r2_buckets": [
+  //   { "binding": "MEDIA", "bucket_name": "your-existing-bubo-bucket" }
+  // ]
+}

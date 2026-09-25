@@ -1,26 +1,16 @@
-# Dependencies
 node_modules/
-frontend/node_modules/
-backend/node_modules/
-
-# Builds and coverage
-frontend/dist/
+.expo/
+.expo-shared/
+dist/
+build/
 coverage/
-*.log
-npm-debug.log*
-
-# Environment and secrets
 .env
 .env.*
 !.env.example
-!backend/.env.example
-
-# Editors and operating systems
-.vscode/
-.idea/
+.dev.vars
+.wrangler/
 .DS_Store
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.swp
+*.log
+npm-debug.log*
+android/.gradle/
+ios/Pods/

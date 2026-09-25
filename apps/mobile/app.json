@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Bubo",
+    "slug": "bubo",
+    "version": "4.0.0",
+    "orientation": "portrait",
+    "scheme": "bubo",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.joaoaraujo.bubo"
+    },
+    "android": {
+      "package": "com.joaoaraujo.bubo",
+      "adaptiveIcon": { "backgroundColor": "#F8F5FF" }
+    },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}
