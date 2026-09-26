@@ -13,6 +13,7 @@ Bubo 4 uses Neon PostgreSQL as the source of truth.
 ## Current
 
 - `0001_core.sql` — profiles, books/editions, shelf, reading sessions, reflections, media metadata.
+- `0002_onboarding_settings.sql` — onboarding preferences, interests, reading goals, notification preferences, push devices and updated_at triggers.
 
 ## Environments
 
