@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { colors } from '../../src/theme/tokens';
+import { colors, fonts } from '../../src/theme/tokens';
 
 export default function TabsLayout() {
   return (
@@ -9,16 +9,20 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          minHeight: 68,
+          minHeight: 72,
           paddingTop: 8,
           paddingBottom: 10,
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
+          borderTopWidth: 2,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontFamily: fonts.bold,
+        },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Hoje' }} />
+      <Tabs.Screen name="today" options={{ title: 'Hoje' }} />
       <Tabs.Screen name="library" options={{ title: 'Estante' }} />
       <Tabs.Screen name="review" options={{ title: 'Revisar' }} />
       <Tabs.Screen name="community" options={{ title: 'Comunidade' }} />

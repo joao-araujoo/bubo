@@ -19,3 +19,57 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
+
+  auth-schema-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Generate Better Auth schema with official CLI
+        working-directory: apps/api
+        shell: bash
+        run: |
+          cat > auth-schema-probe.ts <<'EOF'
+          import { expo } from '@better-auth/expo';
+          import { betterAuth } from 'better-auth';
+
+          export const auth = betterAuth({
+            appName: 'Bubo',
+            plugins: [expo()],
+            emailAndPassword: {
+              enabled: true,
+              minPasswordLength: 8,
+              revokeSessionsOnPasswordReset: true,
+            },
+            rateLimit: {
+              enabled: true,
+              storage: 'database',
+            },
+            trustedOrigins: ['bubo://'],
+          });
+          EOF
+
+          npx auth@1.7.6 generate             --adapter drizzle             --dialect postgresql             --config ./auth-schema-probe.ts             --output ./auth-schema.generated.ts             --yes
+
+          echo '===== BETTER_AUTH_SCHEMA_BEGIN ====='
+          cat auth-schema.generated.ts
+          echo '===== BETTER_AUTH_SCHEMA_END ====='
+
+          cat > drizzle.probe.config.ts <<'EOF'
+          import { defineConfig } from 'drizzle-kit';
+
+          export default defineConfig({
+            dialect: 'postgresql',
+            schema: './auth-schema.generated.ts',
+            out: './.auth-drizzle-probe',
+          });
+          EOF
+
+          npx drizzle-kit generate --config ./drizzle.probe.config.ts --name better_auth
+
+          echo '===== BETTER_AUTH_SQL_BEGIN ====='
+          find ./.auth-drizzle-probe -name '*.sql' -type f -print -exec cat {} \;
+          echo '===== BETTER_AUTH_SQL_END ====='
