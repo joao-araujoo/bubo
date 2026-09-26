@@ -6,10 +6,11 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "APP_ENV": "development"
-  }
-
-  // Add the existing R2 bucket after its exact name is confirmed:
-  // "r2_buckets": [
-  //   { "binding": "MEDIA", "bucket_name": "your-existing-bubo-bucket" }
-  // ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "bubo"
+    }
+  ]
 }
