@@ -9,13 +9,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.5",
+    "@better-auth/expo": "^1.7.6",
     "@neondatabase/serverless": "^1.0.0",
+    "better-auth": "^1.7.6",
+    "drizzle-orm": "^0.45.3",
     "hono": "^4.9.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "latest",
+    "@cloudflare/workers-types": "^4.20260925.0",
+    "drizzle-kit": "^0.31.11",
     "typescript": "~6.0.3",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.44.0"
   }
 }
