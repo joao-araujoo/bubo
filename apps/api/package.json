@@ -1,0 +1,36 @@
+{
+  "name": "@bubo/api",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Bubo API — Cloudflare Workers + Hono.",
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../scripts/dev-api.mjs",
+    "dev:worker": "wrangler dev --ip 0.0.0.0 --port 8787",
+    "dev:local": "tsx watch --clear-screen=false dev/local-server.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "test": "vitest run",
+    "check:bundle": "wrangler deploy --dry-run --env production --outdir dist",
+    "deploy:production": "wrangler deploy --env production"
+  },
+  "dependencies": {
+    "@better-auth/expo": "1.7.6",
+    "@bubo/config": "*",
+    "@bubo/contracts": "*",
+    "@bubo/database": "*",
+    "@bubo/domain": "*",
+    "@bubo/scoring": "*",
+    "better-auth": "1.7.6",
+    "drizzle-orm": "0.45.3",
+    "hono": "4.13.9",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@bubo/testing": "*",
+    "@cloudflare/workers-types": "5.20260926.1",
+    "@electric-sql/pglite": "0.5.8",
+    "@hono/node-server": "2.1.1",
+    "tsx": "4.23.15",
+    "wrangler": "4.141.0"
+  }
+}

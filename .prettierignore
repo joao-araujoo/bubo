@@ -1,0 +1,19 @@
+node_modules/
+package-lock.json
+.expo/
+dist/
+coverage/
+.wrangler/
+apps/api/.local/
+apps/mobile/android/
+apps/mobile/ios/
+expo-env.d.ts
+*.png
+*.ttf
+*.zip
+
+# Raw design/brand drops (read-only references, never edited)
+Bubo - Assets/
+stitch_bubo_read_deeply/
+assets-source/
+.tmp-inspect/

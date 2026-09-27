@@ -1,0 +1,89 @@
+# Production release checklist
+
+Nothing in this repository deploys by itself. Every step below is a deliberate action by the
+owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps in order.
+
+## 0. Before anything
+
+- [ ] **Rotate any credential that was ever pasted into a file or chat:** the Neon password and
+      the Gemini key.
+- [ ] `npm install && npm run verify` is green.
+- [ ] `npm run check:bundle --workspace @bubo/api` prints the production bindings. This is a dry
+      run and uploads nothing.
+
+## 1. Database (Neon)
+
+1. Create a **production branch or database** in Neon. Copy the **pooled** connection string.
+2. Apply the migrations. They're idempotent and each runs in a transaction:
+   ```sh
+   # PowerShell: $env:DATABASE_URL="postgres://…"; npm run db:migrate
+   DATABASE_URL="postgres://…" npm run db:migrate
+   ```
+   Expected output: `applied: 0001_foundation.sql, …, 0005_recall.sql`.
+3. Keep a Neon branch per environment. Never point development at production.
+
+## 2. E-mail (Resend)
+
+1. Verify your sending domain in Resend: add the SPF/DKIM DNS records.
+2. Create an API key with **sending access only**.
+3. Pick the sender, e.g. `Bubo <nao-responda@seu-dominio.com>`.
+
+## 3. API (Cloudflare Workers)
+
+1. **Workers Paid plan.** Password hashing needs more than the Free plan's 10 ms CPU.
+2. Create the R2 bucket `bubo`: `npx wrangler r2 bucket create bubo`.
+3. Set the secrets. Each command prompts for the value, so nothing lands in shell history:
+   ```sh
+   cd apps/api
+   npx wrangler secret put DATABASE_URL --env production
+   npx wrangler secret put BETTER_AUTH_SECRET --env production   # ≥ 32 random chars
+   npx wrangler secret put BETTER_AUTH_URL --env production      # https://api.your-domain
+   npx wrangler secret put RESEND_API_KEY --env production
+   npx wrangler secret put EMAIL_FROM --env production
+   npx wrangler secret put GEMINI_API_KEY --env production       # optional
+   ```
+4. Deploy with `npm run deploy:api`. It runs `verify` first, then
+   `wrangler deploy --env production`.
+5. Attach a custom domain (`api.your-domain`) to the `bubo-api` Worker. `BETTER_AUTH_URL` must
+   match it.
+6. Smoke test:
+   - `GET https://api.your-domain/v1/health` → 200, `environment: production`
+   - `GET https://api.your-domain/v1/ready` → 200. A 503 lists the missing variable names.
+
+**Safety net:** the top-level `wrangler.toml` Worker is `bubo-api-dev`, so a deploy without
+`--env production` can't overwrite production. Production refuses to boot "ready" without
+`https://` auth links, e-mail, a database and a secret.
+
+## 4. Mobile (EAS)
+
+1. Install the CLI and log in: `npm i -g eas-cli`, then `eas login`. Link the project with
+   `cd apps/mobile && eas init`, which writes the project id.
+2. Set the API URL per environment. It's public by design:
+   ```sh
+   eas env:create --environment production --name EXPO_PUBLIC_API_URL --value https://api.your-domain --visibility plaintext
+   eas env:create --environment preview    --name EXPO_PUBLIC_API_URL --value https://api.your-domain --visibility plaintext
+   ```
+   `app.config.ts` **fails the build** when a preview or production build has no `https://` URL.
+3. Internal test build: `eas build --profile preview --platform android` (APK) or `ios`.
+4. Store build: `eas build --profile production --platform all`, then
+   `eas submit --profile production`.
+
+## 5. Store requirements (already covered / still to do)
+
+- ✅ In-app account deletion: Você → "Excluir conta". The password is re-checked and all data is
+  erased.
+- ✅ No tracking and no third-party analytics. Better Auth telemetry is disabled.
+- ✅ Export compliance: `ITSAppUsesNonExemptEncryption: false`, since only standard TLS is used.
+- ⬜ Privacy Policy and Terms URLs, required by both stores. Add them to the store listings and to
+  sign-up.
+- ⬜ If Google sign-in is added, **Sign in with Apple** becomes mandatory on iOS.
+- ⬜ Community features (Task 07+) need reporting, blocking and moderation before release (UGC
+  rules).
+
+## 6. After release
+
+- Watch Workers Logs, which are structured JSON with `requestId`.
+- A new migration means: add `NNNN_*.sql`, run `npm run db:migrate` against production **before**
+  deploying code that needs it, then deploy.
+- Rollback the API with `npx wrangler rollback --env production`. Migrations only ever add, so an
+  older Worker keeps working.

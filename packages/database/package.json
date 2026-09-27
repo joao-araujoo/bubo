@@ -1,0 +1,26 @@
+{
+  "name": "@bubo/database",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Neon Postgres access via Drizzle ORM (schema, client, SQL migrations).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "db:migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.1.0",
+    "drizzle-orm": "0.45.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "tsx": "4.23.15"
+  }
+}

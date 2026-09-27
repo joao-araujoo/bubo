@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+apps/mobile/android/
+apps/mobile/ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro / caches
+.metro-health-check*
+.cache/
+.eslintcache
+*.tsbuildinfo
+coverage/
+
+# Cloudflare Workers
+.wrangler/
+# Local embedded Postgres data (PGlite) for the Node dev server
+apps/api/.local/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts / packaging
+build/
+out/
+*.zip
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local scratch
+.tmp-inspect/

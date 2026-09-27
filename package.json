@@ -1,0 +1,54 @@
+{
+  "name": "bubo",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Bubo — Read deeply. Monorepo (Expo mobile app + Cloudflare Workers API + shared packages).",
+  "license": "UNLICENSED",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "npm run start --workspace @bubo/mobile",
+    "dev:api": "npm run dev --workspace @bubo/api",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "assets:build": "node scripts/build-assets.mjs",
+    "assets:check": "node scripts/check-assets.mjs",
+    "audit:repo": "node scripts/audit-repo.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run assets:check && npm run audit:repo",
+    "package:zip": "node scripts/package-zip.mjs",
+    "db:migrate": "npm run db:migrate --workspace @bubo/database",
+    "deploy:api": "npm run verify && npm run deploy:production --workspace @bubo/api"
+  },
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "@types/node": "24.19.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260925.1": true
+  }
+}

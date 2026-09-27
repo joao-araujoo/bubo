@@ -1,0 +1,45 @@
+# Bubo API — Cloudflare Worker configuration.
+# Local development (`npm run dev:api`) runs fully locally (Miniflare or the Node/PGlite server):
+# nothing is created or changed in your Cloudflare account.
+# Secrets are NEVER stored here: locally they come from apps/api/.dev.vars (gitignored); remotely
+# they are set with `wrangler secret put <NAME> --env production` (see docs/release.md).
+
+# Top-level = local development only. Its name differs from production on purpose: an accidental
+# `wrangler deploy` without `--env production` can never overwrite the production Worker.
+name = "bubo-api-dev"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+APP_ENV = "development"
+BETTER_AUTH_URL = "http://localhost:8787"
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "bubo"
+
+# ---------------------------------------------------------------------------------------------
+# Production — deploy with `npm run deploy:api` (runs verify first). Bindings are not inherited
+# by environments, so they are repeated here.
+# Required secrets (config validation keeps /v1/ready at 503 until all are set):
+#   DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL (https://…), RESEND_API_KEY, EMAIL_FROM
+# Optional: GEMINI_API_KEY, GOOGLE_BOOKS_API_KEY
+# ---------------------------------------------------------------------------------------------
+[env.production]
+name = "bubo-api"
+
+[env.production.vars]
+APP_ENV = "production"
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[env.production.observability]
+enabled = true
+
+[[env.production.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "bubo"

@@ -1,0 +1,13 @@
+# Copy to apps/api/.dev.vars (gitignored) for `npm run dev:api`. Never commit real values.
+# Empty DATABASE_URL → local embedded Postgres (PGlite). Set it → wrangler dev + Neon.
+DATABASE_URL=
+# ≥ 32 chars: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+BETTER_AUTH_SECRET=
+# LAN address (http://<your-ip>:8787) so e-mailed links open on a phone.
+BETTER_AUTH_URL=http://localhost:8787
+GEMINI_API_KEY=
+# Optional locally (reset links are logged in development); required in production.
+RESEND_API_KEY=
+EMAIL_FROM=
+# Optional: Google Books key (catalog works without it; Open Library needs none).
+GOOGLE_BOOKS_API_KEY=
