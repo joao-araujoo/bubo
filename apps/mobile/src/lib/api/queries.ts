@@ -7,7 +7,7 @@ import {
   type ReviewRequest,
   type UpdateShelfEntryRequest,
 } from '@bubo/contracts';
-import { toLocalIsoDate } from '@bubo/domain';
+import { toIsbn13, toLocalIsoDate } from '@bubo/domain';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, ApiError } from './client';
@@ -22,8 +22,9 @@ export const queryKeys = {
   shelf: (userId: string) => ['shelf', userId] as const,
   shelfEntry: (userId: string, entryId: string) => ['shelf', userId, entryId] as const,
   stats: (userId: string, today: string) => ['stats', userId, today] as const,
+  memory: (userId: string, today: string) => ['memory', userId, today] as const,
   due: (userId: string, today: string) => ['recall', userId, today] as const,
-  catalogSearch: (userId: string, q: string) => ['catalog', userId, 'search', q] as const,
+  catalogSearch: (userId: string, q: string) => ['catalog', userId, 'search-v2', q] as const,
   catalogBook: (userId: string, catalogId: string) =>
     ['catalog', userId, 'book', catalogId] as const,
   catalogIsbn: (userId: string, isbn: string) => ['catalog', userId, 'isbn', isbn] as const,
@@ -31,7 +32,7 @@ export const queryKeys = {
 
 /** Normalized search text (the cache key and the request share it). */
 export function normalizeCatalogQuery(q: string) {
-  return q.trim().replace(/\s+/g, ' ').toLowerCase();
+  return toIsbn13(q) ?? q.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 /** Catalog search. Results are cached for a day on the server and kept here for 30 minutes. */
@@ -40,9 +41,12 @@ export function useCatalogSearch(userId: string | undefined, q: string) {
   return useQuery({
     queryKey: queryKeys.catalogSearch(userId ?? 'anonymous', query),
     queryFn: ({ signal }) => api.searchCatalog(query, signal),
-    enabled: userId !== undefined && query.length >= 2,
-    staleTime: 30 * 60_000,
-    placeholderData: (previous) => previous,
+    enabled: Boolean(userId) && query.length >= 2,
+    staleTime: (state) =>
+      !state.state.data?.results.length || Object.values(state.state.data.sources).includes('error')
+        ? 60_000
+        : 30 * 60_000,
+    retry: (count, error) => count < 2 && error instanceof ApiError && error.retryable,
   });
 }
 
@@ -114,6 +118,15 @@ export function useStats(userId: string | undefined) {
   });
 }
 
+export function useMemoryStats(userId: string | undefined) {
+  const today = toLocalIsoDate(new Date());
+  return useQuery({
+    queryKey: queryKeys.memory(userId ?? 'anonymous', today),
+    queryFn: ({ signal }) => api.getMemoryStats(today, signal),
+    enabled: Boolean(userId),
+  });
+}
+
 /** Recall cards due on the reader's local today. */
 export function useDueCards(userId: string | undefined) {
   const today = toLocalIsoDate(new Date());
@@ -131,6 +144,7 @@ function useInvalidateReading(userId: string) {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['shelf', userId] }),
       queryClient.invalidateQueries({ queryKey: ['stats', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['memory', userId] }),
       queryClient.invalidateQueries({ queryKey: ['recall', userId] }),
       // "Já está na estante" on catalog screens.
       queryClient.invalidateQueries({ queryKey: ['catalog', userId, 'book'] }),

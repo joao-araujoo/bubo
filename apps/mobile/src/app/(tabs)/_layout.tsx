@@ -33,7 +33,21 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.accentText,
         tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarLabelStyle: { ...theme.typography.caption, textTransform: 'none', fontSize: 12 },
+        tabBarLabelStyle: {
+          ...theme.typography.caption,
+          textTransform: 'none',
+          fontSize: 11,
+          textAlign: 'center',
+          width: '100%',
+          marginHorizontal: 0,
+        },
+        tabBarItemStyle: {
+          flex: 1,
+          flexBasis: 0,
+          minWidth: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
@@ -69,8 +83,10 @@ export default function TabsLayout() {
             tabBarIcon: ({ focused }) => (
               <View
                 style={{
-                  paddingHorizontal: theme.spacing.md,
-                  paddingVertical: theme.spacing.xxs,
+                  width: 48,
+                  height: 32,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   borderRadius: theme.radii.pill,
                   backgroundColor: focused ? theme.colors.primarySoft : theme.colors.transparent,
                 }}

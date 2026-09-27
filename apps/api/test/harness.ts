@@ -15,7 +15,10 @@ type CallInit = RequestInit & {
  * Full API on an in-memory Postgres (PGlite) with real Better Auth. `call` emulates the Expo client
  * (sends `expo-origin: bubo://` and the session cookie).
  */
-export async function createHarness(deps: Omit<AppDeps, 'databaseProvider' | 'pingDatabase'> = {}) {
+export async function createHarness(
+  deps: Omit<AppDeps, 'databaseProvider' | 'pingDatabase'> = {},
+  bindingOverrides: Record<string, string | undefined> = {},
+) {
   const database = await createPgliteDatabase();
   const logs = createLogCollector();
   const app = createApp({
@@ -29,12 +32,12 @@ export async function createHarness(deps: Omit<AppDeps, 'databaseProvider' | 'pi
     },
     ...deps,
   });
-  const env = () =>
-    createBindings({
-      DATABASE_URL: PGLITE_DATABASE_URL,
-      BETTER_AUTH_SECRET: TEST_SECRET,
-      BETTER_AUTH_URL: 'http://localhost:8787',
-    });
+  const bindings = createBindings({
+    DATABASE_URL: PGLITE_DATABASE_URL,
+    BETTER_AUTH_SECRET: TEST_SECRET,
+    BETTER_AUTH_URL: 'http://localhost:8787',
+    ...bindingOverrides,
+  });
 
   let ipCounter = 0;
   let emailCounter = 0;
@@ -48,7 +51,7 @@ export async function createHarness(deps: Omit<AppDeps, 'databaseProvider' | 'pi
       headers.set('expo-origin', init.appOrigin ?? 'bubo://');
     }
     headers.set('x-forwarded-for', init.ip ?? '10.255.255.1');
-    return app.request(`http://localhost:8787${path}`, { ...init, body, headers }, env());
+    return app.request(`http://localhost:8787${path}`, { ...init, body, headers }, bindings);
   }
 
   /** Signs up a fresh reader and returns its session cookie. */
@@ -72,5 +75,5 @@ export async function createHarness(deps: Omit<AppDeps, 'databaseProvider' | 'pi
     return { cookie: cookie.split(';')[0] ?? '' };
   }
 
-  return { app, call, signUp, logs, database, close: () => database.close() };
+  return { app, call, signUp, logs, database, bindings, close: () => database.close() };
 }

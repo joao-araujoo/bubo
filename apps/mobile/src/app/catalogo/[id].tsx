@@ -13,7 +13,7 @@ import {
   InlineMessage,
   Text,
 } from '../../design-system';
-import { authorLine, catalogErrorMessage } from '../../features/catalog/catalog';
+import { authorLine, catalogErrorMessage, editionLabel } from '../../features/catalog/catalog';
 import { useAddFromCatalog } from '../../features/catalog/useAddFromCatalog';
 import { ApiError } from '../../lib/api/client';
 import { useCatalogBook } from '../../lib/api/queries';
@@ -34,6 +34,7 @@ const LANGUAGES: Record<string, string> = {
 const SOURCE_LABELS: Record<CatalogBook['sources'][number], string> = {
   google: 'Google Books',
   openlibrary: 'Open Library',
+  brasilapi: 'BrasilAPI',
 };
 
 function formatIsbn(isbn: string) {
@@ -76,6 +77,9 @@ function BookDetails({ book }: { book: CatalogBook }) {
           ))}
         </View>
       ) : null}
+      <Text variant="bodySm" color="textMuted">
+        {editionLabel(book)}
+      </Text>
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
           <Icon name="notes" size={20} color="accentText" />

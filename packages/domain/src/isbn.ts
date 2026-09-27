@@ -1,7 +1,11 @@
 /** ISBN helpers (ISBN-10 / ISBN-13 with checksums). Books are keyed by ISBN-13. */
 
 export function normalizeIsbn(value: string): string {
-  return value.replace(/[\s-]/g, '').toUpperCase();
+  return value
+    .normalize('NFKC')
+    .replace(/^\s*ISBN(?:-1[03])?\s*:?\s*/i, '')
+    .replace(/[\s\u2010-\u2015-]/g, '')
+    .toUpperCase();
 }
 
 export function isValidIsbn13(value: string): boolean {
@@ -41,4 +45,14 @@ export function toIsbn13(value: string | null | undefined): string | null {
   if (isValidIsbn13(isbn)) return isbn;
   if (isValidIsbn10(isbn)) return isbn10To13(isbn);
   return null;
+}
+
+/** Equivalent ISBN-10, only for the 978 range; 979 has no ISBN-10 equivalent. */
+export function toIsbn10(value: string): string | null {
+  const isbn = toIsbn13(value);
+  if (!isbn?.startsWith('978')) return null;
+  const core = isbn.slice(3, 12);
+  const sum = [...core].reduce((total, digit, index) => total + Number(digit) * (10 - index), 0);
+  const check = (11 - (sum % 11)) % 11;
+  return `${core}${check === 10 ? 'X' : check}`;
 }

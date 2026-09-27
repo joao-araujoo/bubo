@@ -6,20 +6,23 @@ import {
   hardenCoverUrl,
   isCatalogId,
   MAX_BOOK_PAGES,
+  normalizeIsbn,
   openLibraryCoverById,
   parsePublishedYear,
   toIsbn13,
+  toIsbn10,
   workMatchKey,
 } from '@bubo/domain';
 import { z } from 'zod';
 
 import { AppError } from '../lib/errors';
 import { type Logger } from '../lib/logger';
-import { API_VERSION } from '../version';
+import { CatalogTransport, type Fetched } from './catalog-transport';
+import { type CoverCache } from './cover-cache';
 import { type CatalogCache } from './catalog-cache';
 
 /**
- * Book catalog (ADR-016): Google Books + Open Library, queried in parallel with timeouts, merged
+ * Book catalog (ADR-016): Google Books + Open Library, plus BrasilAPI for Brazilian ISBNs,
  * and de-duplicated. Every upstream payload is validated with lenient Zod schemas and every cover
  * URL is hardened (https + allowlisted hosts). Results are cached (search 24 h, books 7 days).
  */
@@ -30,21 +33,21 @@ export type CatalogServiceOptions = {
   fetch: FetchLike;
   cache: CatalogCache;
   googleApiKey?: string;
+  contact?: string;
+  covers?: CoverCache;
   timeoutMs?: number;
   logger?: Logger;
 };
 
 const GOOGLE = 'https://www.googleapis.com/books/v1';
 const OPEN_LIBRARY = 'https://openlibrary.org';
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v4';
 const TTL = {
   search: 24 * 60 * 60,
   partialSearch: 10 * 60,
   book: 7 * 24 * 60 * 60,
   notFound: 60 * 60,
-  googleBackoff: 10 * 60,
 } as const;
-const GOOGLE_BACKOFF_KEY = `backoff:${CACHE_VERSION}:google`;
 
 // ---------------------------------------------------------------- upstream shapes (lenient)
 
@@ -63,7 +66,9 @@ const googleVolumeSchema = z.object({
     language: z.string().optional(),
   }),
 });
-const googleListSchema = z.object({ items: z.array(z.unknown()).optional() });
+const googleListSchema = z
+  .object({ items: z.array(z.unknown()).optional(), totalItems: z.number().optional() })
+  .refine((data) => data.items !== undefined || data.totalItems === 0);
 
 const openLibraryDocSchema = z.object({
   key: z.string().regex(/^\/works\/OL\d{1,12}W$/),
@@ -81,6 +86,12 @@ const openLibraryDocSchema = z.object({
     .object({
       docs: z.array(
         z.object({
+          key: z
+            .string()
+            .regex(/^\/books\/OL\d{1,12}M$/)
+            .optional(),
+          publish_date: z.array(z.string()).optional(),
+          number_of_pages: z.number().optional(),
           title: z.string().optional(),
           language: z.array(z.string()).optional(),
           cover_i: z.number().int().positive().optional(),
@@ -94,6 +105,9 @@ const openLibraryDocSchema = z.object({
 const openLibrarySearchSchema = z.object({ docs: z.array(z.unknown()) });
 
 const openLibraryEditionSchema = z.object({
+  isbn_10: z.array(z.string()).optional(),
+  isbn_13: z.array(z.string()).optional(),
+  physical_format: z.string().optional(),
   title: z.string().optional(),
   subtitle: z.string().optional(),
   authors: z.array(z.object({ key: z.string().regex(/^\/authors\/OL\d{1,12}A$/) })).optional(),
@@ -230,6 +244,7 @@ export function mapGoogleVolume(raw: unknown): CatalogBook | null {
     description: plainDescription(info.description),
     coverUrls: coverCandidates({ coverUrl: googleCover(volume), isbn13 }),
     sources: ['google'],
+    edition: 'edition',
   };
 }
 
@@ -240,26 +255,29 @@ export function mapOpenLibraryDoc(raw: unknown): CatalogBook | null {
   const edition = doc.editions?.docs[0];
   const title = clean(edition?.title ?? doc.title, 300);
   if (!title) return null;
-  // An edition with an ISBN is a concrete book: key it by ISBN so details show that edition.
+  // Keep the selected edition's identity; a work's ISBN list is never edition evidence.
   const isbn13 = (edition?.isbn ?? []).map((value) => toIsbn13(value)).find(Boolean) ?? null;
-  const languages = edition?.language ?? doc.language ?? [];
+  const languages = edition?.language ?? [];
   const covers = [
     edition?.cover_i ? openLibraryCoverById(edition.cover_i) : null,
-    doc.cover_i ? openLibraryCoverById(doc.cover_i) : null,
+    !edition && doc.cover_i ? openLibraryCoverById(doc.cover_i) : null,
   ].filter((url): url is string => url !== null);
   return {
-    catalogId: isbn13 ? `isbn:${isbn13}` : `ol:${doc.key.slice('/works/'.length)}`,
+    catalogId: edition?.key
+      ? `ol:${edition.key.slice('/books/'.length)}`
+      : `ol:${doc.key.slice('/works/'.length)}`,
     title,
     subtitle: edition?.title ? null : clean(doc.subtitle, 300),
     authors: cleanAuthors(doc.author_name),
-    publisher: clean(edition?.publisher?.[0] ?? doc.publisher?.[0], 200),
-    publishedYear: parsePublishedYear(doc.first_publish_year),
-    totalPages: pages(doc.number_of_pages_median),
+    publisher: clean(edition?.publisher?.[0], 200),
+    publishedYear: parsePublishedYear(edition?.publish_date?.[0]),
+    totalPages: pages(edition?.number_of_pages),
     isbn13,
     language: languages.length === 1 ? language(languages[0]) : null,
     description: null,
     coverUrls: unique(covers),
     sources: ['openlibrary'],
+    edition: edition?.key ? 'edition' : 'work',
   };
 }
 /** Fills gaps in `base` from `other` and unions covers/sources. `base` keeps its id and title. */
@@ -273,6 +291,7 @@ export function mergeBooks(base: CatalogBook, other: CatalogBook): CatalogBook {
     totalPages: base.totalPages ?? other.totalPages,
     isbn13: base.isbn13 ?? other.isbn13,
     language: base.language ?? other.language,
+    format: base.format ?? other.format,
     description: base.description ?? other.description,
     coverUrls: orderCovers([...base.coverUrls, ...other.coverUrls]),
     sources: unique([...base.sources, ...other.sources]),
@@ -288,31 +307,56 @@ function orderCovers(urls: readonly string[]): string[] {
 
 /**
  * Merges ranked lists (first list wins ties) into one de-duplicated list: same ISBN-13 or same
- * work (folded title + first author's last name). Books with a cover come first (stable).
+ * confirmed edition identity. Different formats, ISBNs and languages remain separate.
  */
 export function mergeResults(lists: readonly CatalogBook[][], limit: number): CatalogBook[] {
   const merged: CatalogBook[] = [];
-  const index = new Map<string, number>();
-  for (const list of lists) {
-    for (const book of list) {
-      const keys = [
-        `w:${workMatchKey(book.title, book.authors)}`,
-        ...(book.isbn13 ? [`i:${book.isbn13}`] : []),
-      ];
-      const at = keys.map((key) => index.get(key)).find((value) => value !== undefined);
-      if (at !== undefined) {
-        const current = merged[at];
-        if (current) merged[at] = mergeBooks(current, book);
-        for (const key of keys) index.set(key, at);
-        continue;
-      }
-      merged.push(book);
-      for (const key of keys) index.set(key, merged.length - 1);
-    }
+  for (const book of lists.flat()) {
+    const at = merged.findIndex((other) => sameEdition(other, book));
+    if (at >= 0 && merged[at]) merged[at] = mergeBooks(merged[at], book);
+    else merged.push(book);
   }
-  const withCover = merged.filter((book) => book.coverUrls.length > 0);
-  const withoutCover = merged.filter((book) => book.coverUrls.length === 0);
-  return [...withCover, ...withoutCover].slice(0, limit);
+  return merged.slice(0, limit);
+}
+
+/** Missing edition metadata is not evidence that two editions are interchangeable. */
+export function sameEdition(a: CatalogBook, b: CatalogBook): boolean {
+  if (a.catalogId === b.catalogId) return true;
+  if (a.isbn13 || b.isbn13) return Boolean(a.isbn13 && a.isbn13 === b.isbn13);
+  return Boolean(
+    a.authors.length &&
+    b.authors.length &&
+    a.publisher &&
+    b.publisher &&
+    a.publishedYear &&
+    b.publishedYear &&
+    a.language &&
+    b.language &&
+    foldText(a.title) === foldText(b.title) &&
+    foldText(a.authors.join(' ')) === foldText(b.authors.join(' ')) &&
+    foldText(a.publisher) === foldText(b.publisher) &&
+    a.publishedYear === b.publishedYear &&
+    a.language === b.language &&
+    a.format === b.format,
+  );
+}
+
+/** Small explicit language hints; ambiguous titles use the app's Portuguese locale. No translation. */
+export function queryLanguage(query: string): string {
+  const words = new Set(foldText(query).split(' '));
+  if (['the', 'and', 'of', 'with', 'for'].some((word) => words.has(word))) return 'en';
+  if (['el', 'los', 'las', 'una', 'del'].some((word) => words.has(word))) return 'es';
+  if (['le', 'les', 'une', 'des'].some((word) => words.has(word))) return 'fr';
+  return 'pt';
+}
+
+/** Strong title/author token coverage; remaining suggestions are explicitly approximate. */
+export function strongMatch(book: CatalogBook, query: string): boolean {
+  const words = foldText(query.replace(/^(?:title|author|intitle|inauthor):/i, ''))
+    .split(' ')
+    .filter(Boolean);
+  const haystack = new Set(foldText(`${book.title} ${book.authors.join(' ')}`).split(' '));
+  return words.length > 0 && words.every((word) => haystack.has(word));
 }
 
 /**
@@ -326,12 +370,12 @@ export function rankResults(
   popularity: ReadonlyMap<string, number> = new Map(),
 ): CatalogBook[] {
   if (/^subject:/i.test(query.trim())) return [...books];
-  const q = foldText(query);
+  const q = foldText(query.replace(/^(?:title|author|intitle|inauthor):/i, ''));
   const words = q.split(' ').filter((word) => word.length > 1);
   const scored = books.map((book, index) => {
     const title = foldText(book.title);
     const authors = foldText(book.authors.join(' '));
-    let score = 0;
+    let score = strongMatch(book, query) ? 200 : 0;
     if (title === q) score += 100;
     else if (title.startsWith(q)) score += 60;
     const titleHits = words.filter((word) => title.includes(word)).length;
@@ -339,7 +383,7 @@ export function rankResults(
     if (words.length && titleHits === words.length) score += 40;
     score += titleHits * 8 + authorHits * 6;
     if (titleHits + authorHits === 0) score -= 200;
-    if (book.language?.startsWith('pt')) score += 12;
+    if (book.language?.startsWith(queryLanguage(query))) score += 12;
     if (book.coverUrls.length) score += 10;
     if (book.authors.length) score += 4;
     // Widely published works (many editions) are usually what the reader means.
@@ -353,7 +397,6 @@ export function rankResults(
 
 // ---------------------------------------------------------------- service
 
-type Fetched = { ok: true; data: unknown } | { ok: false; status: number };
 type SourceResult = {
   status: 'ok' | 'error' | 'skipped';
   books: CatalogBook[];
@@ -362,36 +405,22 @@ type SourceResult = {
 };
 
 export class CatalogService {
-  private readonly timeoutMs: number;
+  private readonly transport: CatalogTransport;
 
   constructor(private readonly options: CatalogServiceOptions) {
-    this.timeoutMs = options.timeoutMs ?? 5000;
+    this.transport = new CatalogTransport({ ...options, timeoutMs: options.timeoutMs ?? 4000 });
   }
 
-  private async getJson(url: string, source: CatalogSource): Promise<Fetched> {
-    try {
-      const response = await this.options.fetch(url, {
-        headers: {
-          accept: 'application/json',
-          // Open Library asks API clients to identify themselves.
-          'user-agent': `Bubo/${API_VERSION} (reading app; catalog lookups)`,
-        },
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-      if (!response.ok) {
-        if (response.status !== 404) {
-          this.options.logger?.warn('catalog source failed', { source, status: response.status });
-        }
-        return { ok: false, status: response.status };
-      }
-      return { ok: true, data: await response.json() };
-    } catch (error) {
-      this.options.logger?.warn('catalog source unreachable', {
-        source,
-        reason: error instanceof Error ? error.name : 'unknown',
-      });
-      return { ok: false, status: 0 };
-    }
+  private getJson(url: string, source: CatalogSource): Promise<Fetched> {
+    return this.transport.get(url, source);
+  }
+
+  async cacheCover(book: CatalogBook): Promise<CatalogBook> {
+    if (!this.options.covers) return book;
+    const url = await this.options.covers.ingest(book.coverUrls);
+    return url
+      ? { ...book, cachedCoverUrl: url, coverUrls: unique([url, ...book.coverUrls]).slice(0, 4) }
+      : book;
   }
 
   private googleUrl(path: string, params: Record<string, string>): string {
@@ -401,7 +430,6 @@ export class CatalogService {
   }
 
   private async searchGoogle(q: string, limit: number): Promise<SourceResult> {
-    if (!(await this.googleAvailable())) return { status: 'skipped', books: [] };
     const result = await this.getJson(
       this.googleUrl('/volumes', {
         q,
@@ -413,12 +441,12 @@ export class CatalogService {
       'google',
     );
     if (!result.ok) {
-      await this.noteGoogleFailure(result.status);
       return { status: 'error', books: [] };
     }
     const list = googleListSchema.safeParse(result.data);
     if (!list.success) return { status: 'error', books: [] };
     const books = (list.data.items ?? [])
+      .slice(0, 40)
       .map(mapGoogleVolume)
       .filter((book): book is CatalogBook => book !== null);
     return { status: 'ok', books };
@@ -429,9 +457,9 @@ export class CatalogService {
       q,
       limit: String(Math.min(limit + 10, 40)),
       // Prefer Portuguese editions' titles when a work has them.
-      lang: 'pt',
+      lang: queryLanguage(q),
       fields:
-        'key,title,subtitle,author_name,first_publish_year,cover_i,number_of_pages_median,publisher,language,edition_count,editions,editions.title,editions.language,editions.cover_i,editions.isbn,editions.publisher',
+        'key,title,subtitle,author_name,cover_i,language,edition_count,editions,editions.key,editions.title,editions.language,editions.cover_i,editions.isbn,editions.publisher,editions.publish_date,editions.number_of_pages',
     });
     const result = await this.getJson(
       `${OPEN_LIBRARY}/search.json?${params.toString()}`,
@@ -442,7 +470,7 @@ export class CatalogService {
     if (!list.success) return { status: 'error', books: [] };
     const books: CatalogBook[] = [];
     const popularity = new Map<string, number>();
-    for (const raw of list.data.docs) {
+    for (const raw of list.data.docs.slice(0, 40)) {
       const book = mapOpenLibraryDoc(raw);
       if (!book) continue;
       books.push(book);
@@ -452,46 +480,74 @@ export class CatalogService {
     return { status: 'ok', books, popularity };
   }
 
-  /** Free-text search. A query that is a valid ISBN becomes an ISBN lookup. */
+  /** Free-text search. ISBN-like input must pass its checksum before reaching any source. */
   async search(rawQuery: string, limit: number): Promise<CatalogSearchResponse> {
-    const q = rawQuery.trim().replace(/\s+/g, ' ');
+    const q = rawQuery.normalize('NFKC').trim().replace(/\s+/g, ' ');
+    if (/^(?:\d{9}[\dX]|\d{13})$/.test(normalizeIsbn(q)) && !toIsbn13(q)) {
+      throw new AppError('VALIDATION_FAILED', 'Invalid ISBN checksum.');
+    }
+    const isbn13 = toIsbn13(q);
+    if (isbn13) return this.cachedCovers({ ...(await this.isbnSearch(isbn13)), query: q });
     const cacheKey = `search:${CACHE_VERSION}:${q.toLowerCase()}:${limit}`;
     const cached = await this.readSearch(cacheKey);
-    if (cached) return cached;
-
-    const isbn13 = toIsbn13(q);
-    let response: CatalogSearchResponse;
-    if (isbn13) {
-      const found = await this.lookupIsbn(isbn13);
-      response = {
-        query: q,
-        results: found ? [found] : [],
-        sources: { google: 'ok', openlibrary: 'ok' },
-      };
-    } else {
-      const [google, openLibrary] = await Promise.all([
-        this.searchGoogle(q, limit),
-        this.searchOpenLibrary(q, limit),
-      ]);
-      if (google.status !== 'ok' && openLibrary.status === 'error') {
-        throw new AppError('SERVICE_UNAVAILABLE', 'The book catalog is unavailable right now.');
-      }
-      response = {
-        query: q,
-        results: rankResults(
-          mergeResults([google.books, openLibrary.books], 60),
-          q,
-          openLibrary.popularity,
-        ).slice(0, limit),
-        sources: { google: google.status, openlibrary: openLibrary.status },
-      };
+    if (cached) return this.cachedCovers({ ...cached, query: q });
+    const [google, openLibrary] = await Promise.all([
+      this.searchWithFallback(q, limit, 'google'),
+      this.searchWithFallback(q, limit, 'openlibrary'),
+    ]);
+    if (
+      (google.status !== 'ok' || openLibrary.status !== 'ok') &&
+      !google.books.length &&
+      !openLibrary.books.length
+    ) {
+      throw new AppError('SERVICE_UNAVAILABLE', 'The book catalog is unavailable right now.');
     }
+    const response: CatalogSearchResponse = {
+      query: q,
+      results: rankResults(
+        mergeResults([google.books, openLibrary.books], Infinity),
+        q,
+        openLibrary.popularity,
+      )
+        .slice(0, limit)
+        .map((book) => ({
+          ...book,
+          match: /^subject:/i.test(q) || strongMatch(book, q) ? 'exact' : 'approximate',
+        })),
+      sources: { google: google.status, openlibrary: openLibrary.status, brasilapi: 'skipped' },
+    };
 
-    const partial = response.sources.google !== 'ok' || response.sources.openlibrary !== 'ok';
-    await this.options.cache.set(cacheKey, response, partial ? TTL.partialSearch : TTL.search);
-    // Seed the details cache so opening a result shows exactly what the reader just saw.
-    await Promise.all(response.results.map((book) => this.writeBook(book.catalogId, book)));
-    return response;
+    const partial = Object.values(response.sources).some((status) => status === 'error');
+    await this.options.cache.set(
+      cacheKey,
+      response,
+      !response.results.length ? 60 : partial ? TTL.partialSearch : TTL.search,
+    );
+    // Google search includes volume metadata. Open Library editions need their own detail read.
+    await Promise.all(
+      response.results
+        .filter((book) => book.catalogId.startsWith('gb:'))
+        .map((book) => this.writeBook(book.catalogId, { ...book, match: undefined })),
+    );
+    return this.cachedCovers(response);
+  }
+
+  private async cachedCovers(response: CatalogSearchResponse): Promise<CatalogSearchResponse> {
+    if (!this.options.covers) return response;
+    const covers = this.options.covers;
+    const results = await Promise.all(
+      response.results.map(async (book) => {
+        const url = await covers.cached(book.coverUrls);
+        return url
+          ? {
+              ...book,
+              cachedCoverUrl: url,
+              coverUrls: unique([url, ...book.coverUrls]).slice(0, 4),
+            }
+          : book;
+      }),
+    );
+    return { ...response, results };
   }
 
   private async readSearch(key: string): Promise<CatalogSearchResponse | null> {
@@ -504,6 +560,7 @@ export class CatalogService {
         sources: z.object({
           google: z.enum(['ok', 'error', 'skipped']),
           openlibrary: z.enum(['ok', 'error', 'skipped']),
+          brasilapi: z.enum(['ok', 'error', 'skipped']).optional(),
         }),
       })
       .safeParse(hit);
@@ -521,6 +578,10 @@ export class CatalogService {
   /** A book by catalog id, or null when no source knows it. Throws 503 when sources are down. */
   async getBook(catalogId: string): Promise<CatalogBook | null> {
     if (!isCatalogId(catalogId)) return null;
+    if (catalogId.startsWith('isbn:')) {
+      const isbn = toIsbn13(catalogId.slice(5));
+      return isbn ? this.fetchIsbn(isbn) : null;
+    }
     const hit = cachedBookSchema.safeParse(
       await this.options.cache.get(`book:${CACHE_VERSION}:${catalogId}`),
     );
@@ -528,9 +589,11 @@ export class CatalogService {
 
     const [kind, id = ''] = catalogId.split(':') as [string, string | undefined];
     let book: CatalogBook | null;
-    if (kind === 'isbn') book = await this.fetchIsbn(id);
-    else if (kind === 'gb') book = await this.fetchGoogleVolume(id);
-    else book = await this.fetchOpenLibraryWork(id);
+    if (kind === 'gb') book = await this.fetchGoogleVolume(id);
+    else
+      book = id.endsWith('M')
+        ? await this.fetchEdition(`${OPEN_LIBRARY}/books/${id}.json`, null, `ol:${id}`)
+        : await this.fetchOpenLibraryWork(id);
     await this.writeBook(catalogId, book);
     return book;
   }
@@ -542,81 +605,218 @@ export class CatalogService {
   }
 
   private async fetchGoogleVolume(id: string): Promise<CatalogBook | null> {
-    if (!(await this.googleAvailable())) {
-      throw new AppError('SERVICE_UNAVAILABLE', 'The book catalog is unavailable right now.');
-    }
     const result = await this.getJson(
       this.googleUrl(`/volumes/${id}`, { country: 'BR' }),
       'google',
     );
     if (!result.ok) {
       if (result.status === 404 || result.status === 400) return null;
-      await this.noteGoogleFailure(result.status);
       throw new AppError('SERVICE_UNAVAILABLE', 'The book catalog is unavailable right now.');
     }
     return mapGoogleVolume(result.data);
   }
 
+  private async searchWithFallback(
+    q: string,
+    limit: number,
+    source: 'google' | 'openlibrary',
+  ): Promise<SourceResult> {
+    const search = (value: string) =>
+      source === 'google' ? this.searchGoogle(value, limit) : this.searchOpenLibrary(value, limit);
+    const primary =
+      source === 'google'
+        ? q.replace(/^title:/i, 'intitle:').replace(/^author:/i, 'inauthor:')
+        : q.replace(/^intitle:/i, 'title:').replace(/^inauthor:/i, 'author:');
+    const first = await search(primary);
+    if (
+      first.status !== 'ok' ||
+      /^subject:/i.test(q) ||
+      first.books.some((book) => strongMatch(book, q))
+    )
+      return first;
+    const normalized = foldText(q.replace(/^(?:title|author|intitle|inauthor):/i, ''));
+    const alternatives =
+      source === 'google'
+        ? [`intitle:"${normalized}"`, `inauthor:"${normalized}"`]
+        : [`title:(${normalized}) OR author:(${normalized})`];
+    for (const alternate of alternatives) {
+      const next = await search(alternate);
+      first.books.push(...next.books);
+      if (next.popularity)
+        first.popularity = new Map([...(first.popularity ?? []), ...next.popularity]);
+      if (next.status !== 'ok') return { ...first, status: 'error' };
+      if (next.books.some((book) => strongMatch(book, q))) break;
+    }
+    return first;
+  }
+
   private async fetchIsbn(isbn13: string): Promise<CatalogBook | null> {
-    const [google, openLibrary] = await Promise.all([
-      this.googleAvailable().then((available) =>
-        available
-          ? this.getJson(
-              this.googleUrl('/volumes', { q: `isbn:${isbn13}`, country: 'BR' }),
-              'google',
-            )
-          : ({ ok: false, status: 429 } as const),
-      ),
-      this.getJson(`${OPEN_LIBRARY}/isbn/${isbn13}.json`, 'openlibrary'),
+    const response = await this.isbnSearch(isbn13);
+    if (
+      !response.results.length &&
+      Object.values(response.sources).some((status) => status === 'error')
+    ) {
+      throw new AppError('SERVICE_UNAVAILABLE', 'Some ISBN sources are unavailable. Please retry.');
+    }
+    return response.results[0] ?? null;
+  }
+
+  private async isbnSearch(isbn13: string): Promise<CatalogSearchResponse> {
+    const key = `isbn:${CACHE_VERSION}:${isbn13}`;
+    const hit = await this.readSearch(key);
+    if (hit) return hit;
+    const [google, openlibrary, brasilapi] = await Promise.all([
+      this.isbnGoogle(isbn13),
+      this.isbnOpenLibrary(isbn13),
+      this.isbnBrasil(isbn13),
     ]);
-    if (!google.ok) await this.noteGoogleFailure(google.status);
-    // 404 means "not in this library", not "library down".
-    const googleDown = !google.ok && google.status !== 404;
-    const openLibraryDown = !openLibrary.ok && openLibrary.status !== 404;
-    if (googleDown && openLibraryDown) {
+    const response: CatalogSearchResponse = {
+      query: isbn13,
+      results: mergeResults([brasilapi.books, openlibrary.books, google.books], 1).map((book) => ({
+        ...book,
+        catalogId: `isbn:${isbn13}`,
+        match: 'exact',
+      })),
+      sources: {
+        google: google.status,
+        openlibrary: openlibrary.status,
+        brasilapi: brasilapi.status,
+      },
+    };
+    if (
+      !response.results.length &&
+      [google, openlibrary, brasilapi].some((result) => result.status === 'error')
+    ) {
       throw new AppError('SERVICE_UNAVAILABLE', 'The book catalog is unavailable right now.');
     }
+    const partial = Object.values(response.sources).some((status) => status === 'error');
+    // A partial miss must never become an authoritative negative cache entry.
+    if (response.results.length || !partial)
+      await this.options.cache.set(
+        key,
+        response,
+        partial ? 60 : response.results.length ? TTL.book : 300,
+      );
+    return response;
+  }
 
-    let fromGoogle: CatalogBook | null = null;
-    if (google.ok) {
-      const list = googleListSchema.safeParse(google.data);
-      // Google search is fuzzy: only accept a volume that really carries this ISBN.
-      fromGoogle =
-        (list.success ? (list.data.items ?? []) : [])
-          .map(mapGoogleVolume)
-          .find((book) => book?.isbn13 === isbn13) ?? null;
+  private async isbnGoogle(isbn13: string): Promise<SourceResult> {
+    let result = await this.searchGoogle(`isbn:${isbn13}`, 10);
+    let books = result.books.filter((book) => book.isbn13 === isbn13);
+    const isbn10 = toIsbn10(isbn13);
+    if (!books.length && result.status === 'ok' && isbn10) {
+      result = await this.searchGoogle(`isbn:${isbn10}`, 10);
+      books = result.books.filter((book) => book.isbn13 === isbn13);
     }
+    return { status: result.status, books };
+  }
 
-    let fromOpenLibrary: CatalogBook | null = null;
-    const edition = openLibrary.ok ? openLibraryEditionSchema.safeParse(openLibrary.data) : null;
-    const title = edition?.success ? clean(edition.data.title, 300) : null;
-    if (edition?.success && title) {
-      const data = edition.data;
-      const coverId = data.covers?.find((id) => Number.isInteger(id) && id > 0);
-      fromOpenLibrary = {
-        catalogId: `isbn:${isbn13}`,
-        title,
-        subtitle: clean(data.subtitle, 300),
-        authors: cleanAuthors(await this.authorNames((data.authors ?? []).map((a) => a.key))),
-        publisher: clean(data.publishers?.[0], 200),
-        publishedYear: parsePublishedYear(data.publish_date),
-        totalPages: pages(data.number_of_pages),
+  private async isbnOpenLibrary(isbn13: string): Promise<SourceResult> {
+    try {
+      let book = await this.fetchEdition(
+        `${OPEN_LIBRARY}/isbn/${isbn13}.json`,
         isbn13,
-        language: language(data.languages?.[0]?.key.split('/').pop()),
-        description: null,
-        coverUrls: coverId ? [openLibraryCoverById(coverId)] : [],
-        sources: ['openlibrary'],
-      };
+        `isbn:${isbn13}`,
+      );
+      const isbn10 = toIsbn10(isbn13);
+      if (!book && isbn10)
+        book = await this.fetchEdition(
+          `${OPEN_LIBRARY}/isbn/${isbn10}.json`,
+          isbn13,
+          `isbn:${isbn13}`,
+        );
+      return { status: 'ok', books: book ? [book] : [] };
+    } catch {
+      return { status: 'error', books: [] };
     }
+  }
 
-    const base = fromGoogle ?? fromOpenLibrary;
-    if (!base) return null;
-    const merged = fromGoogle && fromOpenLibrary ? mergeBooks(fromGoogle, fromOpenLibrary) : base;
+  private async fetchEdition(
+    url: string,
+    requested: string | null,
+    catalogId: string,
+  ): Promise<CatalogBook | null> {
+    const response = await this.getJson(url, 'openlibrary');
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new AppError('SERVICE_UNAVAILABLE', 'Open Library is unavailable.');
+    }
+    const parsed = openLibraryEditionSchema.safeParse(response.data);
+    if (!parsed.success) throw new AppError('SERVICE_UNAVAILABLE', 'Invalid edition response.');
+    const data = parsed.data;
+    const title = clean(data.title, 300);
+    const identifiers = [...(data.isbn_13 ?? []), ...(data.isbn_10 ?? [])]
+      .map(toIsbn13)
+      .filter((isbn): isbn is string => isbn !== null);
+    if (!title || (requested && !identifiers.includes(requested))) return null;
+    const isbn13 = requested ?? identifiers[0] ?? null;
+    const coverId = data.covers?.find((id) => Number.isInteger(id) && id > 0);
     return {
-      ...merged,
-      catalogId: `isbn:${isbn13}`,
+      catalogId,
+      title,
+      subtitle: clean(data.subtitle, 300),
+      authors: cleanAuthors(await this.authorNames((data.authors ?? []).map((a) => a.key))),
+      publisher: clean(data.publishers?.[0], 200),
+      publishedYear: parsePublishedYear(data.publish_date),
+      totalPages: pages(data.number_of_pages),
       isbn13,
-      coverUrls: orderCovers(coverCandidates({ coverUrl: null, isbn13, extra: merged.coverUrls })),
+      language: language(data.languages?.[0]?.key.split('/').pop()),
+      description: null,
+      coverUrls: coverCandidates({
+        coverUrl: coverId ? openLibraryCoverById(coverId) : null,
+        isbn13,
+      }),
+      sources: ['openlibrary'],
+      edition: 'edition',
+      format: clean(data.physical_format, 80),
+    };
+  }
+
+  private async isbnBrasil(isbn13: string): Promise<SourceResult> {
+    if (!/^978(?:65|85)/.test(isbn13)) return { status: 'skipped', books: [] };
+    const result = await this.getJson(
+      `https://brasilapi.com.br/api/isbn/v1/${isbn13}?providers=cbl,mercado-editorial`,
+      'brasilapi',
+    );
+    if (!result.ok) return { status: result.status === 404 ? 'ok' : 'error', books: [] };
+    const parsed = z
+      .object({
+        isbn: z.string(),
+        title: z.string(),
+        authors: z.array(z.string()).nullish(),
+        subtitle: z.string().nullish(),
+        publisher: z.string().nullish(),
+        year: z.number().nullish(),
+        page_count: z.number().nullish(),
+        synopsis: z.string().nullish(),
+        cover_url: z.string().nullish(),
+        format: z.string().nullish(),
+      })
+      .safeParse(result.data);
+    if (!parsed.success) return { status: 'error', books: [] };
+    const data = parsed.data;
+    const title = clean(data.title, 300);
+    if (toIsbn13(data.isbn) !== isbn13 || !title) return { status: 'ok', books: [] };
+    return {
+      status: 'ok',
+      books: [
+        {
+          catalogId: `isbn:${isbn13}`,
+          title,
+          subtitle: clean(data.subtitle, 300),
+          authors: cleanAuthors(data.authors ?? undefined),
+          publisher: clean(data.publisher, 200),
+          publishedYear: parsePublishedYear(data.year),
+          totalPages: pages(data.page_count ?? undefined),
+          isbn13,
+          language: null,
+          description: plainDescription(data.synopsis),
+          coverUrls: coverCandidates({ coverUrl: data.cover_url ?? null, isbn13 }),
+          sources: ['brasilapi'],
+          edition: 'edition',
+          format: clean(data.format, 80),
+        },
+      ],
     };
   }
 
@@ -631,16 +831,6 @@ export class CatalogService {
     return names.filter(Boolean);
   }
 
-  /** After a 429/403 from Google (shared keyless quota), skip it for a while instead of waiting. */
-  private async googleAvailable(): Promise<boolean> {
-    return (await this.options.cache.get(GOOGLE_BACKOFF_KEY)) === undefined;
-  }
-
-  private async noteGoogleFailure(status: number) {
-    if (status === 429 || status === 403) {
-      await this.options.cache.set(GOOGLE_BACKOFF_KEY, true, TTL.googleBackoff);
-    }
-  }
   private async fetchOpenLibraryWork(workId: string): Promise<CatalogBook | null> {
     const result = await this.getJson(`${OPEN_LIBRARY}/works/${workId}.json`, 'openlibrary');
     if (!result.ok) {
@@ -663,7 +853,7 @@ export class CatalogService {
       subtitle: clean(work.data.subtitle, 300),
       authors: cleanAuthors(names.filter(Boolean)),
       publisher: null,
-      publishedYear: parsePublishedYear(work.data.first_publish_date),
+      publishedYear: null,
       totalPages: null,
       isbn13: null,
       language: null,
@@ -672,6 +862,7 @@ export class CatalogService {
       ),
       coverUrls: coverId ? [openLibraryCoverById(coverId)] : [],
       sources: ['openlibrary'],
+      edition: 'work',
     };
   }
 }

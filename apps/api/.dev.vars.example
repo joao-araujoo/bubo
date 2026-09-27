@@ -9,5 +9,9 @@ GEMINI_API_KEY=
 # Optional locally (reset links are logged in development); required in production.
 RESEND_API_KEY=
 EMAIL_FROM=
-# Optional: Google Books key (catalog works without it; Open Library needs none).
+# Server-only Google Books identification; keyless calls may return 429.
 GOOGLE_BOOKS_API_KEY=
+# Contact for Open Library; no key required for Open Library or BrasilAPI.
+CATALOG_CONTACT_EMAIL=
+# HTTPS public base URL for the MEDIA bucket. Empty keeps external cover fallback.
+MEDIA_PUBLIC_URL=

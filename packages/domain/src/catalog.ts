@@ -3,10 +3,10 @@
  * (typographic cover fallback). See ADR-016.
  */
 
-/** Catalog ids: `isbn:<ISBN-13>`, `gb:<Google Books volume id>`, `ol:<Open Library work id>`. */
-export const CATALOG_ID_PATTERN = /^(isbn:97[89]\d{10}|gb:[A-Za-z0-9_-]{6,40}|ol:OL\d{1,12}W)$/;
+/** Catalog ids: ISBN-13, Google volume, or Open Library work (W) / edition (M). */
+export const CATALOG_ID_PATTERN = /^(isbn:97[89]\d{10}|gb:[A-Za-z0-9_-]{6,40}|ol:OL\d{1,12}[WM])$/;
 
-export type CatalogSource = 'google' | 'openlibrary';
+export type CatalogSource = 'google' | 'openlibrary' | 'brasilapi';
 
 export function isCatalogId(value: string): boolean {
   return CATALOG_ID_PATTERN.test(value);
@@ -18,13 +18,13 @@ export function foldText(value: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 }
 
 /**
  * Match key for "the same work" across sources: folded title (subtitle dropped) + first author's
- * last name. Editions of the same work in the same language collapse into one result.
+ * last name. Used only for ranking popularity, never to merge edition metadata.
  */
 export function workMatchKey(title: string, authors: readonly string[]): string {
   const mainTitle = foldText(title.split(/[:(\u2013\u2014]/)[0] ?? title).replace(

@@ -77,12 +77,41 @@
 
 ## 🟡 Task 05 — Discover + catalog + ISBN
 
-- Done: server-side catalog lookup (Open Library / Google Books, cached), Discover, first-book and
+- Done: server-side catalog lookup (Open Library / Google Books / BrasilAPI ISBN, cached), Discover, first-book and
   add-book search, manual fallback, and ISBN scanner (`expo-camera`). See ADR-016.
 - Done: light theme as the default and a visual pass on Estante, Revisar, login, onboarding,
   focused reading and profile using real account data. Other existing screens still need visual
   review on a device.
-- Remaining: ingest book covers into R2. Current HTTPS provider covers may be unavailable.
+- Done: edition-preserving deduplication, bounded title/author alternatives, ISBN-10/13
+  equivalence, partial failures and approximate-match/language labels.
+- Done locally: bounded cover ingestion through `MediaStorage` when opening or adding one book;
+  search reuses cached covers without downloads. Requires `MEDIA` and `MEDIA_PUBLIC_URL`;
+  external/typographic fallback remains available.
+- Public read-only probes: Open Library returned editions for “Dom Casmurro”; BrasilAPI/CBL
+  returned ISBN `9788545702870`; keyless Google Books returned quota HTTP 429.
+- Remaining: device acceptance for search/scanner/edition selection and cover fallback;
+  Google with an owner-configured key and real R2 delivery. No remote configuration,
+  upload, migration or deployment was performed. Neon persistence was separately verified below.
+  Fixtures do not prove provider coverage.
+
+- Search regression fixed: the mobile client had omitted `/catalog/search`, turning a route 404
+  into “not found”. Authenticated client/API tests cover the actual URL, cookie, results, empty
+  results and failures. Live authenticated API probes returned title/author, ISBN-10 and ISBN-13
+  results with Open Library/BrasilAPI despite Google's quota failure (ADR-016).
+- Neon: existing `DATABASE_URL` confirmed in the API's local configuration. Schema/ledger match
+  Bubo, 0001–0007 already applied, zero pending. One identifiable isolated record was written,
+  read back and removed with absence verified. No user shelf was populated and no secret changed.
+
+## 🟡 Task 06 — Memory and stats (first vertical slice)
+
+- `GET /v1/me/memory?today=YYYY-MM-DD`: seven days of owner-scoped review counts, grouped in
+  Postgres from existing `review_logs`. No migration required.
+- `estatisticas`, reached from Você → Minha memória: daily Lembrei/Quase/Esqueci self-assessments,
+  real total, loading/error/retry and honest empty state. Cache is scoped by user/day and refreshed
+  after reviews. These counts are not estimated retention, cognitive improvement or a Bubo Score.
+- API tests cover auth, calendar validation, empty history, persisted/idempotent reviews,
+  account isolation and date boundaries. Visual/device acceptance remains pending.
+- Retention curve, book memory path, reading cycles, achievements/levels and Bubo Score remain.
 
 ## Later (see [screens.md](screens.md) for the full list)
 

@@ -23,6 +23,7 @@ export function HomeHeader({ name, streakDays, xp }: Props) {
         <BuboLogo height={28} />
       </View>
       <Chip
+        align="center"
         tone="orange"
         icon="local-fire-department"
         iconColor="orange"
@@ -32,6 +33,7 @@ export function HomeHeader({ name, streakDays, xp }: Props) {
         }
       />
       <Chip
+        align="center"
         tone="gold"
         icon="star"
         iconColor="goldRim"

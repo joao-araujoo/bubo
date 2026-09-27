@@ -49,7 +49,12 @@ export function toShelfEntry(entry: EntryRow, book: BookRow): ShelfEntry {
       isbn13: book.isbn,
       publisher: book.publisher,
       publishedYear: book.publishedYear,
-      coverUrls: coverCandidates({ coverUrl: book.coverUrl, isbn13: book.isbn }),
+      coverUrls: [
+        ...new Set([
+          ...(book.coverUrl?.startsWith('https://') ? [book.coverUrl] : []),
+          ...coverCandidates({ coverUrl: book.coverUrl, isbn13: book.isbn }),
+        ]),
+      ],
     },
   });
 }
@@ -82,7 +87,13 @@ type AddStatus = 'reading' | 'want_to_read';
 async function assertNotShelved(
   tx: Executor,
   userId: string,
-  book: { id?: string; isbn?: string | null; title: string },
+  book: {
+    id?: string;
+    isbn?: string | null;
+    title: string;
+    author?: string | null;
+    catalogKey?: string | null;
+  },
 ) {
   const [duplicate] = await tx
     .select({ id: shelfEntries.id })
@@ -92,7 +103,7 @@ async function assertNotShelved(
       and(
         eq(shelfEntries.userId, userId),
         or(
-          sql`lower(${books.title}) = lower(${book.title})`,
+          !book.catalogKey ? sql`lower(${books.title}) = lower(${book.title})` : undefined,
           book.id ? eq(books.id, book.id) : undefined,
           book.isbn ? eq(books.isbn, book.isbn) : undefined,
         ),
@@ -143,7 +154,7 @@ export async function insertManualBook(tx: Executor, userId: string, input: NewB
  * gain missing fields, so a later lookup can't rewrite what other readers already see.
  */
 export async function upsertCatalogBook(tx: Executor, book: CatalogBook): Promise<BookRow> {
-  const coverUrl = hardenCoverUrl(book.coverUrls[0]);
+  const coverUrl = book.cachedCoverUrl ?? hardenCoverUrl(book.coverUrls[0]);
   const [existing] = await tx
     .select()
     .from(books)
@@ -159,7 +170,8 @@ export async function upsertCatalogBook(tx: Executor, book: CatalogBook): Promis
     .orderBy(sql`(${books.catalogKey} = ${book.catalogId}) DESC`)
     .limit(1);
   if (existing) {
-    if (existing.coverUrl || !coverUrl) return existing;
+    if (!coverUrl || existing.coverUrl === coverUrl || (existing.coverUrl && !book.cachedCoverUrl))
+      return existing;
     const [updated] = await tx
       .update(books)
       .set({ coverUrl })
@@ -198,7 +210,11 @@ export async function addManualBook(
   input: NewBook & { status: AddStatus },
 ) {
   return db.transaction(async (tx) => {
-    await assertNotShelved(tx, userId, { title: input.title, isbn: input.isbn ?? null });
+    await assertNotShelved(tx, userId, {
+      title: input.title,
+      author: input.author,
+      isbn: input.isbn ?? null,
+    });
     const book = await insertManualBook(tx, userId, input);
     return insertEntry(tx, userId, book, input.status);
   });

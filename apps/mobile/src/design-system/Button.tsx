@@ -27,6 +27,8 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
+  /** Reduced label, icon and padding for buttons in dense horizontal groups. */
+  compact?: boolean;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -60,6 +62,7 @@ const variantColors = (colors: ColorTokens, variant: ButtonVariant) => {
 /**
  * Tactile "pushdown" button (Stitch design system): a solid rim below the face that the face
  * sinks onto when pressed, with a haptic tick. Height ≥ 48 (md) / 56 (lg).
+ * Compact mode keeps dense button groups on one line while preserving the touch target.
  */
 export function Button({
   label,
@@ -71,6 +74,7 @@ export function Button({
   disabled = false,
   loading = false,
   fullWidth = false,
+  compact = false,
   accessibilityHint,
   style,
 }: Props) {
@@ -102,17 +106,23 @@ export function Button({
             styles.face,
             {
               minHeight: height,
-              paddingHorizontal: theme.spacing.lg,
-              paddingVertical: theme.spacing.md,
+              paddingHorizontal: compact ? theme.spacing.xs : theme.spacing.lg,
+              paddingVertical: compact ? theme.spacing.xs : theme.spacing.md,
             },
           ]}
         >
           {loading ? (
             <ActivityIndicator color={theme.colors[palette.text]} />
           ) : (
-            <View style={[styles.content, { gap: theme.spacing.sm }]}>
-              {icon ? <Icon name={icon} size={20} color={palette.text} /> : null}
-              <Text variant="labelLg" color={palette.text} align="center" style={{ flexShrink: 1 }}>
+            <View style={[styles.content, { gap: compact ? theme.spacing.xs : theme.spacing.sm }]}>
+              {icon ? <Icon name={icon} size={compact ? 18 : 20} color={palette.text} /> : null}
+              <Text
+                variant={compact ? 'label' : 'labelLg'}
+                color={palette.text}
+                align="center"
+                numberOfLines={compact ? 1 : undefined}
+                style={{ flexShrink: 1 }}
+              >
                 {label}
               </Text>
               {trailing}

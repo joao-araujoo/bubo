@@ -141,6 +141,7 @@ describe('GET /v1/openapi.json', () => {
     const doc = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
     expect(doc.openapi).toBe('3.0.3');
     expect(Object.keys(doc.paths)).toEqual([
+      '/v1/me/memory',
       '/v1/health',
       '/v1/ready',
       '/v1/me',

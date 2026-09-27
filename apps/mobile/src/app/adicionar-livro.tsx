@@ -158,7 +158,7 @@ function SearchMode({ userId }: { userId: string }) {
         <EmptyState
           mascot="recallPrompt"
           title="Qual livro você quer adicionar?"
-          description="Busque pelo título, autor ou ISBN. As capas e os dados vêm do Google Books e da Open Library."
+          description="Busque pelo título, autor ou ISBN. Confira a edição encontrada antes de adicionar."
         />
       ) : results.isPending ? (
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Buscando livros" />

@@ -2,6 +2,7 @@ export * from './catalog';
 export * from './errors';
 export * from './health';
 export * from './me';
+export * from './memory';
 export * from './openapi';
 export * from './recall';
 export * from './shelf';

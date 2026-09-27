@@ -220,8 +220,7 @@ export default function DiscoverScreen() {
 
   const results = useCatalogSearch(userId, searching ? typed : GENRE_QUERIES[topicGenre]);
   const books = results.data?.results ?? [];
-  const partial =
-    results.data?.sources.google === 'error' || results.data?.sources.openlibrary === 'error';
+  const partial = Object.values(results.data?.sources ?? {}).some((status) => status === 'error');
 
   const { addToShelf, pendingId } = useAddFromCatalog(userId);
   const shelfEntryFor = useShelfLookup(userId);

@@ -18,7 +18,7 @@ describe('catalog ids', () => {
     expect(isCatalogId('gb:zyTCAlFPjgYC')).toBe(true);
     expect(isCatalogId('ol:OL45804W')).toBe(true);
     expect(isCatalogId('isbn:1234567890123')).toBe(false);
-    expect(isCatalogId('ol:OL1M')).toBe(false);
+    expect(isCatalogId('ol:OL1M')).toBe(true);
     expect(isCatalogId('gb:../../etc')).toBe(false);
     expect(isCatalogId('https://evil.example')).toBe(false);
   });

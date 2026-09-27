@@ -7,6 +7,8 @@ import { AppError } from '../lib/errors';
 import { createRateLimiter } from '../lib/rate-limit';
 import { type CatalogCache } from '../services/catalog-cache';
 import { CatalogService, type FetchLike } from '../services/catalog';
+import { CoverCache } from '../services/cover-cache';
+import { MediaStorage } from '../services/media';
 import { findCatalogEntryId } from '../services/shelf';
 
 export type CatalogProvider = (c: Context<AppEnv>) => CatalogService;
@@ -23,6 +25,16 @@ export function createCatalogProvider(deps: {
       cache: deps.cache,
       googleApiKey: config.ok ? config.env.GOOGLE_BOOKS_API_KEY : undefined,
       logger: c.get('logger'),
+      contact: config.ok ? config.env.CATALOG_CONTACT_EMAIL : undefined,
+      covers:
+        config.ok && config.env.MEDIA_PUBLIC_URL && c.env.MEDIA
+          ? new CoverCache({
+              fetch: deps.fetch,
+              cache: deps.cache,
+              media: new MediaStorage(c.env.MEDIA),
+              publicUrl: config.env.MEDIA_PUBLIC_URL,
+            })
+          : undefined,
     });
   };
 }
@@ -62,7 +74,9 @@ export function catalogRoutes(deps: { catalog: CatalogProvider; now: () => Date 
   routes.get(API_ROUTES.catalogBook, async (c) => {
     const id = catalogIdSchema.safeParse(c.req.param('catalogId'));
     if (!id.success) throw new AppError('NOT_FOUND', 'Book not found in the catalog.');
-    const book = await deps.catalog(c).getBook(id.data);
+    const catalog = deps.catalog(c);
+    const found = await catalog.getBook(id.data);
+    const book = found ? await catalog.cacheCover(found) : null;
     if (!book) throw new AppError('NOT_FOUND', 'Book not found in the catalog.');
     const shelfEntryId = await findCatalogEntryId(c.get('db'), c.get('session').user.id, book);
     return c.json({ book, shelfEntryId });
@@ -75,7 +89,9 @@ export function catalogRoutes(deps: { catalog: CatalogProvider; now: () => Date 
         issues: [{ path: 'isbn', message: 'Must be a valid ISBN-10 or ISBN-13.' }],
       });
     }
-    const book = await deps.catalog(c).lookupIsbn(isbn13);
+    const catalog = deps.catalog(c);
+    const found = await catalog.lookupIsbn(isbn13);
+    const book = found ? await catalog.cacheCover(found) : null;
     if (!book) throw new AppError('NOT_FOUND', 'No book found for this ISBN.');
     const shelfEntryId = await findCatalogEntryId(c.get('db'), c.get('session').user.id, book);
     return c.json({ book, shelfEntryId });
@@ -88,5 +104,5 @@ export function catalogRoutes(deps: { catalog: CatalogProvider; now: () => Date 
 export async function resolveCatalogBook(catalog: CatalogService, catalogId: string) {
   const book = await catalog.getBook(catalogId);
   if (!book) throw new AppError('NOT_FOUND', 'Book not found in the catalog.');
-  return book;
+  return catalog.cacheCover(book);
 }

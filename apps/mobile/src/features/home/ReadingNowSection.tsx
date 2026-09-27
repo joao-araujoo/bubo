@@ -65,6 +65,8 @@ function ReadingBook({ entry }: { entry: ShelfEntry }) {
         <Button
           label="Continuar leitura"
           icon="play-arrow"
+          size="md"
+          compact
           style={{ flex: 1 }}
           onPress={() => router.push({ pathname: '/sessao/[id]', params: { id: entry.id } })}
         />
@@ -72,6 +74,8 @@ function ReadingBook({ entry }: { entry: ShelfEntry }) {
           label="Atualizar"
           icon="add"
           variant="secondary"
+          size="md"
+          compact
           accessibilityHint="Atualiza a página atual ou o status do livro"
           onPress={() => router.push({ pathname: '/livro/[id]', params: { id: entry.id } })}
         />

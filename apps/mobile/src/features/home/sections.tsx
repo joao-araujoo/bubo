@@ -50,7 +50,7 @@ export function ActiveRecallSection({
             Hora de lembrar sem espiar. O que ficou das suas últimas leituras?
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <View style={{ gap: theme.spacing.sm }}>
           <Chip
             label={dueCount === 1 ? '1 card pendente' : `${dueCount} cards pendentes`}
             tone="neutral"
@@ -61,7 +61,7 @@ export function ActiveRecallSection({
             icon="play-arrow"
             variant="success"
             size="md"
-            style={{ flex: 1 }}
+            fullWidth
             onPress={() => router.push('/revisao')}
           />
         </View>

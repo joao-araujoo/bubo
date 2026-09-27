@@ -183,6 +183,11 @@ export default function YouScreen() {
       ) : null}
       <AppearancePicker />
       <Button
+        label="Minha memória"
+        variant="secondary"
+        onPress={() => router.push('/estatisticas')}
+      />
+      <Button
         label="Sair da conta"
         variant="secondary"
         size="md"

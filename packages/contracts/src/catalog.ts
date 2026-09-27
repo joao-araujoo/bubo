@@ -2,7 +2,7 @@ import { CATALOG_ID_PATTERN, MAX_BOOK_PAGES } from '@bubo/domain';
 import { z } from 'zod';
 
 export const catalogIdSchema = z.string().regex(CATALOG_ID_PATTERN, 'Invalid catalog id.');
-export const catalogSourceSchema = z.enum(['google', 'openlibrary']);
+export const catalogSourceSchema = z.enum(['google', 'openlibrary', 'brasilapi']);
 export const catalogSourceStatusSchema = z.enum(['ok', 'error', 'skipped']);
 
 /** A book as returned by the catalog (merged from Google Books and Open Library). */
@@ -20,6 +20,10 @@ export const catalogBookSchema = z.object({
   /** Ordered https candidates from allowlisted hosts. May be empty: clients draw a fallback. */
   coverUrls: z.array(z.url()),
   sources: z.array(catalogSourceSchema),
+  match: z.enum(['exact', 'approximate']).optional(),
+  edition: z.enum(['edition', 'work']).optional(),
+  format: z.string().nullable().optional(),
+  cachedCoverUrl: z.url().optional(),
 });
 export type CatalogBook = z.infer<typeof catalogBookSchema>;
 
@@ -34,7 +38,11 @@ export const catalogSearchResponseSchema = z.object({
   query: z.string(),
   results: z.array(catalogBookSchema),
   /** Per-source status so clients can say "resultados parciais" honestly. */
-  sources: z.object({ google: catalogSourceStatusSchema, openlibrary: catalogSourceStatusSchema }),
+  sources: z.object({
+    google: catalogSourceStatusSchema,
+    openlibrary: catalogSourceStatusSchema,
+    brasilapi: catalogSourceStatusSchema.optional(),
+  }),
 });
 export type CatalogSearchResponse = z.infer<typeof catalogSearchResponseSchema>;
 

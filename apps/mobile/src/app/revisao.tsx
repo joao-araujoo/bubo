@@ -3,7 +3,14 @@ import { toLocalIsoDate } from '@bubo/domain';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Keyboard,
+  View,
+} from 'react-native';
 
 import {
   BuboMascot,
@@ -12,6 +19,7 @@ import {
   Chip,
   EmptyState,
   FormScreen,
+  Icon,
   InlineMessage,
   Text,
   TextField,
@@ -21,7 +29,8 @@ import { ApiError } from '../lib/api/client';
 import { useDueCards, useRefreshAfterReview, useReviewCard } from '../lib/api/queries';
 import { useAuthState } from '../lib/auth/session';
 import { haptics } from '../lib/haptics';
-import { useTheme } from '../theme';
+import { FadeIn, useReducedMotion } from '../lib/motion';
+import { motion, useTheme } from '../theme';
 
 function CardStep({
   card,
@@ -38,20 +47,41 @@ function CardStep({
   const review = useReviewCard();
   const [attempt, setAttempt] = useState('');
   const [revealed, setRevealed] = useState(false);
+  const [selected, setSelected] = useState<(typeof GRADE_OPTIONS)[number] | null>(null);
+  const [saved, setSaved] = useState<ReviewResult | null>(null);
+  const locked = useRef(false);
+  const advanced = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   // One id per card attempt: retrying after a network error never counts twice.
   const reviewId = useRef(Crypto.randomUUID());
 
-  async function grade(value: 1 | 3 | 4 | 5) {
+  async function grade(option: (typeof GRADE_OPTIONS)[number]) {
+    if (locked.current) return;
+    locked.current = true;
+    setSelected(option);
     try {
       const result = await review.mutateAsync({
         cardId: card.id,
-        body: { id: reviewId.current, grade: value, localDate: toLocalIsoDate(new Date()) },
+        body: { id: reviewId.current, grade: option.grade, localDate: toLocalIsoDate(new Date()) },
       });
-      if (value >= 3) haptics.success();
-      else haptics.press();
-      onGraded(result);
+      if (!mounted.current) return;
+      if (option.grade >= 4) haptics.success();
+      else haptics.selection();
+      setSaved(result);
+      AccessibilityInfo.announceForAccessibility(
+        `${option.label}. Revisão salva. ${option.message}`,
+      );
     } catch {
+      locked.current = false;
+      if (!mounted.current) return;
       haptics.error();
+      AccessibilityInfo.announceForAccessibility('Não foi possível salvar. Tente novamente.');
     }
   }
 
@@ -65,14 +95,44 @@ function CardStep({
 
   return (
     <FormScreen
-      step={{ current: index + 1, total }}
+      title="Hora de lembrar"
+      eyebrow={`Lembrança ${index + 1} de ${total}`}
       footer={
-        revealed ? (
-          <View style={{ gap: theme.spacing.sm }}>
+        saved && selected ? (
+          <FadeIn key="saved" style={{ gap: theme.spacing.md }}>
+            <View
+              style={{
+                borderLeftWidth: theme.sizes.borderWidth,
+                borderLeftColor: theme.colors[selected.color],
+                paddingLeft: theme.spacing.md,
+                gap: theme.spacing.sm,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                <Icon name={selected.icon} color={selected.color} />
+                <Text variant="labelLg" style={{ flex: 1 }}>
+                  {selected.label} · revisão salva
+                </Text>
+              </View>
+              <Text variant="bodySm">{selected.message}</Text>
+            </View>
+            <Button
+              label={index + 1 === total ? 'Ver conclusão' : 'Próxima lembrança'}
+              icon="arrow-forward"
+              fullWidth
+              onPress={() => {
+                if (advanced.current) return;
+                advanced.current = true;
+                onGraded(saved);
+              }}
+            />
+          </FadeIn>
+        ) : revealed ? (
+          <FadeIn key="grading" style={{ gap: theme.spacing.sm }}>
             <Text variant="label" align="center" color="textMuted">
               Quanto você lembrou?
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
               {GRADE_OPTIONS.map((option) => (
                 <Button
                   key={option.grade}
@@ -80,34 +140,53 @@ function CardStep({
                   icon={option.icon}
                   variant={option.variant}
                   size="md"
+                  compact
                   accessibilityHint={option.hint}
                   disabled={review.isPending}
-                  style={{ flexGrow: 1, flexBasis: '45%' }}
-                  onPress={() => void grade(option.grade)}
+                  loading={review.isPending && selected?.grade === option.grade}
+                  style={{ flex: 1, minWidth: 0 }}
+                  onPress={() => void grade(option)}
                 />
               ))}
             </View>
-          </View>
+          </FadeIn>
         ) : (
           <Button
             label="Mostrar minha nota"
             icon="visibility"
             fullWidth
             onPress={() => {
-              haptics.press();
+              Keyboard.dismiss();
               setRevealed(true);
+              AccessibilityInfo.announceForAccessibility(
+                'Nota revelada. Compare com o que você lembrou.',
+              );
             }}
           />
         )
       }
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-        <BuboMascot state="recallPrompt" size={64} />
+        <BuboMascot
+          state={saved && selected ? selected.mascot : revealed ? 'reviewDue' : 'recallPrompt'}
+          size={64}
+          animated
+        />
         <Card containerStyle={{ flex: 1 }} style={{ padding: theme.spacing.md }}>
           <Text variant="caption" color="accentText">
-            Bubo · sem espiar
+            {saved
+              ? 'Bubo · um passo de cada vez'
+              : revealed
+                ? 'Bubo · confira com calma'
+                : 'Bubo · sem espiar'}
           </Text>
-          <Text variant="bodySm">Conte com suas palavras o que ficou desta leitura.</Text>
+          <Text variant="bodySm">
+            {saved && selected
+              ? selected.message
+              : revealed
+                ? 'Não precisa ser palavra por palavra. O que importa é a ideia.'
+                : 'Conte com suas palavras o que ficou desta leitura.'}
+          </Text>
         </Card>
       </View>
       <Card>
@@ -132,7 +211,7 @@ function CardStep({
             />
           </>
         ) : (
-          <>
+          <FadeIn style={{ gap: theme.spacing.md }}>
             {attempt.trim() ? (
               <Card tone="muted">
                 <Text variant="caption" color="textMuted">
@@ -141,7 +220,7 @@ function CardStep({
                 <Text variant="body">{attempt.trim()}</Text>
               </Card>
             ) : null}
-            <Card>
+            <Card style={{ backgroundColor: theme.colors.primarySoft }}>
               <Text variant="caption" color="accentText">
                 Sua nota
               </Text>
@@ -151,7 +230,7 @@ function CardStep({
               </Text>
             </Card>
             {review.isError ? <InlineMessage tone="error" message={errorMessage} /> : null}
-          </>
+          </FadeIn>
         )}
       </Card>
     </FormScreen>
@@ -169,29 +248,149 @@ function SummaryStep({
 }) {
   const theme = useTheme();
   const router = useRouter();
+  const reduced = useReducedMotion();
+  const progress = useRef(new Animated.Value(0)).current;
+  const announced = useRef(false);
+
+  useEffect(() => {
+    if (!announced.current) {
+      announced.current = true;
+      haptics.success();
+      AccessibilityInfo.announceForAccessibility(
+        'Sessão de revisão concluída. Seus resultados estão disponíveis.',
+      );
+    }
+    if (reduced) {
+      progress.setValue(1);
+      return;
+    }
+    // One shared clock: arrive, hold, celebrate gently, then settle. No loops or navigation gate.
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: motion.slow * 3 + motion.base + motion.fast,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reduced]);
+
+  const phase = (start: number, end: number) =>
+    reduced
+      ? 1
+      : progress.interpolate({
+          inputRange: [start, end],
+          outputRange: [0, 1],
+          extrapolate: 'clamp',
+        });
+
   return (
     <FormScreen
       back={false}
-      footer={<Button label="Concluir" icon="check" fullWidth onPress={() => router.back()} />}
-    >
-      <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
-        <BuboMascot state="recallCorrect" size={180} />
-        {streakDays > 0 ? (
-          <Chip
-            label={streakDays > 1 ? `${streakDays} dias seguidos` : 'Primeiro dia da sequência'}
-            tone="orange"
-            icon="local-fire-department"
-            iconColor="orange"
-            align="center"
+      footer={
+        <View>
+          <Animated.View
+            pointerEvents="none"
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              position: 'absolute',
+              top: -theme.spacing.xs,
+              bottom: -theme.spacing.xs,
+              left: -theme.spacing.xs,
+              right: -theme.spacing.xs,
+              borderRadius: theme.radii.pill,
+              borderWidth: theme.sizes.borderWidth,
+              borderColor: theme.colors.purpleLight,
+              opacity: reduced
+                ? 0
+                : progress.interpolate({
+                    inputRange: [0, 0.7, 0.85, 1],
+                    outputRange: [0, 0, 1, 0],
+                  }),
+            }}
           />
-        ) : null}
-        <Text variant="display" align="center" accessibilityRole="header">
-          Isso ficou com você.
-        </Text>
-        <Text variant="bodyLg" color="textMuted" align="center">
-          {reviewed === 1 ? '1 card revisado' : `${reviewed} cards revisados`} · +{xp} XP. Cada
-          lembrança espaçada fica mais forte.
-        </Text>
+          <Button label="Concluir e voltar" icon="check" fullWidth onPress={() => router.back()} />
+        </View>
+      }
+    >
+      <View style={{ alignItems: 'center', gap: theme.spacing.lg }}>
+        <View style={{ padding: theme.spacing.lg }}>
+          <Animated.View
+            pointerEvents="none"
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: theme.colors.primarySoft,
+              borderRadius: theme.radii.pill,
+              opacity: phase(0, 0.3),
+              transform: [
+                {
+                  scale: reduced
+                    ? 1
+                    : progress.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [0.8, 1.06, 1],
+                      }),
+                },
+              ],
+            }}
+          />
+          <Animated.View
+            style={{
+              opacity: phase(0, 0.2),
+              transform: [
+                {
+                  translateY: reduced
+                    ? 0
+                    : progress.interpolate({
+                        inputRange: [0, 0.25, 0.4, 0.55, 0.75, 1],
+                        outputRange: [motion.enterOffset * 2, 0, 0, -motion.enterOffset, 0, 0],
+                      }),
+                },
+                {
+                  scale: reduced
+                    ? 1
+                    : progress.interpolate({
+                        inputRange: [0, 0.25, 0.4, 0.55, 0.75, 1],
+                        outputRange: [0.9, 1, 1, 1.03, 1, 1],
+                      }),
+                },
+              ],
+            }}
+          >
+            <BuboMascot state="sessionComplete" size={180} />
+          </Animated.View>
+        </View>
+        <Animated.View style={{ opacity: phase(0.25, 0.45) }}>
+          <Text variant="display" align="center" accessibilityRole="header">
+            Isso ficou com você.
+          </Text>
+        </Animated.View>
+        <Animated.View
+          style={{ alignItems: 'center', gap: theme.spacing.md, opacity: phase(0.45, 0.65) }}
+        >
+          {streakDays > 0 ? (
+            <Chip
+              label={streakDays > 1 ? `${streakDays} dias seguidos` : 'Primeiro dia da sequência'}
+              tone="orange"
+              icon="local-fire-department"
+              iconColor="orange"
+              align="center"
+            />
+          ) : null}
+          <Text variant="bodyLg" color="textMuted" align="center">
+            {reviewed === 1 ? '1 card revisado' : `${reviewed} cards revisados`} · +{xp} XP. Cada
+            lembrança espaçada fica mais forte.
+          </Text>
+        </Animated.View>
       </View>
     </FormScreen>
   );

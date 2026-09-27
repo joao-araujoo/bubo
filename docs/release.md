@@ -14,12 +14,17 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 ## 1. Database (Neon)
 
 1. Create a **production branch or database** in Neon. Copy the **pooled** connection string.
-2. Apply the migrations. They're idempotent and each runs in a transaction:
+2. Confirm the target, then inspect pending migrations without writes:
+   `npm run db:migrate --workspace @bubo/database -- --check`.
+   The migrator reads process `DATABASE_URL`, falling back only to the gitignored
+   `apps/api/.dev.vars`; it derives a direct Neon connection in memory. No secret is printed.
+   Apply only after reviewing compatibility. Migrations are idempotent and transactional:
    ```sh
    # PowerShell: $env:DATABASE_URL="postgres://…"; npm run db:migrate
    DATABASE_URL="postgres://…" npm run db:migrate
    ```
-   Expected output: `applied: 0001_foundation.sql, …, 0005_recall.sql`.
+   Expected output lists only applied pending files (currently through `0007_shelf_entry_pages.sql`),
+   or `migrations up to date`.
 3. Keep a Neon branch per environment. Never point development at production.
 
 ## 2. E-mail (Resend)

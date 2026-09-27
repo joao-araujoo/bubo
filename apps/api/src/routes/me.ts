@@ -7,10 +7,18 @@ import { parseJsonBody } from '../lib/validation';
 import { type CatalogProvider, resolveCatalogBook } from './catalog';
 import { completeOnboarding, getReaderProfile, toMeResponse } from '../services/reader';
 import { getStats } from '../services/sessions';
+import { getMemoryStats } from '../services/memory';
 
 /** Session-protected reader routes (mounted behind withDatabase → withAuth → requireSession). */
 export function readerRoutes(deps: { catalog: CatalogProvider }) {
   const routes = new Hono<AppEnv>();
+
+  routes.get(API_ROUTES.memoryStats, async (c) => {
+    const query = statsQuerySchema.safeParse({ today: c.req.query('today') });
+    if (!query.success)
+      throw new AppError('VALIDATION_FAILED', 'Query parameter "today" must be a calendar date.');
+    return c.json(await getMemoryStats(c.get('db'), c.get('session').user.id, query.data.today));
+  });
 
   routes.get(API_ROUTES.me, async (c) => {
     const { user } = c.get('session');

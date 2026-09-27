@@ -91,6 +91,7 @@ function RootNavigator() {
           <Stack.Screen name="revisao" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="excluir-conta" />
           <Stack.Screen name="descobrir" />
+          <Stack.Screen name="estatisticas" />
           <Stack.Screen name="catalogo/[id]" />
           <Stack.Screen
             name="sessao/[id]"

@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { isbn10To13, isValidIsbn10, isValidIsbn13, normalizeIsbn, toIsbn13 } from '../src';
+import {
+  isbn10To13,
+  isValidIsbn10,
+  isValidIsbn13,
+  normalizeIsbn,
+  toIsbn13,
+  toIsbn10,
+} from '../src';
 
 describe('ISBN', () => {
+  it('accepts printed prefixes and Unicode hyphens, and converts only the 978 range to ISBN-10', () => {
+    expect(toIsbn13('ISBN-10: ８５７６５７３１３x')).toBe('9788576573135');
+    expect(toIsbn13('ISBN-13: 978–85–7657–313–5')).toBe('9788576573135');
+    expect(toIsbn10('9788576573135')).toBe('857657313X');
+    expect(toIsbn10('9791090636071')).toBeNull();
+    expect(toIsbn13('ISBN 9788576573136')).toBeNull();
+  });
   it('normalizes hyphens and spaces', () => {
     expect(normalizeIsbn('978-85-359-0277-8 ')).toBe('9788535902778');
   });

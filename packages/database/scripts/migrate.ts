@@ -3,23 +3,52 @@
 // Never run against production without an explicit, reviewed release step.
 import { Pool } from '@neondatabase/serverless';
 
-import { applyMigrations, loadMigrations } from '../src/node';
+import {
+  applyMigrations,
+  loadMigrations,
+  loadDatabaseUrl,
+  migrationDatabaseUrl,
+} from '../src/node';
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  console.error('DATABASE_URL is not set. Aborting (no changes made).');
-  process.exit(1);
+async function main() {
+  const databaseUrl = loadDatabaseUrl();
+  if (!databaseUrl) {
+    console.error('DATABASE_URL is not set. Aborting (no changes made).');
+    process.exit(1);
+  }
+
+  const pool = new Pool({ connectionString: migrationDatabaseUrl(databaseUrl) });
+  try {
+    const client = await pool.connect();
+    try {
+      if (process.argv.includes('--check')) {
+        const table = await client.query("select to_regclass('public._bubo_migrations') as name");
+        const records = table.rows[0]?.name
+          ? await client.query('select name from _bubo_migrations')
+          : { rows: [] };
+        const names = new Set(records.rows.map((row: { name: string }) => row.name));
+        const pending = loadMigrations()
+          .filter((migration) => !names.has(migration.name))
+          .map((migration) => migration.name);
+        console.log(JSON.stringify({ pending, changesMade: false }));
+      } else {
+        const applied = await applyMigrations(
+          { exec: (sql) => client.query(sql), query: (sql, params) => client.query(sql, params) },
+          loadMigrations(),
+        );
+        console.log(applied.length ? `applied: ${applied.join(', ')}` : 'migrations up to date');
+      }
+    } finally {
+      client.release();
+    }
+  } finally {
+    await pool.end();
+  }
 }
 
-const pool = new Pool({ connectionString: databaseUrl });
-const client = await pool.connect();
-try {
-  const applied = await applyMigrations(
-    { exec: (sql) => client.query(sql), query: (sql, params) => client.query(sql, params) },
-    loadMigrations(),
+main().catch(() => {
+  console.error(
+    'Database migration/check failed. Confirm connectivity and schema; credentials were not logged.',
   );
-  console.log(applied.length ? `applied: ${applied.join(', ')}` : 'migrations up to date');
-} finally {
-  client.release();
-  await pool.end();
-}
+  process.exitCode = 1;
+});

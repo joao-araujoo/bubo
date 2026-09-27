@@ -16,6 +16,7 @@ import {
   errorResponseSchema,
   healthResponseSchema,
   meResponseSchema,
+  memoryStatsResponseSchema,
   sessionResultSchema,
   shelfEntryDetailSchema,
   shelfEntrySchema,
@@ -168,6 +169,12 @@ export function createApiClient({
       request(`${API_ROUTES.stats}?today=${encodeURIComponent(today)}`, statsResponseSchema, {
         signal,
       }),
+    getMemoryStats: (today: string, signal?: AbortSignal) =>
+      request(
+        `${API_ROUTES.memoryStats}?today=${encodeURIComponent(today)}`,
+        memoryStatsResponseSchema,
+        { signal },
+      ),
     getDueCards: (today: string, signal?: AbortSignal) =>
       request(
         `${API_ROUTES.recallDue}?today=${encodeURIComponent(today)}`,
@@ -180,11 +187,38 @@ export function createApiClient({
       request(API_ROUTES.recallCards, recallCardSchema, { method: 'POST', body }),
     deleteCard: (id: string) =>
       request(apiPath(API_ROUTES.recallCard, { id }), deleteResponseSchema, { method: 'DELETE' }),
-    searchCatalog: (q: string, signal?: AbortSignal) =>
-      request(`?q=${encodeURIComponent(q)}&limit=20`, catalogSearchResponseSchema, {
-        signal,
-        timeoutMs: 20_000,
-      }),
+    searchCatalog: async (q: string, signal?: AbortSignal) => {
+      try {
+        const result = await request(
+          `${API_ROUTES.catalogSearch}?q=${encodeURIComponent(q)}&limit=20`,
+          catalogSearchResponseSchema,
+          {
+            signal,
+            timeoutMs: 20_000,
+          },
+        );
+        if (!result.results.length && Object.values(result.sources).includes('error')) {
+          throw new ApiError(
+            'SERVICE_UNAVAILABLE',
+            'Não foi possível concluir a busca nas bibliotecas.',
+            503,
+            null,
+          );
+        }
+        return result;
+      } catch (error) {
+        // Search represents a legitimate miss with HTTP 200 + []; a 404 is a routing failure.
+        if (error instanceof ApiError && error.status === 404) {
+          throw new ApiError(
+            'INVALID_RESPONSE',
+            'Não foi possível acessar a busca de livros.',
+            404,
+            error.requestId,
+          );
+        }
+        throw error;
+      }
+    },
     getCatalogBook: (catalogId: string, signal?: AbortSignal) =>
       request(apiPath(API_ROUTES.catalogBook, { catalogId }), catalogBookResponseSchema, {
         signal,

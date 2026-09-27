@@ -39,8 +39,15 @@ export const serverEnvSchema = z
     RESEND_API_KEY: optionalString,
     /** Sender, e.g. "Bubo <nao-responda@seu-dominio.com>" (domain verified in Resend). */
     EMAIL_FROM: optionalString,
-    /** Optional Google Books API key (raises the shared per-IP quota). Open Library needs none. */
+    /** Google Books identification; keyless requests are best-effort and may have zero quota. */
     GOOGLE_BOOKS_API_KEY: optionalString,
+    CATALOG_CONTACT_EMAIL: optionalString.pipe(z.email().optional()),
+    MEDIA_PUBLIC_URL: optionalUrl.pipe(
+      z
+        .string()
+        .regex(/^https:\/\/[^/?#]+(?:\/[^?#]*)?$/, 'Use an HTTPS public bucket base URL')
+        .optional(),
+    ),
   })
   .superRefine((env, ctx) => {
     if (env.APP_ENV !== 'production') return;

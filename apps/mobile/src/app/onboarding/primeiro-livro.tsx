@@ -16,6 +16,7 @@ import {
 import { Raised } from '../../design-system/Raised';
 import {
   authorLine,
+  editionLabel,
   catalogErrorMessage,
   scannerPick,
   useDebouncedValue,
@@ -63,7 +64,11 @@ function PickRow({
 }) {
   const theme = useTheme();
   const author = authorLine(book);
-  const facts = [book.totalPages ? `${book.totalPages} páginas` : null, book.publishedYear]
+  const facts = [
+    book.totalPages ? `${book.totalPages} páginas` : null,
+    book.publishedYear,
+    editionLabel(book),
+  ]
     .filter(Boolean)
     .join(' • ');
   return (

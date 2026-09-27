@@ -16,7 +16,12 @@ import {
   Text,
   TextField,
 } from '../design-system';
-import { authorLine, catalogErrorMessage, scannerPick } from '../features/catalog/catalog';
+import {
+  authorLine,
+  catalogErrorMessage,
+  editionLabel,
+  scannerPick,
+} from '../features/catalog/catalog';
 import { useAddFromCatalog, useShelfLookup } from '../features/catalog/useAddFromCatalog';
 import { ApiError } from '../lib/api/client';
 import { useIsbnLookup } from '../lib/api/queries';
@@ -204,6 +209,9 @@ function ResultSheet({ isbn, book, loading, error, pick, onRetry, onRescan }: Sh
             </Text>
             <Text variant="bodySm" color="textMuted" numberOfLines={1}>
               {[author, book.publisher].filter(Boolean).join(' · ') || 'Autor desconhecido'}
+            </Text>
+            <Text variant="bodySm" color="textMuted">
+              {editionLabel(book)}
             </Text>
             {book.totalPages ? <Chip label={`${book.totalPages} páginas`} tone="primary" /> : null}
           </View>

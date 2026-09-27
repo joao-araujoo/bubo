@@ -37,7 +37,7 @@ const googleSearch = {
         imageLinks: { thumbnail: GOOGLE_THUMB },
       },
     },
-    // Another edition of the same work: collapses into the first result.
+    // A different edition must remain selectable.
     {
       id: 'duneGB0002',
       volumeInfo: { title: 'Duna: Edição especial', authors: ['Frank Herbert'] },
@@ -77,6 +77,7 @@ function createUpstream() {
   const calls: string[] = [];
   const overrides: Route[] = [];
   const routes: Route = (url) => {
+    if (url.hostname === 'brasilapi.com.br') return json({}, 404);
     if (url.hostname === 'www.googleapis.com') {
       if (url.pathname === '/books/v1/volumes') {
         const q = url.searchParams.get('q') ?? '';
@@ -141,12 +142,12 @@ describe('catalog search', () => {
     expect(errorResponseSchema.parse(await short.json()).error.code).toBe('VALIDATION_FAILED');
   });
 
-  it('merges both sources, collapses editions, hardens covers and caches', async () => {
+  it('combines sources, preserves editions, hardens covers and caches', async () => {
     const { cookie } = await harness.signUp();
     const response = await search(cookie, 'duna');
     expect(response.status).toBe(200);
     const body = catalogSearchResponseSchema.parse(await response.json());
-    expect(body.sources).toEqual({ google: 'ok', openlibrary: 'ok' });
+    expect(body.sources).toEqual({ google: 'ok', openlibrary: 'ok', brasilapi: 'skipped' });
 
     const [duna, ...rest] = body.results;
     expect(duna).toMatchObject({
@@ -157,18 +158,24 @@ describe('catalog search', () => {
       publishedYear: 2017,
       totalPages: 680,
       isbn13: DUNA_ISBN,
-      sources: ['google', 'openlibrary'],
+      sources: ['google'],
       description: 'Uma obra-prima & clássico.\n\nArrakis.',
     });
     // Google (https, flat, larger) → Open Library by cover id → Open Library by ISBN (last).
     expect(duna?.coverUrls).toEqual([
       'https://books.google.com/books/content?id=duneGB0001&printsec=frontcover&img=1&source=gbs_api&zoom=1&fife=w400-h600',
-      'https://covers.openlibrary.org/b/id/42-L.jpg?default=false',
       `https://covers.openlibrary.org/b/isbn/${DUNA_ISBN}-L.jpg?default=false`,
     ]);
     const ids = body.results.map((book) => book.catalogId);
     // Relevance: exact title first; titles that match no query word go last.
-    expect(ids).toEqual(['gb:duneGB0001', 'gb:messiasGB01', 'ol:OL893415W', 'gb:evilGB0001']);
+    expect(ids).toEqual([
+      'gb:duneGB0001',
+      'ol:OL100W',
+      'gb:duneGB0002',
+      'gb:messiasGB01',
+      'ol:OL893415W',
+      'gb:evilGB0001',
+    ]);
     expect(rest.find((book) => book.catalogId === 'gb:evilGB0001')?.coverUrls).toEqual([]);
     for (const book of body.results) {
       for (const url of book.coverUrls)
@@ -193,7 +200,7 @@ describe('catalog search', () => {
       url.hostname === 'www.googleapis.com' ? json({ error: { code: 429 } }, 429) : undefined,
     );
     const partial = catalogSearchResponseSchema.parse(await (await search(cookie, 'duna')).json());
-    expect(partial.sources).toEqual({ google: 'error', openlibrary: 'ok' });
+    expect(partial.sources).toEqual({ google: 'error', openlibrary: 'ok', brasilapi: 'skipped' });
     expect(partial.results.map((book) => book.catalogId)).toEqual(['ol:OL100W', 'ol:OL893415W']);
 
     // Google is now in back-off (not even called); Open Library down too → 503.
@@ -212,6 +219,7 @@ describe('catalog search', () => {
     upstream.overrides.push((url) =>
       url.pathname === `/isbn/${OTHER_ISBN}.json`
         ? json({
+            isbn_13: [OTHER_ISBN],
             title: 'Memórias Póstumas de Brás Cubas',
             authors: [{ key: '/authors/OL1A' }],
             publishers: ['Penguin'],
@@ -249,7 +257,7 @@ describe('catalog ISBN lookup and details', () => {
         return json({ items: [googleSearch.items[0]] });
       }
       if (url.pathname === `/isbn/${OTHER_ISBN}.json`) {
-        return json({ title: 'Dom Casmurro', covers: [9] });
+        return json({ title: 'Dom Casmurro', isbn_13: [OTHER_ISBN], covers: [9] });
       }
       return undefined;
     });
@@ -278,7 +286,7 @@ describe('catalog ISBN lookup and details', () => {
     expect(book).toMatchObject({
       title: 'Dune',
       authors: ['Frank Herbert'],
-      publishedYear: 1965,
+      publishedYear: null,
       description: 'Set on the desert planet Arrakis.',
       coverUrls: ['https://covers.openlibrary.org/b/id/11481354-L.jpg?default=false'],
     });
@@ -449,6 +457,7 @@ describe('catalog helpers', () => {
       editions: {
         docs: [
           {
+            key: '/books/OL123M',
             title: 'Duna',
             language: ['por'],
             cover_i: 2,
@@ -459,15 +468,12 @@ describe('catalog helpers', () => {
       },
     });
     expect(book).toMatchObject({
-      catalogId: `isbn:${DUNA_ISBN}`,
+      catalogId: 'ol:OL123M',
       title: 'Duna',
       language: 'pt',
       publisher: 'Aleph',
       isbn13: DUNA_ISBN,
-      coverUrls: [
-        'https://covers.openlibrary.org/b/id/2-L.jpg?default=false',
-        'https://covers.openlibrary.org/b/id/1-L.jpg?default=false',
-      ],
+      coverUrls: ['https://covers.openlibrary.org/b/id/2-L.jpg?default=false'],
     });
   });
 
@@ -499,7 +505,7 @@ describe('catalog helpers', () => {
     ]);
   });
 
-  it('prefers the first list and keeps books without cover at the end', () => {
+  it('does not merge incomplete records using title and surname alone', () => {
     const book = (catalogId: string, title: string, covers: string[] = []) => ({
       catalogId,
       title,
@@ -521,8 +527,8 @@ describe('catalog helpers', () => {
       ],
       10,
     );
-    expect(merged.map((b) => b.catalogId)).toEqual(['gb:aaaaaaaa', 'gb:bbbbbbbb']);
-    expect(merged[0]?.coverUrls).toEqual(['https://covers.openlibrary.org/b/id/1-L.jpg']);
+    expect(merged.map((b) => b.catalogId)).toEqual(['gb:aaaaaaaa', 'gb:bbbbbbbb', 'ol:OL1W']);
+    expect(merged[0]?.coverUrls).toEqual([]);
   });
 
   it('expires and evicts memory cache entries, and falls back to the edge cache', async () => {

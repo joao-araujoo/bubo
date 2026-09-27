@@ -74,6 +74,10 @@ board. Swapping a pair only needs an edit to `scripts/asset-manifest.mjs`, then
 
 ## Derived app files (`npm run assets:build`)
 
+Review feedback also maps `recallPartial` (“Quase”) to the confirmed official `doubt` pose.
+There is no dedicated partial-recall asset; doubt is the closest available confirmed expression.
+Lembrei and Esqueci retain `recallCorrect` / `recallIncorrect` (`confident` / `worried`).
+
 - `apps/mobile/assets/mascot/*.png`: 640×640, full square frame, so every pose keeps the same
   scale.
 - `apps/mobile/assets/brand/*`: trimmed. Logo 720 px wide, symbol 512 px.

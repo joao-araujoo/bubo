@@ -80,7 +80,9 @@ export function createLayeredCache(memory: CatalogCache, edge: EdgeCache | null)
         const response = await edge.match(url(key));
         if (!response) return undefined;
         const value: unknown = await response.json();
-        const ttl = Number(response.headers.get('x-bubo-ttl') ?? '300');
+        const expires = Number(response.headers.get('x-bubo-expires'));
+        const ttl = Math.floor((expires - Date.now()) / 1000);
+        if (!Number.isFinite(ttl) || ttl <= 0) return undefined;
         await memory.set(key, value, Math.min(Number.isFinite(ttl) ? ttl : 300, 3600));
         return value;
       } catch {
@@ -96,7 +98,7 @@ export function createLayeredCache(memory: CatalogCache, edge: EdgeCache | null)
             headers: {
               'content-type': 'application/json',
               'cache-control': `public, max-age=${ttlSeconds}`,
-              'x-bubo-ttl': String(ttlSeconds),
+              'x-bubo-expires': String(Date.now() + ttlSeconds * 1000),
             },
           }),
         );

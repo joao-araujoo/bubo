@@ -94,6 +94,7 @@ export const mascotForState = {
   reviewDue: 'review',
   recallPrompt: 'curious',
   recallCorrect: 'confident',
+  recallPartial: 'doubt',
   recallIncorrect: 'worried',
   sessionComplete: 'celebrating',
   achievementUnlocked: 'achievement',

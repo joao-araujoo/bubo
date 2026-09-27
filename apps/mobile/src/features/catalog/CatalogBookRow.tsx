@@ -5,7 +5,7 @@ import { Pressable, View } from 'react-native';
 import { BookCover, Button, Card, Chip, type Icon, Text } from '../../design-system';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
-import { authorLine } from './catalog';
+import { authorLine, editionLabel } from './catalog';
 
 type Action = {
   label: string;
@@ -31,6 +31,8 @@ export function CatalogBookRow({ book, onOpen, action, badge }: Props) {
   const facts = [
     book.totalPages ? `${book.totalPages} págs.` : null,
     book.publishedYear ? String(book.publishedYear) : null,
+    book.publisher,
+    editionLabel(book),
   ].filter((fact): fact is string => fact !== null);
 
   const body = (

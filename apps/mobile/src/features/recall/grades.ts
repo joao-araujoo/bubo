@@ -1,6 +1,8 @@
 import { type ComponentProps } from 'react';
 
 import { type ButtonVariant, type Icon } from '../../design-system';
+import { type MascotState } from '../../assets/registry';
+import { type ColorTokens } from '../../theme';
 
 type IconName = ComponentProps<typeof Icon>['name'];
 
@@ -11,17 +13,40 @@ export const GRADE_OPTIONS: {
   hint: string;
   icon: IconName;
   variant: ButtonVariant;
+  mascot: MascotState;
+  color: keyof ColorTokens;
+  message: string;
 }[] = [
-  { grade: 1, label: 'Não lembrei', hint: 'Volta amanhã', icon: 'replay', variant: 'secondary' },
+  {
+    grade: 4,
+    label: 'Lembrei',
+    hint: 'Lembrei bem. Intervalo maior',
+    icon: 'check',
+    variant: 'primary',
+    mascot: 'recallCorrect',
+    color: 'success',
+    message: 'A ideia ficou com você. Continue cultivando essa lembrança.',
+  },
   {
     grade: 3,
-    label: 'Com esforço',
-    hint: 'Intervalo curto',
+    label: 'Quase',
+    hint: 'Lembrei com esforço. Intervalo curto',
     icon: 'psychology',
     variant: 'secondary',
+    mascot: 'recallPartial',
+    color: 'warning',
+    message: 'Você encontrou parte do caminho. Rever ajuda a ligar as ideias.',
   },
-  { grade: 4, label: 'Lembrei bem', hint: 'Intervalo maior', icon: 'check', variant: 'primary' },
-  { grade: 5, label: 'Fácil', hint: 'Intervalo bem maior', icon: 'bolt', variant: 'success' },
+  {
+    grade: 1,
+    label: 'Esqueci',
+    hint: 'Não lembrei. Volta amanhã',
+    icon: 'replay',
+    variant: 'secondary',
+    mascot: 'recallIncorrect',
+    color: 'purpleLight',
+    message: 'Tudo bem esquecer. Esta lembrança terá outra oportunidade.',
+  },
 ];
 
 /** ~30 s per card, rounded up — shown as an honest estimate, never a promise. */

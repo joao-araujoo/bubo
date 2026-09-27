@@ -39,7 +39,12 @@ export function authorLine(book: Pick<CatalogBook, 'authors'>): string | null {
 
 /** "Frank Herbert · Aleph · 2017" (only what is known). */
 export function metaLine(book: CatalogBook): string {
-  return [authorLine(book), book.publisher, book.publishedYear ? String(book.publishedYear) : null]
+  return [
+    authorLine(book),
+    book.publisher,
+    book.publishedYear ? String(book.publishedYear) : null,
+    editionLabel(book),
+  ]
     .filter(Boolean)
     .join(' · ');
 }
@@ -50,6 +55,10 @@ export function catalogErrorMessage(error: unknown): string {
       return 'Sem conexão. Confira sua internet e tente de novo.';
     }
     if (error.code === 'RATE_LIMITED') return 'Muitas buscas seguidas. Espere um instante.';
+    if (error.code === 'INVALID_RESPONSE')
+      return 'Não foi possível acessar a busca. Confira a conexão com a API e tente de novo.';
+    if (error.code === 'UNAUTHORIZED')
+      return 'Sua sessão expirou. Entre novamente para buscar livros.';
     if (error.code === 'SERVICE_UNAVAILABLE') {
       return 'O catálogo de livros está indisponível agora. Tente em alguns minutos.';
     }
@@ -74,3 +83,26 @@ export const scannerPick = {
     return book;
   },
 };
+
+export function editionLabel(book: CatalogBook): string {
+  const labels: Record<string, string> = {
+    pt: 'Português',
+    en: 'Inglês',
+    es: 'Espanhol',
+    fr: 'Francês',
+    de: 'Alemão',
+    it: 'Italiano',
+  };
+  const language = book.language
+    ? (labels[book.language.split('-')[0] ?? ''] ?? book.language)
+    : 'Idioma não informado';
+  const formats: Record<string, string> = { PHYSICAL: 'Impresso', DIGITAL: 'Digital' };
+  return [
+    language,
+    book.format ? (formats[book.format] ?? book.format) : null,
+    book.match === 'approximate' ? 'Correspondência aproximada' : null,
+    book.edition === 'work' ? 'Edição não identificada' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}

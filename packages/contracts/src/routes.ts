@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { catalogBookResponseSchema, catalogSearchResponseSchema } from './catalog';
 import { errorResponseSchema } from './errors';
+import { memoryStatsResponseSchema } from './memory';
 import { healthResponseSchema, readyResponseSchema } from './health';
 import {
   meResponseSchema,
@@ -37,6 +38,7 @@ export const API_ROUTES = {
   me: '/me',
   onboarding: '/me/onboarding',
   stats: '/me/stats',
+  memoryStats: '/me/memory',
   shelf: '/shelf',
   shelfEntry: '/shelf/:id',
   sessions: '/sessions',
@@ -72,6 +74,14 @@ export type ApiRouteDefinition = {
 
 /** Registry used to generate the OpenAPI document. Add every new route here. */
 export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
+  {
+    method: 'get',
+    path: API_ROUTES.memoryStats,
+    summary: 'Seven days of recorded review self-assessments. Query: today=YYYY-MM-DD.',
+    tags: ['me'],
+    auth: true,
+    responses: { 200: { description: 'Review history.', schema: memoryStatsResponseSchema } },
+  },
   {
     method: 'get',
     path: API_ROUTES.health,
@@ -218,7 +228,10 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
         description: 'Results (possibly partial, see sources).',
         schema: catalogSearchResponseSchema,
       },
-      503: { description: 'Every catalog source failed.', schema: errorResponseSchema },
+      503: {
+        description: 'No usable results and at least one catalog source failed.',
+        schema: errorResponseSchema,
+      },
     },
   },
   {
