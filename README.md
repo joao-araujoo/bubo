@@ -1,58 +1,67 @@
-# Bubo — Read deeply.
+<div align="center">
 
-Bubo is a reading companion that helps people remember what they read. It combines focused reading
-sessions, active recall and spaced review, and anti-spoiler reading clubs. The mascot is an owl
-called Bubo.
+<img src="apps/mobile/assets/brand/bubo-logo-horizontal.png" alt="Bubo — Read Deeply" width="360" />
 
-**Status:** Tasks 01–04 are done:
+### Leia com presença. Lembre com confiança.
 
-- foundation
-- authentication + onboarding
-- Estante + focused reading sessions
-- Revisar (active recall + spaced review)
-- production readiness
+Um companheiro de leitura para transformar páginas lidas em ideias que ficam.
 
-Next screens: [docs/screens.md](docs/screens.md). Shipping: [docs/release.md](docs/release.md).
+![Em desenvolvimento](https://img.shields.io/badge/status-em%20desenvolvimento-7052A3?style=for-the-badge)
+![Aplicativo mobile](https://img.shields.io/badge/app-mobile-8D72B9?style=for-the-badge)
+![Idioma](https://img.shields.io/badge/idioma-PT--BR-B6A3D4?style=for-the-badge)
 
-`npm run dev:api` runs locally with embedded Postgres, with no cloud setup. See
-[docs/roadmap.md](docs/roadmap.md).
+</div>
 
-The repository contains:
+---
 
-- an npm-workspaces monorepo
-- an Expo SDK 57 mobile app
-- a Cloudflare Workers + Hono API
-- shared TypeScript packages
-- the official brand assets
-- documentation and ADRs
+## O que é o Bubo?
 
-## Quick start
+Bubo ajuda você a **ler com foco, recordar sem espiar e revisar na hora certa**. Cada sessão de leitura pode virar uma pequena prática de memória: você registra seu progresso, tenta recuperar o que aprendeu e volta às ideias antes que elas se percam.
 
-```sh
-npm install
-npm run doctor
-npm run dev:api        # http://localhost:8787/v1/health
-npm run dev:mobile     # Expo dev server
-npm run verify         # all quality gates
-```
+<div align="center">
+  <img src="apps/mobile/assets/mascot/bubo-deep-reading.png" alt="Mascote oficial Bubo lendo" width="150" />
+  <img src="apps/mobile/assets/mascot/bubo-review.png" alt="Mascote oficial Bubo revisando" width="150" />
+  <img src="apps/mobile/assets/mascot/bubo-celebrating.png" alt="Mascote oficial Bubo celebrando" width="150" />
+</div>
 
-Requires Node ≥ 20.19 and **npm only**. Works on Windows, macOS and Linux. See
-[docs/development.md](docs/development.md).
+### A jornada de leitura
 
-## Layout
+1. **Escolha um livro.** Encontre pelo catálogo ou ISBN, ou adicione manualmente à sua estante.
+2. **Leia com foco.** Registre uma sessão e acompanhe o avanço real no livro.
+3. **Lembre sem consultar.** Crie e responda perguntas sobre o que leu.
+4. **Revise no momento certo.** Avalie o quanto lembrou e deixe o Bubo organizar a próxima revisão.
 
-| path                 | what                                                               |
-| -------------------- | ------------------------------------------------------------------ |
-| `apps/mobile`        | Expo Router app: 5 tabs (Hoje, Estante, Revisar, Comunidade, Você) |
-| `apps/api`           | Worker API under `/v1` (health, ready, OpenAPI)                    |
-| `packages/config`    | constants + validated env                                          |
-| `packages/contracts` | shared Zod contracts + error envelope + OpenAPI builder            |
-| `packages/domain`    | pure domain rules                                                  |
-| `packages/scoring`   | retention, spaced repetition, XP                                   |
-| `packages/database`  | Drizzle schema, Neon client, SQL migrations                        |
-| `packages/testing`   | test helpers                                                       |
-| `assets-source`      | official brand files (canonical, hashed)                           |
-| `docs`               | documentation + ADR-001…011                                        |
-| `scripts`            | cross-platform tooling                                             |
+## Como o progresso é calculado
 
-Read [AGENTS.md](AGENTS.md) before contributing, whether you're a person or an AI agent.
+O Bubo recompensa a prática, especialmente o esforço de lembrar. Os números vêm de atividades registradas; uma estante vazia começa em zero.
+
+| Atividade               | Cálculo de XP                                          |
+| ----------------------- | ------------------------------------------------------ |
+| Leitura focada          | **1 XP por minuto inteiro**, até 60 minutos por sessão |
+| Tentativa de recordação | **2 XP por tentativa**                                 |
+| Resposta lembrada       | **+3 XP por acerto**                                   |
+| Revisão concluída       | **+25 XP** quando houve pelo menos uma tentativa       |
+
+Por exemplo, uma sessão de **20 minutos** rende **20 XP**. Em uma revisão concluída com **3 tentativas e 2 acertos**, são **37 XP**: `3 × 2 + 2 × 3 + 25`.
+
+A **sequência de dias** considera dias consecutivos com leitura ou revisão concluída. Se hoje ainda não houve atividade, a sequência de ontem continua visível até o fim do dia. A semana usa o calendário local do leitor.
+
+As revisões seguem repetição espaçada: quando a lembrança foi difícil, o conteúdo volta no dia seguinte; com boas respostas, os intervalos crescem. O objetivo é revisar melhor, sem transformar leitura em corrida por pontos.
+
+## Telas e experiências
+
+|                        Hoje                         |                Estante                |                         Revisar                         |
+| :-------------------------------------------------: | :-----------------------------------: | :-----------------------------------------------------: |
+| Seu próximo passo, atividade da semana e progresso. | Livros, sessões e caminho de leitura. | Perguntas para lembrar sem espiar e revisões pendentes. |
+
+> Capturas reais das telas serão adicionadas aqui após a próxima rodada de registro no dispositivo. As ilustrações acima são poses oficiais do Bubo, não capturas da interface.
+
+O app tem cinco áreas: **Hoje · Estante · Revisar · Comunidade · Você**. Comunidade e clubes de leitura com proteção contra spoilers estão planejados; as experiências de leitura, estante e revisão já estão em desenvolvimento ativo.
+
+---
+
+<div align="center">
+  <img src="apps/mobile/assets/mascot/bubo-main.png" alt="Mascote oficial Bubo" width="110" />
+
+**Leia profundamente. Guarde o que importa.**
+</div>
