@@ -185,7 +185,24 @@ export default function YouScreen() {
       <Button
         label="Minha memória"
         variant="secondary"
+        icon="insights"
+        accessibilityHint="Abre suas revisões dos últimos 7 dias"
         onPress={() => router.push('/estatisticas')}
+      />
+      <Button
+        label="Mural de conquistas"
+        variant="secondary"
+        icon="emoji-events"
+        accessibilityHint="Abre seu nível e suas conquistas"
+        onPress={() => router.push('/conquistas')}
+      />
+      <Button
+        label="Leitores bloqueados"
+        variant="secondary"
+        size="md"
+        icon="block"
+        accessibilityHint="Mostra quem você bloqueou nos clubes"
+        onPress={() => router.push('/bloqueados')}
       />
       <Button
         label="Sair da conta"

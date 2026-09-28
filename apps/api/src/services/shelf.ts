@@ -33,6 +33,16 @@ export function effectiveTotalPages(entry: EntryRow, book: BookRow): number | nu
   return entry.totalPages ?? book.totalPages;
 }
 
+/** Stored https cover first, then ISBN-derived candidates; clients keep a typographic fallback. */
+export function bookCoverUrls(book: Pick<BookRow, 'coverUrl' | 'isbn'>): string[] {
+  return [
+    ...new Set([
+      ...(book.coverUrl?.startsWith('https://') ? [book.coverUrl] : []),
+      ...coverCandidates({ coverUrl: book.coverUrl, isbn13: book.isbn }),
+    ]),
+  ];
+}
+
 export function toShelfEntry(entry: EntryRow, book: BookRow): ShelfEntry {
   return shelfEntrySchema.parse({
     id: entry.id,
@@ -49,12 +59,7 @@ export function toShelfEntry(entry: EntryRow, book: BookRow): ShelfEntry {
       isbn13: book.isbn,
       publisher: book.publisher,
       publishedYear: book.publishedYear,
-      coverUrls: [
-        ...new Set([
-          ...(book.coverUrl?.startsWith('https://') ? [book.coverUrl] : []),
-          ...coverCandidates({ coverUrl: book.coverUrl, isbn13: book.isbn }),
-        ]),
-      ],
+      coverUrls: bookCoverUrls(book),
     },
   });
 }

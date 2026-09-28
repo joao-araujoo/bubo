@@ -9,6 +9,7 @@ export function createRateLimiter(options: {
   windowMs: number;
   now?: () => number;
   maxKeys?: number;
+  message?: string;
 }) {
   const now = options.now ?? (() => Date.now());
   const maxKeys = options.maxKeys ?? 5000;
@@ -31,7 +32,10 @@ export function createRateLimiter(options: {
       }
       current.count += 1;
       if (current.count > options.limit) {
-        throw new AppError('RATE_LIMITED', 'Too many catalog requests. Try again in a moment.');
+        throw new AppError(
+          'RATE_LIMITED',
+          options.message ?? 'Too many catalog requests. Try again in a moment.',
+        );
       }
     },
   };

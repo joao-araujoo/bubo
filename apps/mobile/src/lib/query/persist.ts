@@ -16,7 +16,9 @@ export const CACHE_MAX_AGE_MS = 24 * 60 * 60_000;
 
 const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: 'bubo.query-cache.v1',
+  // Bump when a persisted response shape gains a required field (v2: shelf detail `reviews`,
+  // Task 06), so an OTA update with the same app version never reads an older shape.
+  key: 'bubo.query-cache.v2',
   throttleTime: 1_000,
 });
 

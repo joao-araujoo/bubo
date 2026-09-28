@@ -117,11 +117,23 @@ export const sessionResultSchema = z.object({
 });
 export type SessionResult = z.infer<typeof sessionResultSchema>;
 
-/** GET /v1/shelf/:id — one book with its recent sessions. */
+/** One graded recall attempt on a card of this book (a `review_logs` row). */
+export const bookReviewSchema = z.object({
+  id: z.string(),
+  cardId: z.string(),
+  grade: z.number().int().min(0).max(5),
+  localDate: localDateSchema,
+  reviewedAt: z.iso.datetime(),
+});
+export type BookReview = z.infer<typeof bookReviewSchema>;
+
+/** GET /v1/shelf/:id — one book with its recent sessions, cards and reviews. */
 export const shelfEntryDetailSchema = z.object({
   entry: shelfEntrySchema,
   sessions: z.array(readingSessionSchema),
   cards: z.array(recallCardSchema),
+  /** Most recent reviews first. Defaults to [] for API versions without the field. */
+  reviews: z.array(bookReviewSchema).default([]),
 });
 export type ShelfEntryDetail = z.infer<typeof shelfEntryDetailSchema>;
 

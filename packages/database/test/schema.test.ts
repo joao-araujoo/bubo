@@ -75,6 +75,11 @@ describe('database schema', () => {
     expect(Object.keys(schema).sort()).toEqual([
       'accounts',
       'books',
+      'clubMembers',
+      'clubPosts',
+      'clubReplies',
+      'clubs',
+      'contentReports',
       'rateLimits',
       'readerProfiles',
       'readingSessions',
@@ -82,6 +87,7 @@ describe('database schema', () => {
       'reviewLogs',
       'sessions',
       'shelfEntries',
+      'userBlocks',
       'users',
       'verifications',
     ]);

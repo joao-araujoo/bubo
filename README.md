@@ -56,7 +56,7 @@ As revisões seguem repetição espaçada: quando a lembrança foi difícil, o c
 
 > Capturas reais das telas serão adicionadas aqui após a próxima rodada de registro no dispositivo. As ilustrações acima são poses oficiais do Bubo, não capturas da interface.
 
-O app tem cinco áreas: **Hoje · Estante · Revisar · Comunidade · Você**. Comunidade e clubes de leitura com proteção contra spoilers estão planejados; as experiências de leitura, estante e revisão já estão em desenvolvimento ativo.
+O app tem cinco áreas: **Hoje · Estante · Revisar · Comunidade · Você**. Na Comunidade já existem clubes de leitura com debates protegidos contra spoilers (cada debate diz a página de que fala), denúncia e bloqueio; enquetes, convites e feed de amigos vêm depois.
 
 ---
 
@@ -65,3 +65,10 @@ O app tem cinco áreas: **Hoje · Estante · Revisar · Comunidade · Você**. C
 
 **Leia profundamente. Guarde o que importa.**
 </div>
+
+---
+
+## Para o dono do projeto
+
+- **[CONFIGURAR.md](CONFIGURAR.md)** — tudo o que ainda depende de você (contas, chaves, lojas).
+- **[docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md)** — roteiro para testar cada tela do app.

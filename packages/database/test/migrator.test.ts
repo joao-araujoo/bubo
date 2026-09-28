@@ -40,6 +40,7 @@ describe('applyMigrations (PGlite)', () => {
       '0005_recall.sql',
       '0006_catalog.sql',
       '0007_shelf_entry_pages.sql',
+      '0008_community.sql',
     ]);
   });
 
@@ -152,5 +153,49 @@ describe('reading sessions constraints', () => {
       `SELECT count(*)::int AS n FROM "reading_sessions"`,
     );
     expect(rows[0]?.n).toBe(0);
+  });
+
+  it('enforces community constraints and cascades with the account', async () => {
+    await applyMigrations(client(), loadMigrations());
+    await insertUser('u1');
+    await insertUser('u2');
+    await pg.query(
+      `INSERT INTO "books" ("id", "title", "catalog_key") VALUES ('b1', 'Duna', 'ol:1')`,
+    );
+    const club = (id: string, icon: string) =>
+      pg.query(
+        `INSERT INTO "reading_clubs" ("id", "owner_user_id", "name", "icon", "book_id") VALUES ($1, 'u1', 'Clube', $2, 'b1')`,
+        [id, icon],
+      );
+    await club('c1', 'planet');
+    await expect(club('c2', 'emoji')).rejects.toThrow();
+    const post = (id: string, page: number) =>
+      pg.query(
+        `INSERT INTO "reading_club_posts" ("id", "club_id", "author_user_id", "title", "body", "spoiler_page") VALUES ($1, 'c1', 'u2', 'Tópico', 'Texto', $2)`,
+        [id, page],
+      );
+    await post('p1', 120);
+    await expect(post('p2', -1)).rejects.toThrow();
+    await expect(post('p3', 20001)).rejects.toThrow();
+    const report = (id: string) =>
+      pg.query(
+        `INSERT INTO "reading_club_reports" ("id", "reporter_user_id", "club_id", "target_type", "target_id", "reason") VALUES ($1, 'u1', 'c1', 'post', 'p1', 'spoiler')`,
+        [id],
+      );
+    await report('r1');
+    await expect(report('r2')).rejects.toThrow();
+    await expect(
+      pg.query(
+        `INSERT INTO "user_blocks" ("blocker_user_id", "blocked_user_id") VALUES ('u1', 'u1')`,
+      ),
+    ).rejects.toThrow();
+    // A club's book cannot disappear under it.
+    await expect(pg.query(`DELETE FROM "books" WHERE "id" = 'b1'`)).rejects.toThrow();
+    // Deleting the owner removes the club and everything in it.
+    await pg.query(`DELETE FROM "users" WHERE "id" = 'u1'`);
+    const { rows } = await pg.query<{ n: number }>(
+      `SELECT (SELECT count(*) FROM "reading_clubs") + (SELECT count(*) FROM "reading_club_posts") + (SELECT count(*) FROM "reading_club_reports")::int AS n`,
+    );
+    expect(Number(rows[0]?.n)).toBe(0);
   });
 });

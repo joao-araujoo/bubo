@@ -121,10 +121,11 @@ function createUpstream() {
 let upstream: ReturnType<typeof createUpstream>;
 let harness: Awaited<ReturnType<typeof createHarness>>;
 
+// A fresh PGlite database per test: allow the same startup time as the other suites' beforeAll.
 beforeEach(async () => {
   upstream = createUpstream();
   harness = await createHarness({ catalogFetch: upstream.fetch });
-});
+}, 60_000);
 afterEach(async () => {
   await harness.close();
 });

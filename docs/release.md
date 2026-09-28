@@ -3,6 +3,32 @@
 Nothing in this repository deploys by itself. Every step below is a deliberate action by the
 owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps in order.
 
+## Current remote state (keep this updated after every remote change)
+
+Last updated 2026-09-27 (Task 07 deploy). Owner-facing checklist in Portuguese:
+[../CONFIGURAR.md](../CONFIGURAR.md).
+
+- **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
+  `9c50e6bd-3c7e-495e-954d-d459e2f9b014`). The account's `workers.dev` subdomain `bubo-api` was
+  registered automatically by the first deploy; renaming it changes every Worker URL on the account.
+- **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),
+  `BETTER_AUTH_SECRET` (random, stored only in Cloudflare; rotating it signs everyone out),
+  `BETTER_AUTH_URL` = the URL above. **Not set:** `RESEND_API_KEY`/`EMAIL_FROM` (password reset
+  answers 503), `GOOGLE_BOOKS_API_KEY` (Google 429; Open Library/BrasilAPI answer),
+  `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`.
+- **Neon:** migrations `0001`–`0008` applied, 0 pending. Production and the owner's local
+  `dev:api` share this database — split into a `production` branch before real users.
+- **Legacy tables in Neon:** about 40 empty tables that no Bubo migration created (`clubs`,
+  `club_members`, `club_polls`, `content_reports`, `posts`, `blocks`, `works`, `editions`, …). They
+  are untouched. New Bubo tables must not reuse those names (hence `reading_club_*` in 0008).
+- **R2:** bucket `bubo` bound as `MEDIA`; public delivery not configured.
+- **Plan:** Workers Paid not confirmed (password hashing can exceed Free CPU limits under load).
+- **Expo Go vs production:** production trusts only `bubo://`; Expo Go (`exp://`) works only with a
+  development API. Testing against production needs an EAS build.
+- **Smoke tests (2026-09-27):** core flow (health, ready, sign-up, memory, catalog, ISBN, add,
+  session → card, shelf detail, OpenAPI, achievements, reset → 503, account deletion) and the
+  Comunidade flow with two accounts both passed; every test account was deleted.
+
 ## 0. Before anything
 
 - [ ] **Rotate any credential that was ever pasted into a file or chat:** the Neon password and
@@ -43,10 +69,14 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
    npx wrangler secret put DATABASE_URL --env production
    npx wrangler secret put BETTER_AUTH_SECRET --env production   # ≥ 32 random chars
    npx wrangler secret put BETTER_AUTH_URL --env production      # https://api.your-domain
-   npx wrangler secret put RESEND_API_KEY --env production
+   npx wrangler secret put RESEND_API_KEY --env production       # optional pair, see below
    npx wrangler secret put EMAIL_FROM --env production
    npx wrangler secret put GEMINI_API_KEY --env production       # optional
    ```
+   **Without Resend** (allowed since 2026-09-27, owner decision): the API runs normally and
+   `POST /v1/auth/request-password-reset` answers `503 SERVICE_UNAVAILABLE` for every address;
+   the app shows "O serviço está indisponível no momento". Set both secrets to enable reset.
+   Setting only one of the pair fails config validation.
 4. Deploy with `npm run deploy:api`. It runs `verify` first, then
    `wrangler deploy --env production`.
 5. Attach a custom domain (`api.your-domain`) to the `bubo-api` Worker. `BETTER_AUTH_URL` must

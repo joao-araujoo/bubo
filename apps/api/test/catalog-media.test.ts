@@ -46,7 +46,7 @@ beforeEach(async () => {
     },
     { MEDIA_PUBLIC_URL: 'https://media.example.test' },
   );
-});
+}, 60_000);
 afterEach(async () => {
   await harness.close();
 });

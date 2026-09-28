@@ -1,16 +1,18 @@
 import {
+  type BookReview,
   type CreateCardRequest,
   type DueCardsResponse,
   type RecallCard,
   type ReviewRequest,
   type ReviewResult,
+  bookReviewSchema,
   dueCardsResponseSchema,
   recallCardSchema,
 } from '@bubo/contracts';
 import { type Database, type Executor, schema } from '@bubo/database';
 import { addDays } from '@bubo/domain';
 import { type RecallGrade, scheduleNextReview, xpForRecallSession } from '@bubo/scoring';
-import { and, asc, eq, gt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
 
 import { AppError } from '../lib/errors';
 import { findEntry } from './shelf';
@@ -158,6 +160,37 @@ export async function listEntryCards(
     .where(and(eq(recallCards.userId, userId), eq(recallCards.shelfEntryId, entryId)))
     .orderBy(asc(recallCards.dueDate));
   return rows.map((row) => toCard(row, bookTitle));
+}
+
+/** Recent graded attempts on this book's cards (owner-scoped, newest first, bounded). */
+export async function listEntryReviews(
+  db: Executor,
+  userId: string,
+  entryId: string,
+  limit = 20,
+): Promise<BookReview[]> {
+  const rows = await db
+    .select({
+      id: reviewLogs.id,
+      cardId: reviewLogs.cardId,
+      grade: reviewLogs.grade,
+      localDate: reviewLogs.localDate,
+      reviewedAt: reviewLogs.reviewedAt,
+    })
+    .from(reviewLogs)
+    .innerJoin(recallCards, eq(recallCards.id, reviewLogs.cardId))
+    .where(
+      and(
+        eq(reviewLogs.userId, userId),
+        eq(recallCards.userId, userId),
+        eq(recallCards.shelfEntryId, entryId),
+      ),
+    )
+    .orderBy(desc(reviewLogs.reviewedAt), desc(reviewLogs.id))
+    .limit(limit);
+  return rows.map((row) =>
+    bookReviewSchema.parse({ ...row, reviewedAt: row.reviewedAt.toISOString() }),
+  );
 }
 
 /**

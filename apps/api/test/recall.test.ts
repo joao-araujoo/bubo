@@ -323,3 +323,58 @@ describe('account deletion', () => {
     expect(Number(rows[0]?.n)).toBe(0);
   });
 });
+
+describe('book memory path data', () => {
+  it("lists a book's reviews once, newest first, scoped to that book and reader", async () => {
+    now = new Date('2026-09-26T15:00:00.000Z');
+    const { cookie, entry } = await readerWithBook();
+    const other = shelfEntrySchema.parse(
+      await (
+        await h.call('/v1/shelf', { method: 'POST', cookie, json: { title: 'Outro livro' } })
+      ).json(),
+    );
+    const createCard = async (shelfEntryId: string, prompt: string) =>
+      recallCardSchema.parse(
+        await (
+          await h.call('/v1/recall/cards', {
+            method: 'POST',
+            cookie,
+            json: { shelfEntryId, prompt, localDate: '2026-09-26' },
+          })
+        ).json(),
+      );
+    const first = await createCard(entry.id, 'Primeira ideia');
+    const second = await createCard(entry.id, 'Segunda ideia');
+    const elsewhere = await createCard(other.id, 'Ideia de outro livro');
+    const detail = async (id: string, reader = cookie) =>
+      shelfEntryDetailSchema.parse(
+        await (await h.call(`/v1/shelf/${id}`, { cookie: reader })).json(),
+      );
+    expect((await detail(entry.id)).reviews).toEqual([]);
+
+    const review = async (cardId: string, grade: number, id = uuid()) =>
+      h.call(`/v1/recall/cards/${cardId}/review`, {
+        method: 'POST',
+        cookie,
+        json: { id, grade, localDate: '2026-09-27' },
+      });
+    now = new Date('2026-09-27T10:00:00.000Z');
+    const retryId = uuid();
+    expect((await review(first.id, 4, retryId)).status).toBe(201);
+    expect((await review(first.id, 4, retryId)).status).toBe(200);
+    now = new Date('2026-09-27T11:00:00.000Z');
+    expect((await review(second.id, 1)).status).toBe(201);
+    expect((await review(elsewhere.id, 3)).status).toBe(201);
+
+    const { reviews } = await detail(entry.id);
+    expect(reviews.map(({ cardId, grade, localDate }) => ({ cardId, grade, localDate }))).toEqual([
+      { cardId: second.id, grade: 1, localDate: '2026-09-27' },
+      { cardId: first.id, grade: 4, localDate: '2026-09-27' },
+    ]);
+    expect(reviews[0]?.reviewedAt).toBe('2026-09-27T11:00:00.000Z');
+    expect((await detail(other.id)).reviews.map((r) => r.cardId)).toEqual([elsewhere.id]);
+
+    const stranger = await h.signUp();
+    expect((await h.call(`/v1/shelf/${entry.id}`, { cookie: stranger.cookie })).status).toBe(404);
+  });
+});

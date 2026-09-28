@@ -50,14 +50,18 @@ export const serverEnvSchema = z
     ),
   })
   .superRefine((env, ctx) => {
+    // Resend is a pair in every environment: one without the other is a misconfiguration.
+    if (Boolean(env.RESEND_API_KEY) !== Boolean(env.EMAIL_FROM)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [env.RESEND_API_KEY ? 'EMAIL_FROM' : 'RESEND_API_KEY'],
+        message: 'RESEND_API_KEY and EMAIL_FROM must be set together',
+      });
+    }
     if (env.APP_ENV !== 'production') return;
-    for (const key of [
-      'DATABASE_URL',
-      'BETTER_AUTH_SECRET',
-      'BETTER_AUTH_URL',
-      'RESEND_API_KEY',
-      'EMAIL_FROM',
-    ] as const) {
+    // E-mail is optional in production (owner decision, 2026-09-27): without Resend, password
+    // reset answers 503 SERVICE_UNAVAILABLE instead of silently dropping the message.
+    for (const key of ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL'] as const) {
       if (!env[key]) {
         ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
       }

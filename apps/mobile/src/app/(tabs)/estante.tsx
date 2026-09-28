@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   EmptyState,
+  HeaderButton,
   Icon,
   InlineMessage,
   ProgressBar,
@@ -115,6 +116,11 @@ export default function ShelfScreen() {
               Cognição & leitura profunda
             </Text>
           </View>
+          <HeaderButton
+            icon="explore"
+            label="Descobrir livros"
+            onPress={() => router.push('/descobrir')}
+          />
           <Button label="+ Livro" size="md" onPress={openAdd} />
         </View>
       }

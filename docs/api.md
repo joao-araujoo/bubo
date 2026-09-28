@@ -6,26 +6,48 @@
 
 ## Endpoints
 
-| method   | path                              | auth    | purpose                                                             | success                             | failure                                     |
-| -------- | --------------------------------- | ------- | ------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------- |
-| GET      | `/v1/health`                      | public  | liveness. **No DB, no third parties.**                              | 200 `HealthResponse`                | never fails because of config               |
-| GET      | `/v1/ready`                       | public  | readiness: config valid + DB `select 1`                             | 200 `ReadyResponse`                 | 503 `ReadyResponse` (`not_ready`)           |
-| GET      | `/v1/openapi.json`                | public  | OpenAPI 3.0 document built from Zod                                 | 200                                 | —                                           |
-| GET/POST | `/v1/auth/*`                      | —       | Better Auth (see below)                                             | Better Auth JSON                    | Better Auth JSON; 403 for blocked redirects |
-| GET      | `/v1/me`                          | session | reader + onboarding state (`MeResponse`)                            | 200                                 | 401, 503                                    |
-| PUT      | `/v1/me/onboarding`               | session | save habit, goals, interests, optional first book                   | 200 `MeResponse`                    | 400 bad JSON, 422 `VALIDATION_FAILED`, 401  |
-| GET      | `/v1/shelf`                       | session | the reader's shelf (`ShelfResponse`), newest first                  | 200                                 | 401, 503                                    |
-| GET      | `/v1/me/stats?today=YYYY-MM-DD`   | session | XP, streak, week activity, `readToday` from real sessions           | 200 `StatsResponse`                 | 422 bad/missing `today`                     |
-| POST     | `/v1/shelf`                       | session | add a book manually (`quero ler` or `lendo`)                        | 201 `ShelfEntry`                    | 409 already on shelf, 422                   |
-| GET      | `/v1/shelf/:id`                   | session | one entry + its recent sessions                                     | 200 `ShelfEntryDetail`              | 404 (also for other readers' entries)       |
-| PATCH    | `/v1/shelf/:id`                   | session | status / current page / page count                                  | 200 `ShelfEntry`                    | 404, 422 (page beyond the book)             |
-| DELETE   | `/v1/shelf/:id`                   | session | remove the entry and its sessions                                   | 200 `{ deleted: true }`             | 404                                         |
-| POST     | `/v1/sessions`                    | session | record a finished focused session (idempotent on `id`)              | 201 new / 200 retry `SessionResult` | 404, 422 implausible timing or pages        |
-| GET      | `/v1/recall/due?today=YYYY-MM-DD` | session | cards due today or earlier (+ counts, next due date)                | 200 `DueCardsResponse`              | 422 bad `today`                             |
-| POST     | `/v1/recall/cards`                | session | create a card for a book on the shelf (first due tomorrow)          | 201 `RecallCard`                    | 404, 422                                    |
-| DELETE   | `/v1/recall/cards/:id`            | session | delete a card                                                       | 200 `{ deleted: true }`             | 404                                         |
-| POST     | `/v1/recall/cards/:id/review`     | session | self-grade a recall (SM-2), idempotent on `id`                      | 201 new / 200 retry `ReviewResult`  | 404, 409 not due yet, 422                   |
-| POST     | `/v1/auth/delete-user`            | session | Better Auth: delete the account (`{ password }`); all data cascades | 200                                 | 400/401 wrong password                      |
+| method   | path                                  | auth    | purpose                                                             | success                             | failure                                     |
+| -------- | ------------------------------------- | ------- | ------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------- |
+| GET      | `/v1/health`                          | public  | liveness. **No DB, no third parties.**                              | 200 `HealthResponse`                | never fails because of config               |
+| GET      | `/v1/ready`                           | public  | readiness: config valid + DB `select 1`                             | 200 `ReadyResponse`                 | 503 `ReadyResponse` (`not_ready`)           |
+| GET      | `/v1/openapi.json`                    | public  | OpenAPI 3.0 document built from Zod                                 | 200                                 | —                                           |
+| GET/POST | `/v1/auth/*`                          | —       | Better Auth (see below)                                             | Better Auth JSON                    | Better Auth JSON; 403 for blocked redirects |
+| GET      | `/v1/me`                              | session | reader + onboarding state (`MeResponse`)                            | 200                                 | 401, 503                                    |
+| PUT      | `/v1/me/onboarding`                   | session | save habit, goals, interests, optional first book                   | 200 `MeResponse`                    | 400 bad JSON, 422 `VALIDATION_FAILED`, 401  |
+| GET      | `/v1/shelf`                           | session | the reader's shelf (`ShelfResponse`), newest first                  | 200                                 | 401, 503                                    |
+| GET      | `/v1/me/stats?today=YYYY-MM-DD`       | session | XP, streak, week activity, `readToday` from real sessions           | 200 `StatsResponse`                 | 422 bad/missing `today`                     |
+| GET      | `/v1/me/achievements?today=`          | session | level (from XP) + 13 badges recomputed from activity (ADR-018)      | 200 `AchievementsResponse`          | 422 bad/missing `today`                     |
+| GET      | `/v1/me/memory?today=YYYY-MM-DD`      | session | seven days of Lembrei/Quase/Esqueci counts from `review_logs`       | 200 `MemoryStatsResponse`           | 422 bad/missing `today`                     |
+| POST     | `/v1/shelf`                           | session | add a book manually (`quero ler` or `lendo`)                        | 201 `ShelfEntry`                    | 409 already on shelf, 422                   |
+| GET      | `/v1/shelf/:id`                       | session | one entry + recent sessions, its cards and its last 20 reviews      | 200 `ShelfEntryDetail`              | 404 (also for other readers' entries)       |
+| PATCH    | `/v1/shelf/:id`                       | session | status / current page / page count                                  | 200 `ShelfEntry`                    | 404, 422 (page beyond the book)             |
+| DELETE   | `/v1/shelf/:id`                       | session | remove the entry and its sessions                                   | 200 `{ deleted: true }`             | 404                                         |
+| POST     | `/v1/sessions`                        | session | record a finished focused session (idempotent on `id`)              | 201 new / 200 retry `SessionResult` | 404, 422 implausible timing or pages        |
+| GET      | `/v1/recall/due?today=YYYY-MM-DD`     | session | cards due today or earlier (+ counts, next due date)                | 200 `DueCardsResponse`              | 422 bad `today`                             |
+| POST     | `/v1/recall/cards`                    | session | create a card for a book on the shelf (first due tomorrow)          | 201 `RecallCard`                    | 404, 422                                    |
+| DELETE   | `/v1/recall/cards/:id`                | session | delete a card                                                       | 200 `{ deleted: true }`             | 404                                         |
+| POST     | `/v1/recall/cards/:id/review`         | session | self-grade a recall (SM-2), idempotent on `id`                      | 201 new / 200 retry `ReviewResult`  | 404, 409 not due yet, 422                   |
+| GET      | `/v1/catalog/search?q=&limit=`        | session | Google Books + Open Library (+ BrasilAPI ISBN), merged by edition   | 200 `CatalogSearchResponse`         | 422 short `q`, 429, 503 all sources failed  |
+| GET      | `/v1/catalog/books/:catalogId`        | session | one catalog edition + whether it is on the shelf                    | 200 `CatalogBookResponse`           | 404 unknown id, 429                         |
+| GET      | `/v1/catalog/isbn/:isbn`              | session | ISBN-10/13 lookup (scanner); never substitutes another ISBN         | 200 `CatalogBookResponse`           | 404 no book, 422 invalid ISBN, 429          |
+| GET      | `/v1/clubs?q=`                        | session | my clubs + public clubs to discover (search name/book)              | 200 `ClubsResponse`                 | 401                                         |
+| POST     | `/v1/clubs`                           | session | create a club around a catalog book from my shelf                   | 201 `ClubDetail`                    | 404 entry, 409 5 clubs, 422 manual book     |
+| GET      | `/v1/clubs/:id`                       | session | club, my role, my page, open reports (owner)                        | 200 `ClubDetail`                    | 404                                         |
+| DELETE   | `/v1/clubs/:id`                       | session | delete club + all content (owner)                                   | 200 `{ deleted: true }`             | 403, 404                                    |
+| PUT      | `/v1/clubs/:id/membership`            | session | join (`acceptGuidelines: true`), shelves the book                   | 200 `ClubDetail`                    | 404, 422                                    |
+| DELETE   | `/v1/clubs/:id/membership`            | session | leave (owner can't)                                                 | 200 `{ deleted: true }`             | 409 owner                                   |
+| GET      | `/v1/clubs/:id/posts`                 | session | topics; beyond my page → `locked`, no text                          | 200 `ClubPostsResponse`             | 403 not member                              |
+| POST     | `/v1/clubs/:id/posts`                 | session | topic anchored to a page (idempotent on `id`)                       | 201 new / 200 retry `ClubPost`      | 403, 409 id, 422 page, 429                  |
+| GET      | `/v1/clubs/:id/posts/:postId`         | session | topic + replies; `?reveal=1` = espiar                               | 200 `ClubTopicResponse`             | 403, 404                                    |
+| DELETE   | `/v1/clubs/:id/posts/:postId`         | session | author deletes / owner removes                                      | 200 `{ deleted: true }`             | 403, 404                                    |
+| POST     | `/v1/clubs/:id/posts/:postId/replies` | session | reply (page ≥ topic page; idempotent)                               | 201 / 200 `ClubReply`               | 403, 404, 409, 422, 429                     |
+| DELETE   | `/v1/clubs/:id/replies/:replyId`      | session | author deletes / owner removes                                      | 200 `{ deleted: true }`             | 403, 404                                    |
+| POST     | `/v1/clubs/:id/moderation`            | session | owner: remove or restore, resolves reports                          | 200 `{ status }`                    | 403, 404                                    |
+| POST     | `/v1/reports`                         | session | report topic/reply (idempotent; 3 → hidden)                         | 200 `{ reported: true }`            | 403, 404, 422 own, 429                      |
+| GET      | `/v1/blocks`                          | session | readers I blocked                                                   | 200 `BlocksResponse`                | 401                                         |
+| POST     | `/v1/blocks`                          | session | block a reader (idempotent)                                         | 200 `BlocksResponse`                | 404, 422 self                               |
+| DELETE   | `/v1/blocks/:userId`                  | session | unblock                                                             | 200 `BlocksResponse`                | 401                                         |
+| POST     | `/v1/auth/delete-user`                | session | Better Auth: delete the account (`{ password }`); all data cascades | 200                                 | 400/401 wrong password                      |
 
 **Better Auth endpoints** (under `/v1/auth`):
 

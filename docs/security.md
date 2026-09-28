@@ -32,7 +32,9 @@
   - Tokens last 1 hour and are single-use.
   - A reset revokes all sessions.
   - Reset links are sent by Resend in production. In development they're logged locally. Anywhere
-    else, with no provider configured, the request fails. It never drops the e-mail silently.
+    else, with no provider configured, the request is refused up front with 503 (the same answer
+    for every address). Better Auth sends in a background task and would otherwise answer 200, so
+    the refusal happens before it (`apps/api/src/app.ts`, test `email-disabled.test.ts`).
 - **Account deletion:** Você → "Excluir conta" (`/v1/auth/delete-user`).
   - The password is re-checked.
   - Every row owned by the reader cascades from `users`: sessions, shelf, reading sessions, cards,
@@ -42,8 +44,9 @@
   - `DATABASE_URL`
   - `BETTER_AUTH_SECRET`
   - an `https://` `BETTER_AUTH_URL`
-  - `RESEND_API_KEY`
-  - `EMAIL_FROM`
+
+  `RESEND_API_KEY` + `EMAIL_FROM` are optional but must be set together (owner decision,
+  2026-09-27: launch without e-mail, password reset disabled until Resend is configured).
 
   Release app builds fail without an `https://` API URL.
 
@@ -59,6 +62,19 @@
   - R2 keys validated against traversal
   - image type and size limits
   - Gemini key sent in a header, never in the URL
+
+## User-generated content (Comunidade, ADR-019)
+
+- Anti-spoiler is enforced server-side: locked topics and replies are sent without text; only an
+  explicit `?reveal=1` returns it.
+- Every club route requires a session and membership checks run in the service. Topics are always
+  scoped to their club id (a topic id from another club answers 404).
+- Report, block, author delete and owner remove/restore exist and are tested. Three distinct
+  reports hide an item until the club owner reviews it.
+- Logs carry ids and the report reason only, never the reported text or the reader's details.
+- 30 writes per minute per reader (per isolate) and 5 owned clubs per reader.
+- **Gap before a store release:** no Bubo-wide moderation tool or support contact. See
+  [../CONFIGURAR.md](../CONFIGURAR.md).
 
 ## Supply chain
 

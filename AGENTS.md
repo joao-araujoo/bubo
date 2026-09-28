@@ -94,22 +94,49 @@ On Windows use PowerShell or cmd. All scripts are cross-platform Node.
 
 ## Current status and next step
 
-Tasks 01–04 are complete:
+Tasks 01–05 and 07 are complete in code (Task 05 still needs owner/device acceptance, see
+[docs/roadmap.md](docs/roadmap.md)):
 
 - foundation
 - auth + onboarding
 - reading sessions + Estante
 - Revisar + production readiness
+- Discover + catalog + ISBN
+- Comunidade: clubs + anti-spoiler debates + moderation (Task 07)
 
-**Next: TASK 05 — DISCOVER + CATALOG + ISBN.**
+**Task 06 (memory and stats)** is done except a documented retention model (curve, Bubo Score).
+**Task 07 (Comunidade: clubs, anti-spoiler debates, reports, blocks; ADR-019)** is complete and
+deployed. **Next: TASK 08 — Comunidade part 2** (private clubs + invites, members, polls, reviews,
+friends' feed, notifications, admin moderation).
+
+- Owner-only setup lives in [CONFIGURAR.md](CONFIGURAR.md); the screen test script in
+  [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md). Keep both current when screens or config change.
+- The shared Neon database has empty legacy tables (`clubs`, `club_polls`, `posts`, …). Never
+  reuse those names; never drop them without the owner.
+- Remote state (Neon migrations, Worker deploys, R2) lives in
+  [docs/release.md](docs/release.md) → "Current remote state". Update it after every remote
+  change.
+- The owner authorized applying Neon migrations and deploying the API to Cloudflare as part of
+  task work (2026-09-27): `verify` → `db:migrate -- --check` → `db:migrate` → `deploy:api` →
+  smoke test `/v1/health` and `/v1/ready`. Commits still only when asked.
 
 - The per-screen build plan is [docs/screens.md](docs/screens.md). Update it whenever a screen
   changes status.
-- Releases follow [docs/release.md](docs/release.md). Never deploy or run remote migrations without
-  the owner's explicit go-ahead.
+- Releases follow [docs/release.md](docs/release.md). Remote migrations and API deploys have the
+  owner's standing go-ahead (above); anything else remote (R2 public access, domains, plan, DNS)
+  still needs an explicit request.
 
 ## Reading data rules (Task 03)
 
 - Streak, XP, the week and missions are **derived from `reading_sessions` only** (ADR-014). Never
   store or show numbers that don't come from real activity.
 - Sessions are idempotent on a client UUID. Keep that id stable across retries.
+
+## Community rules (Task 07)
+
+- Anti-spoiler is enforced by the API, never only in the app: content whose `spoiler_page` is beyond
+  the reader's shelf page is sent `locked` with no text. Only `?reveal=1` returns it.
+- Every new kind of user-generated content ships with report, block and author delete, and appears
+  in the owner's moderation view. Logs carry ids and reasons, never the content.
+- Clubs read one shared **catalog** book so page numbers mean the same for everyone.
+- Pure rules go in `@bubo/domain/community.ts`; new tables use the `reading_club_` prefix.

@@ -27,66 +27,66 @@ natively with the design system and never copy HTML (ADR-008). See
 
 ## Map
 
-| Stitch screen                                                    | Route                                      | Status | Notes / needs                                                                                                                          |
-| ---------------------------------------------------------------- | ------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Home / Hoje**                                                  |                                            |        |                                                                                                                                        |
-| `bubo_home_hoje` (north star)                                    | `(tabs)/index`                             | ✅     | header streak/XP, Lendo agora, Recuperação ativa, semana cognitiva, missão                                                             |
-| `bubo_home_vis_o_cognitiva_desktop_1440px`                       | —                                          | n/a    | desktop; content covered by Hoje                                                                                                       |
-| **Auth**                                                         |                                            |        |                                                                                                                                        |
-| `bubo_login_autentica_o_mobile` / `bubo_login`                   | `(auth)/entrar`                            | 🟡     | Google sign-in deferred (OAuth client ids + Apple Sign-In required together on iOS)                                                    |
-| `bubo_cadastro`                                                  | `(auth)/cadastro`                          | 🟡     | terms/privacy checkbox deferred until the legal docs exist                                                                             |
-| `bubo_esqueci_minha_senha`                                       | `(auth)/esqueci-senha` + `redefinir-senha` | ✅     | Resend in production                                                                                                                   |
-| **Onboarding**                                                   |                                            |        |                                                                                                                                        |
-| `bubo_onboarding_boas_vindas`                                    | `(auth)/boas-vindas`                       | ✅     | 1/6                                                                                                                                    |
-| `bubo_onboarding_h_bito`                                         | `onboarding/index`                         | ✅     | 2/6                                                                                                                                    |
-| `bubo_onboarding_objetivo`                                       | `onboarding/objetivo`                      | ✅     | 3/6                                                                                                                                    |
-| `bubo_onboarding_interesses`                                     | `onboarding/interesses`                    | ✅     | 4/6                                                                                                                                    |
-| `bubo_onboarding_primeiro_livro`                                 | `onboarding/primeiro-livro`                | ✅     | catalog search, ISBN and manual entry                                                                                                  |
-| `bubo_onboarding_conclu_do`                                      | `onboarding/concluido`                     | ✅     | "+20 XP" not promised                                                                                                                  |
-| **Estante & books**                                              |                                            |        |                                                                                                                                        |
-| `bubo_minha_estante_bubo_score`                                  | `(tabs)/estante`                           | 🟡     | "Bubo Score" per book needs retention data → **Task 06**                                                                               |
-| `bubo_adicionar_livro_manualmente_mobile_1/_2`                   | `adicionar-livro`                          | ✅     |                                                                                                                                        |
-| `bubo_descobrir_livros_mobile`                                   | `descobrir`                                | 🟡     | edition-aware search; bounded R2 cache implemented, configuration/device acceptance pending                                            |
-| `bubo_scanner_de_isbn_mobile`                                    | `scanner-isbn`                             | ✅     | `expo-camera` barcode scanning, manual ISBN fallback and catalog lookup                                                                |
-| `bubo_detalhe_do_livro_caminho_de_mem_ria_2`                     | `livro/[id]`                               | 🟡     | status, progress, sessions and cards done. "Caminho de memória" timeline → **Task 06**                                                 |
-| `bubo_a_es_do_livro_bottom_sheets_mobile`                        | `livro/[id]` actions                       | 🟡     | actions exist inline; bottom-sheet presentation is a polish item                                                                       |
-| `bubo_hist_rico_de_ciclos_de_leitura_mobile_1/_2`                | `livro/[id]/ciclos`                        | ⬜     | **Task 06**: re-reads ("ciclos") need a `reading_cycles` table                                                                         |
-| **Reading session**                                              |                                            |        |                                                                                                                                        |
-| `bubo_sess_o_de_leitura_focada_1/_2`                             | `sessao/[id]`                              | ✅     | restoring a timer after the OS kills the app is deferred                                                                               |
-| `bubo_resultado_da_sess_o_essa_leitura_ficou`                    | `sessao/[id]` (result step)                | ✅     |                                                                                                                                        |
-| `bubo_nova_reflex_o_toasts_mobile`                               | toasts in session/review                   | ⬜     | small: a toast component in the design system                                                                                          |
-| **Revisar**                                                      |                                            |        |                                                                                                                                        |
-| `bubo_revisar_hora_de_lembrar_2`                                 | `(tabs)/revisar`                           | ✅     | due count, badge on the tab                                                                                                            |
-| `bubo_active_recall_sem_espiar`                                  | `revisao`                                  | ✅     | try → reveal → self-grade (SM-2)                                                                                                       |
-| `bubo_revis_o_espa_ada_isso_ficou_com_voc_2`                     | `revisao` (summary)                        | ✅     |                                                                                                                                        |
-| `bubo_estat_sticas_curva_de_reten_o_mobile`                      | `estatisticas`                             | 🟡     | Seven-day real review self-assessments via `/me/memory`, reached from Você. Retention curve/Score deferred; device acceptance pending. |
-| **Comunidade & clubs** (**Task 07–08**)                          |                                            |        |                                                                                                                                        |
-| `bubo_comunidade_liter_ria_mobile`                               | `(tabs)/comunidade`                        | ⬜     | clubs, members, posts tables; moderation first                                                                                         |
-| `bubo_clubes_anti_spoiler_mobile`                                | `clubes`                                   | ⬜     | anti-spoiler = each post has a page/chapter; hide posts beyond the reader's `current_page`                                             |
-| `bubo_buscar_e_filtrar_clubes_de_leitura_mobile`                 | `clubes/buscar`                            | ⬜     | search + filters by book/genre (`GENRES`)                                                                                              |
-| `bubo_perfil_do_clube_de_leitura_mobile_1/_2`                    | `clubes/[id]`                              | ⬜     |                                                                                                                                        |
-| `bubo_criar_novo_clube_de_leitura_mobile`                        | `clubes/novo`                              | ⬜     |                                                                                                                                        |
-| `bubo_convidar_amigos_para_o_clube_mobile`                       | `clubes/[id]/convidar`                     | ⬜     | invite links (deep link `bubo://`)                                                                                                     |
-| `bubo_clube_de_leitura_f_rum_enquetes_mobile`                    | `clubes/[id]/forum`                        | ⬜     |                                                                                                                                        |
-| `bubo_criar_novo_t_pico_de_debate_anti_spoiler_mobile`           | `clubes/[id]/novo-topico`                  | ⬜     | spoiler threshold per topic                                                                                                            |
-| `bubo_criar_nova_enquete_do_clube_mobile`                        | `clubes/[id]/nova-enquete`                 | ⬜     |                                                                                                                                        |
-| `bubo_vota_o_e_resultados_ao_vivo_da_enquete_mobile`             | `clubes/[id]/enquete/[pollId]`             | ⬜     | "ao vivo" = polling first. Durable Objects/WebSocket later                                                                             |
-| `bubo_diretrizes_modera_o_do_clube_mobile`                       | `clubes/[id]/diretrizes`                   | ⬜     | reports + moderation actions (App Store UGC requirement)                                                                               |
-| `bubo_membros_estat_sticas_do_clube_mobile`                      | `clubes/[id]/membros`                      | ⬜     |                                                                                                                                        |
-| `bubo_feed_de_atualiza_es_dos_clubes_mobile`                     | `comunidade/feed`                          | ⬜     |                                                                                                                                        |
-| `bubo_feed_de_atividades_dos_amigos_mobile_2`                    | `comunidade/amigos`                        | ⬜     | follows table; privacy settings                                                                                                        |
-| `bubo_escrever_resenha_avalia_o_anti_spoiler_mobile`             | `livro/[id]/resenha`                       | ⬜     | reviews with spoiler flag                                                                                                              |
-| `bubo_detalhes_da_resenha_discuss_o_mobile_1/_2`                 | `resenhas/[id]`                            | ⬜     |                                                                                                                                        |
-| **Você**                                                         |                                            |        |                                                                                                                                        |
-| `bubo_perfil_do_leitor_mobile` / `…_voc`                         | `(tabs)/voce`                              | 🟡     | Profile, appearance, sign-out/account deletion and Minha memória entry. Stats device acceptance pending.                               |
-| `bubo_mural_de_conquistas_mobile` / `…_n_veis_cognitivos_mobile` | `conquistas`                               | ⬜     | **Task 06**: achievements derived from sessions/reviews (never granted manually)                                                       |
-| `bubo_configura_es_e_prefer_ncias_cognitivas_mobile`             | `configuracoes`                            | ⬜     | persist theme + session length + reminders (`expo-notifications`)                                                                      |
-| `bubo_notifica_es_e_alertas_cognitivos_mobile`                   | `notificacoes`                             | ⬜     | push via Expo Push API from the Worker (cron trigger for due reviews)                                                                  |
-| `bubo_notifica_es_do_clube_convites_mobile`                      | `notificacoes` (clubs tab)                 | ⬜     | after Comunidade                                                                                                                       |
-| **System**                                                       |                                            |        |                                                                                                                                        |
-| `bubo_splash_screen_animada_mobile`                              | native splash                              | 🟡     | native official symbol + JS loading tied to real boot; device acceptance pending                                                       |
-| `bubo_design_system_component_library`                           | `dev/showcase`                             | ✅     | DEV only                                                                                                                               |
-| `bubo_current_ui_audit`                                          | —                                          | n/a    | reference notes                                                                                                                        |
+| Stitch screen                                                    | Route                                       | Status | Notes / needs                                                                                                       |
+| ---------------------------------------------------------------- | ------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| **Home / Hoje**                                                  |                                             |        |                                                                                                                     |
+| `bubo_home_hoje` (north star)                                    | `(tabs)/index`                              | ✅     | header streak/XP, Lendo agora, Recuperação ativa, semana cognitiva, missão                                          |
+| `bubo_home_vis_o_cognitiva_desktop_1440px`                       | —                                           | n/a    | desktop; content covered by Hoje                                                                                    |
+| **Auth**                                                         |                                             |        |                                                                                                                     |
+| `bubo_login_autentica_o_mobile` / `bubo_login`                   | `(auth)/entrar`                             | 🟡     | Google sign-in deferred (OAuth client ids + Apple Sign-In required together on iOS)                                 |
+| `bubo_cadastro`                                                  | `(auth)/cadastro`                           | 🟡     | terms/privacy checkbox deferred until the legal docs exist                                                          |
+| `bubo_esqueci_minha_senha`                                       | `(auth)/esqueci-senha` + `redefinir-senha`  | ✅     | Resend in production                                                                                                |
+| **Onboarding**                                                   |                                             |        |                                                                                                                     |
+| `bubo_onboarding_boas_vindas`                                    | `(auth)/boas-vindas`                        | ✅     | 1/6                                                                                                                 |
+| `bubo_onboarding_h_bito`                                         | `onboarding/index`                          | ✅     | 2/6                                                                                                                 |
+| `bubo_onboarding_objetivo`                                       | `onboarding/objetivo`                       | ✅     | 3/6                                                                                                                 |
+| `bubo_onboarding_interesses`                                     | `onboarding/interesses`                     | ✅     | 4/6                                                                                                                 |
+| `bubo_onboarding_primeiro_livro`                                 | `onboarding/primeiro-livro`                 | ✅     | catalog search, ISBN and manual entry                                                                               |
+| `bubo_onboarding_conclu_do`                                      | `onboarding/concluido`                      | ✅     | "+20 XP" not promised                                                                                               |
+| **Estante & books**                                              |                                             |        |                                                                                                                     |
+| `bubo_minha_estante_bubo_score`                                  | `(tabs)/estante`                            | 🟡     | "Bubo Score" per book needs retention data → **Task 06**                                                            |
+| `bubo_adicionar_livro_manualmente_mobile_1/_2`                   | `adicionar-livro`                           | ✅     |                                                                                                                     |
+| `bubo_descobrir_livros_mobile`                                   | `descobrir`                                 | 🟡     | edition-aware search done; owner items: Google key, R2 `MEDIA_PUBLIC_URL`, device acceptance                        |
+| `bubo_scanner_de_isbn_mobile`                                    | `scanner-isbn`                              | ✅     | `expo-camera` barcode scanning, manual ISBN fallback and catalog lookup                                             |
+| `bubo_detalhe_do_livro_caminho_de_mem_ria_2`                     | `livro/[id]`                                | 🟡     | status, progress, sessions, cards and a real "Caminho de memória" timeline (ADR-017). Memory score/phases deferred  |
+| `bubo_a_es_do_livro_bottom_sheets_mobile`                        | `livro/[id]` actions                        | 🟡     | actions exist inline; bottom-sheet presentation is a polish item                                                    |
+| `bubo_hist_rico_de_ciclos_de_leitura_mobile_1/_2`                | `clubes/[id]/ciclos`                        | ⬜     | Stitch shows a **club** history → moved to Comunidade (Tasks 07–08); personal re-reads not planned yet              |
+| **Reading session**                                              |                                             |        |                                                                                                                     |
+| `bubo_sess_o_de_leitura_focada_1/_2`                             | `sessao/[id]`                               | ✅     | restoring a timer after the OS kills the app is deferred                                                            |
+| `bubo_resultado_da_sess_o_essa_leitura_ficou`                    | `sessao/[id]` (result step)                 | ✅     |                                                                                                                     |
+| `bubo_nova_reflex_o_toasts_mobile`                               | toasts in session/review                    | ⬜     | small: a toast component in the design system                                                                       |
+| **Revisar**                                                      |                                             |        |                                                                                                                     |
+| `bubo_revisar_hora_de_lembrar_2`                                 | `(tabs)/revisar`                            | ✅     | due count, badge on the tab                                                                                         |
+| `bubo_active_recall_sem_espiar`                                  | `revisao`                                   | ✅     | try → reveal → self-grade (SM-2)                                                                                    |
+| `bubo_revis_o_espa_ada_isso_ficou_com_voc_2`                     | `revisao` (summary)                         | ✅     |                                                                                                                     |
+| `bubo_estat_sticas_curva_de_reten_o_mobile`                      | `estatisticas`                              | 🟡     | 7-day Lembrei/Quase/Esqueci tiles + chart via `/me/memory`, from Você. Retention curve/Score need a model (ADR-017) |
+| **Comunidade & clubs** (**Task 07–08**)                          |                                             |        |                                                                                                                     |
+| `bubo_comunidade_liter_ria_mobile`                               | `(tabs)/comunidade`                         | 🟡     | Task 07: my clubs, discover, search, create. The Stitch social feed (friends, applause) is Task 08                  |
+| `bubo_clubes_anti_spoiler_mobile`                                | `clubes/[id]`                               | ✅     | anti-spoiler enforced by the API (ADR-019): locked cards with page + "Quero espiar"                                 |
+| `bubo_buscar_e_filtrar_clubes_de_leitura_mobile`                 | `(tabs)/comunidade`                         | 🟡     | text search by club or book done; genre filters later                                                               |
+| `bubo_perfil_do_clube_de_leitura_mobile_1/_2`                    | `clubes/[id]`                               | 🟡     | header, real counts, book + my progress, join/leave/delete. No "Bubo Score"/"+XP" (no data)                         |
+| `bubo_criar_novo_clube_de_leitura_mobile`                        | `clubes/novo`                               | ✅     | name, proposal, icon, catalog book from shelf, weekly goal. Public only; private/invite in Task 08                  |
+| `bubo_convidar_amigos_para_o_clube_mobile`                       | `clubes/[id]/convidar`                      | ⬜     | Task 08: invite links (deep link `bubo://`) + private clubs                                                         |
+| `bubo_clube_de_leitura_f_rum_enquetes_mobile`                    | `clubes/[id]` + `debates/[clubId]/[postId]` | 🟡     | forum (topics + replies) done; polls are Task 08                                                                    |
+| `bubo_criar_novo_t_pico_de_debate_anti_spoiler_mobile`           | `novo-debate/[clubId]`                      | ✅     | title, page (with stepper), argument, shield preview. No "tipo de discussão"/quote link yet                         |
+| `bubo_criar_nova_enquete_do_clube_mobile`                        | `clubes/[id]/nova-enquete`                  | ⬜     | Task 08                                                                                                             |
+| `bubo_vota_o_e_resultados_ao_vivo_da_enquete_mobile`             | `clubes/[id]/enquete/[pollId]`              | ⬜     | Task 08: polling first, Durable Objects later                                                                       |
+| `bubo_diretrizes_modera_o_do_clube_mobile`                       | `diretrizes/[clubId]`                       | ✅     | 4 rules, my shield, how reports/blocks work. No named moderators (owner only)                                       |
+| `bubo_membros_estat_sticas_do_clube_mobile`                      | `clubes/[id]/membros`                       | ⬜     | Task 08                                                                                                             |
+| `bubo_feed_de_atualiza_es_dos_clubes_mobile`                     | `comunidade/feed`                           | ⬜     |                                                                                                                     |
+| `bubo_feed_de_atividades_dos_amigos_mobile_2`                    | `comunidade/amigos`                         | ⬜     | follows table; privacy settings                                                                                     |
+| `bubo_escrever_resenha_avalia_o_anti_spoiler_mobile`             | `livro/[id]/resenha`                        | ⬜     | reviews with spoiler flag                                                                                           |
+| `bubo_detalhes_da_resenha_discuss_o_mobile_1/_2`                 | `resenhas/[id]`                             | ⬜     |                                                                                                                     |
+| **Você**                                                         |                                             |        |                                                                                                                     |
+| `bubo_perfil_do_leitor_mobile` / `…_voc`                         | `(tabs)/voce`                               | 🟡     | Profile, appearance, sign-out/account deletion and Minha memória entry. Stats device acceptance pending.            |
+| `bubo_mural_de_conquistas_mobile` / `…_n_veis_cognitivos_mobile` | `conquistas`                                | 🟡     | level + 13 badges recomputed from activity (ADR-018). Unlock dates, tiers, club/retention badges deferred           |
+| `bubo_configura_es_e_prefer_ncias_cognitivas_mobile`             | `configuracoes`                             | ⬜     | persist theme + session length + reminders (`expo-notifications`)                                                   |
+| `bubo_notifica_es_e_alertas_cognitivos_mobile`                   | `notificacoes`                              | ⬜     | push via Expo Push API from the Worker (cron trigger for due reviews)                                               |
+| `bubo_notifica_es_do_clube_convites_mobile`                      | `notificacoes` (clubs tab)                  | ⬜     | after Comunidade                                                                                                    |
+| **System**                                                       |                                             |        |                                                                                                                     |
+| `bubo_splash_screen_animada_mobile`                              | native splash                               | 🟡     | native official symbol + JS loading tied to real boot; device acceptance pending                                    |
+| `bubo_design_system_component_library`                           | `dev/showcase`                              | ✅     | DEV only                                                                                                            |
+| `bubo_current_ui_audit`                                          | —                                           | n/a    | reference notes                                                                                                     |
 
 ## Visual polish — auth, onboarding and boot (2026-09-26)
 
@@ -139,3 +139,43 @@ binding enable ingestion; external and typographic fallbacks remain. See ADR-016
 Pending on Android/iOS: real scanner handoff, edition/language labels, large fonts, small screens,
 assistive technology, failed/retried search, and real R2 public image delivery. Automated API/storage
 fixtures and selected public provider reads do not establish device acceptance.
+
+## Memory path and Minha memória (2026-09-27)
+
+`livro/[id]` replaces the session/card counts with a timeline built by `buildMemoryPath`: reading
+sessions (pages and focus minutes), graded reviews (Lembrei/Quase/Esqueci with the review-screen
+colours and icons) and a final step for the next review. A due step is highlighted in
+`primarySoft` with "Revisar agora"; a future step is muted with a lock and its date. The
+Stitch "Índice cognitivo", "% Retido" and fixed five phases are not shown (ADR-017).
+
+`estatisticas` now uses `FormScreen` (back, eyebrow + title) like the other pushed screens, the
+Você stat tiles, a stacked seven-day chart with a legend and per-day accessibility labels, and
+a footer "Ir para Revisar". Loading, error/retry and empty states are unchanged in meaning.
+
+Pending on a device: timeline spacing on small screens, 1.6× fonts, dark theme, TalkBack/VoiceOver
+reading order and the chart with a single very busy day.
+
+## Achievements wall (2026-09-27)
+
+`conquistas`, reached from Você → "Mural de conquistas", follows the Stitch mural with existing
+components: `FormScreen` (eyebrow "Gamificação Bubo"), a level card with the official
+`achievement` pose, `Chip` "Nível N", XP progress, three Você-style tiles and two-column badge
+cards. Unlocked badges use the category colour (primary / gold / orange) and a "Conquistada" chip;
+locked ones are dashed, muted, show a lock and real progress (`x / alvo`). With nothing unlocked
+an honest note points to the Estante. Pending on a device: grid on narrow screens, 1.6× fonts,
+dark theme and screen-reader labels.
+
+## Comunidade — clubs and anti-spoiler debates (Task 07, 2026-09-27)
+
+Routes are flat on purpose: Expo Router typed `clubes/[id]/index` as a static route without its
+`[id]` param, so nested screens live in `debates/[clubId]/[postId]`, `novo-debate/[clubId]` and
+`diretrizes/[clubId]`. Blocked readers are managed in `bloqueados` (Você → Leitores bloqueados).
+
+Visual language follows existing screens: `Screen` header for the tab (like Revisar), `FormScreen`
+with eyebrow + title for pushed screens, `Card`, `Chip`, `SectionHeader`, official mascot poses
+(`emptyCommunity`, `recallPrompt`, `profile`), primary-soft shield banner, gold dashed spoiler lock
+(Stitch amber card). Reports use an inline panel, not an Alert (Android alerts cap at 3 buttons).
+
+Pending on a device: long names and titles, keyboard with the reply composer in the footer,
+1.6× fonts, dark theme, TalkBack/VoiceOver on locked cards and radio groups, modal presentation of
+`clubes/novo` and `novo-debate/[clubId]`.

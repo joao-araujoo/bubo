@@ -5,7 +5,14 @@ import {
   RECALL_ANSWER_MAX,
   RECALL_PROMPT_MAX,
 } from '@bubo/contracts';
-import { MAX_BOOK_PAGES, type ReadingStatus, readingProgress, toLocalIsoDate } from '@bubo/domain';
+import {
+  MAX_BOOK_PAGES,
+  MEMORY_PATH_MAX_PAST,
+  type ReadingStatus,
+  buildMemoryPath,
+  readingProgress,
+  toLocalIsoDate,
+} from '@bubo/domain';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
@@ -28,6 +35,7 @@ import {
 } from '../../design-system';
 import { formatDuration } from '../../features/session/useFocusTimer';
 import { STATUS_META, STATUS_ORDER, shortDate } from '../../features/shelf/labels';
+import { MemoryPath } from '../../features/shelf/MemoryPath';
 import { ApiError } from '../../lib/api/client';
 import { dueLabel } from '../../features/recall/grades';
 import {
@@ -354,7 +362,8 @@ export default function BookScreen() {
     );
   }
 
-  const { entry, sessions, cards } = detail.data;
+  const { entry, sessions, cards, reviews } = detail.data;
+  const today = toLocalIsoDate(new Date());
   const progress = readingProgress(entry.currentPage, entry.book.totalPages ?? 0);
   const status = STATUS_META[entry.status];
 
@@ -427,28 +436,16 @@ export default function BookScreen() {
           </View>
         ) : null}
       </Card>
-      <Card>
-        <SectionHeader title="Caminho de memória" icon="timeline" />
-        <Text variant="bodySm" color="textMuted">
-          Suas leituras e revisões deste livro, conforme forem registradas.
-        </Text>
-        <View style={{ gap: theme.spacing.sm }}>
-          <Text variant="bodyStrong">
-            {sessions.length} {sessions.length === 1 ? 'sessão de leitura' : 'sessões de leitura'}
-          </Text>
-          <Text variant="bodyStrong">
-            {cards.length} {cards.length === 1 ? 'card de memória' : 'cards de memória'}
-          </Text>
-        </View>
-        {cards.some((card) => card.dueDate <= toLocalIsoDate(new Date())) ? (
-          <Button
-            label="Revisar agora"
-            icon="psychology"
-            variant="secondary"
-            onPress={() => router.push('/revisao')}
-          />
-        ) : null}
-      </Card>
+      <MemoryPath
+        steps={buildMemoryPath({
+          today,
+          sessions,
+          reviews,
+          cardDueDates: cards.map((card) => card.dueDate),
+        })}
+        today={today}
+        truncated={sessions.length + reviews.length > MEMORY_PATH_MAX_PAST}
+      />
       <StatusPicker entry={entry} userId={userId} />
       {/* Remount on status change (e.g. "Terminado" moves the page to the end). */}
       <ProgressEditor key={entry.status} entry={entry} userId={userId} />

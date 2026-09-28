@@ -34,10 +34,24 @@ describe('parseServerEnv', () => {
         'BETTER_AUTH_SECRET',
         'BETTER_AUTH_URL',
         'DATABASE_URL',
-        'EMAIL_FROM',
-        'RESEND_API_KEY',
       ]);
     }
+  });
+
+  it('allows production without e-mail but never half of the Resend pair', () => {
+    const base = {
+      APP_ENV: 'production',
+      DATABASE_URL: 'postgresql://db.example.test/bubo',
+      BETTER_AUTH_SECRET: 'x'.repeat(40),
+      BETTER_AUTH_URL: 'https://api.bubo.example',
+    };
+    expect(parseServerEnv(base).ok).toBe(true);
+    const keyOnly = parseServerEnv({ ...base, RESEND_API_KEY: 're_test' });
+    expect(keyOnly.ok).toBe(false);
+    if (!keyOnly.ok) expect(keyOnly.issues.map((i) => i.path)).toEqual(['EMAIL_FROM']);
+    const senderOnly = parseServerEnv({ ...base, APP_ENV: 'development', EMAIL_FROM: 'a@b.c' });
+    expect(senderOnly.ok).toBe(false);
+    if (!senderOnly.ok) expect(senderOnly.issues.map((i) => i.path)).toEqual(['RESEND_API_KEY']);
   });
 
   it('accepts a complete production config and requires https for auth links', () => {

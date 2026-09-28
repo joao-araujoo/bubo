@@ -46,9 +46,15 @@ async function main() {
   }
 }
 
-main().catch(() => {
+main().catch((error: unknown) => {
   console.error(
     'Database migration/check failed. Confirm connectivity and schema; credentials were not logged.',
   );
+  // SQL errors (5-char SQLSTATE) are safe to show and say which statement failed. Connection
+  // errors are not printed: they can include the host or user.
+  const pg = error as { code?: unknown; message?: unknown };
+  if (typeof pg.code === 'string' && /^[0-9A-Z]{5}$/.test(pg.code)) {
+    console.error(`Postgres ${pg.code}: ${String(pg.message)}`);
+  }
   process.exitCode = 1;
 });

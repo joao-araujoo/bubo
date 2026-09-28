@@ -1,4 +1,6 @@
+export * from './achievements';
 export * from './catalog';
+export * from './community';
 export * from './errors';
 export * from './health';
 export * from './me';

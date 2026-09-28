@@ -142,6 +142,7 @@ describe('GET /v1/openapi.json', () => {
     expect(doc.openapi).toBe('3.0.3');
     expect(Object.keys(doc.paths)).toEqual([
       '/v1/me/memory',
+      '/v1/me/achievements',
       '/v1/health',
       '/v1/ready',
       '/v1/me',
@@ -157,6 +158,17 @@ describe('GET /v1/openapi.json', () => {
       '/v1/catalog/search',
       '/v1/catalog/books/{catalogId}',
       '/v1/catalog/isbn/{isbn}',
+      '/v1/clubs',
+      '/v1/clubs/{id}',
+      '/v1/clubs/{id}/membership',
+      '/v1/clubs/{id}/posts',
+      '/v1/clubs/{id}/posts/{postId}',
+      '/v1/clubs/{id}/posts/{postId}/replies',
+      '/v1/clubs/{id}/replies/{replyId}',
+      '/v1/clubs/{id}/moderation',
+      '/v1/reports',
+      '/v1/blocks',
+      '/v1/blocks/{userId}',
     ]);
   });
 });

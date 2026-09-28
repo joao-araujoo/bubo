@@ -1,6 +1,11 @@
 import {
   type AddBookRequest,
   type CreateCardRequest,
+  type CreateClubRequest,
+  type CreatePostRequest,
+  type CreateReplyRequest,
+  type ModerationRequest,
+  type ReportRequest,
   type CreateSessionRequest,
   type MeResponse,
   type OnboardingRequest,
@@ -23,6 +28,13 @@ export const queryKeys = {
   shelfEntry: (userId: string, entryId: string) => ['shelf', userId, entryId] as const,
   stats: (userId: string, today: string) => ['stats', userId, today] as const,
   memory: (userId: string, today: string) => ['memory', userId, today] as const,
+  achievements: (userId: string, today: string) => ['achievements', userId, today] as const,
+  clubs: (userId: string, q: string) => ['clubs', userId, 'list', q] as const,
+  club: (userId: string, clubId: string) => ['clubs', userId, 'club', clubId] as const,
+  clubPosts: (userId: string, clubId: string) => ['clubs', userId, 'posts', clubId] as const,
+  clubTopic: (userId: string, clubId: string, postId: string, reveal: boolean) =>
+    ['clubs', userId, 'topic', clubId, postId, reveal] as const,
+  blocks: (userId: string) => ['blocks', userId] as const,
   due: (userId: string, today: string) => ['recall', userId, today] as const,
   catalogSearch: (userId: string, q: string) => ['catalog', userId, 'search-v2', q] as const,
   catalogBook: (userId: string, catalogId: string) =>
@@ -127,6 +139,16 @@ export function useMemoryStats(userId: string | undefined) {
   });
 }
 
+/** Level + achievements for the reader's local today (recomputed from activity). */
+export function useAchievements(userId: string | undefined) {
+  const today = toLocalIsoDate(new Date());
+  return useQuery({
+    queryKey: queryKeys.achievements(userId ?? 'anonymous', today),
+    queryFn: ({ signal }) => api.getAchievements(today, signal),
+    enabled: Boolean(userId),
+  });
+}
+
 /** Recall cards due on the reader's local today. */
 export function useDueCards(userId: string | undefined) {
   const today = toLocalIsoDate(new Date());
@@ -145,6 +167,9 @@ function useInvalidateReading(userId: string) {
       queryClient.invalidateQueries({ queryKey: ['shelf', userId] }),
       queryClient.invalidateQueries({ queryKey: ['stats', userId] }),
       queryClient.invalidateQueries({ queryKey: ['memory', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['achievements', userId] }),
+      // Reading progress moves the anti-spoiler line in every club.
+      queryClient.invalidateQueries({ queryKey: ['clubs', userId] }),
       queryClient.invalidateQueries({ queryKey: ['recall', userId] }),
       // "Já está na estante" on catalog screens.
       queryClient.invalidateQueries({ queryKey: ['catalog', userId, 'book'] }),
@@ -227,4 +252,166 @@ export function useCompleteOnboarding(userId: string) {
 export function useFinishOnboarding(userId: string) {
   const queryClient = useQueryClient();
   return (me: MeResponse) => queryClient.setQueryData(queryKeys.me(userId), me);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Comunidade (Task 07)
+// ---------------------------------------------------------------------------------------------
+
+const MISSING_USER = 'anonymous';
+
+/** The reader's clubs + public clubs to discover (optional search by name or book). */
+export function useClubs(userId: string | undefined, q: string) {
+  const term = q.trim();
+  return useQuery({
+    queryKey: queryKeys.clubs(userId ?? MISSING_USER, term),
+    queryFn: ({ signal }) => api.listClubs(term, signal),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useClub(userId: string | undefined, clubId: string) {
+  return useQuery({
+    queryKey: queryKeys.club(userId ?? MISSING_USER, clubId),
+    queryFn: ({ signal }) => api.getClub(clubId, signal),
+    enabled: Boolean(userId) && clubId !== '',
+  });
+}
+
+/** Topics — only fetched for members (the API answers 403 otherwise). */
+export function useClubPosts(userId: string | undefined, clubId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.clubPosts(userId ?? MISSING_USER, clubId),
+    queryFn: ({ signal }) => api.listClubPosts(clubId, signal),
+    enabled: Boolean(userId) && clubId !== '' && enabled,
+  });
+}
+
+export function useClubTopic(
+  userId: string | undefined,
+  clubId: string,
+  postId: string,
+  reveal: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.clubTopic(userId ?? MISSING_USER, clubId, postId, reveal),
+    queryFn: ({ signal }) => api.getClubTopic(clubId, postId, reveal, signal),
+    enabled: Boolean(userId) && clubId !== '' && postId !== '',
+  });
+}
+
+/** Everything under ['clubs', userId] plus the shelf (joining shelves the club's book). */
+function useInvalidateCommunity(userId: string) {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['clubs', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['shelf', userId] }),
+    ]);
+}
+
+export function useCreateClub(userId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: CreateClubRequest) => api.createClub(body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useJoinClub(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({ mutationFn: () => api.joinClub(clubId), onSuccess: invalidate });
+}
+
+export function useLeaveClub(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({ mutationFn: () => api.leaveClub(clubId), onSuccess: invalidate });
+}
+
+export function useDeleteClub(userId: string, clubId: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: () => api.deleteClub(clubId),
+    onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: queryKeys.club(userId, clubId) });
+      await invalidate();
+    },
+  });
+}
+
+export function useCreateClubPost(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: CreatePostRequest) => api.createClubPost(clubId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateClubReply(userId: string, clubId: string, postId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: CreateReplyRequest) => api.createClubReply(clubId, postId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteClubContent(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: ({ targetType, targetId }: { targetType: 'post' | 'reply'; targetId: string }) =>
+      targetType === 'post'
+        ? api.deleteClubPost(clubId, targetId)
+        : api.deleteClubReply(clubId, targetId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useModerateClubContent(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: ModerationRequest) => api.moderateClubContent(clubId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReportContent(userId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: ReportRequest) => api.reportContent(body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useBlocks(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.blocks(userId ?? MISSING_USER),
+    queryFn: ({ signal }) => api.listBlocks(signal),
+    enabled: Boolean(userId),
+  });
+}
+
+function useInvalidateBlocks(userId: string) {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.blocks(userId) }),
+      queryClient.invalidateQueries({ queryKey: ['clubs', userId] }),
+    ]);
+}
+
+export function useBlockUser(userId: string) {
+  const invalidate = useInvalidateBlocks(userId);
+  return useMutation({
+    mutationFn: (target: string) => api.blockUser(target),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUnblockUser(userId: string) {
+  const invalidate = useInvalidateBlocks(userId);
+  return useMutation({
+    mutationFn: (target: string) => api.unblockUser(target),
+    onSuccess: invalidate,
+  });
 }

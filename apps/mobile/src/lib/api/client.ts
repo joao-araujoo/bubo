@@ -1,12 +1,27 @@
 import {
   type AddBookRequest,
   type CreateCardRequest,
+  type CreateClubRequest,
+  type CreatePostRequest,
+  type CreateReplyRequest,
+  type ModerationRequest,
+  type ReportRequest,
   type CreateSessionRequest,
   type ErrorCode,
   type OnboardingRequest,
   type ReviewRequest,
   type UpdateShelfEntryRequest,
   apiPath,
+  achievementsResponseSchema,
+  blocksResponseSchema,
+  clubDetailSchema,
+  clubPostSchema,
+  clubPostsResponseSchema,
+  clubReplySchema,
+  clubsResponseSchema,
+  clubTopicResponseSchema,
+  moderationResponseSchema,
+  reportResponseSchema,
   catalogBookResponseSchema,
   catalogSearchResponseSchema,
   deleteResponseSchema,
@@ -173,6 +188,65 @@ export function createApiClient({
       request(
         `${API_ROUTES.memoryStats}?today=${encodeURIComponent(today)}`,
         memoryStatsResponseSchema,
+        { signal },
+      ),
+    listClubs: (q: string, signal?: AbortSignal) =>
+      request(`${API_ROUTES.clubs}?q=${encodeURIComponent(q)}`, clubsResponseSchema, { signal }),
+    getClub: (id: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.club, { id }), clubDetailSchema, { signal }),
+    createClub: (body: CreateClubRequest) =>
+      request(API_ROUTES.clubs, clubDetailSchema, { method: 'POST', body }),
+    deleteClub: (id: string) =>
+      request(apiPath(API_ROUTES.club, { id }), deleteResponseSchema, { method: 'DELETE' }),
+    joinClub: (id: string) =>
+      request(apiPath(API_ROUTES.clubMembership, { id }), clubDetailSchema, {
+        method: 'PUT',
+        body: { acceptGuidelines: true },
+      }),
+    leaveClub: (id: string) =>
+      request(apiPath(API_ROUTES.clubMembership, { id }), deleteResponseSchema, {
+        method: 'DELETE',
+      }),
+    listClubPosts: (id: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.clubPosts, { id }), clubPostsResponseSchema, { signal }),
+    getClubTopic: (id: string, postId: string, reveal: boolean, signal?: AbortSignal) =>
+      request(
+        `${apiPath(API_ROUTES.clubPost, { id, postId })}${reveal ? '?reveal=1' : ''}`,
+        clubTopicResponseSchema,
+        { signal },
+      ),
+    createClubPost: (id: string, body: CreatePostRequest) =>
+      request(apiPath(API_ROUTES.clubPosts, { id }), clubPostSchema, { method: 'POST', body }),
+    deleteClubPost: (id: string, postId: string) =>
+      request(apiPath(API_ROUTES.clubPost, { id, postId }), deleteResponseSchema, {
+        method: 'DELETE',
+      }),
+    createClubReply: (id: string, postId: string, body: CreateReplyRequest) =>
+      request(apiPath(API_ROUTES.clubReplies, { id, postId }), clubReplySchema, {
+        method: 'POST',
+        body,
+      }),
+    deleteClubReply: (id: string, replyId: string) =>
+      request(apiPath(API_ROUTES.clubReply, { id, replyId }), deleteResponseSchema, {
+        method: 'DELETE',
+      }),
+    moderateClubContent: (id: string, body: ModerationRequest) =>
+      request(apiPath(API_ROUTES.clubModeration, { id }), moderationResponseSchema, {
+        method: 'POST',
+        body,
+      }),
+    reportContent: (body: ReportRequest) =>
+      request(API_ROUTES.reports, reportResponseSchema, { method: 'POST', body }),
+    listBlocks: (signal?: AbortSignal) =>
+      request(API_ROUTES.blocks, blocksResponseSchema, { signal }),
+    blockUser: (userId: string) =>
+      request(API_ROUTES.blocks, blocksResponseSchema, { method: 'POST', body: { userId } }),
+    unblockUser: (userId: string) =>
+      request(apiPath(API_ROUTES.block, { userId }), blocksResponseSchema, { method: 'DELETE' }),
+    getAchievements: (today: string, signal?: AbortSignal) =>
+      request(
+        `${API_ROUTES.achievements}?today=${encodeURIComponent(today)}`,
+        achievementsResponseSchema,
         { signal },
       ),
     getDueCards: (today: string, signal?: AbortSignal) =>

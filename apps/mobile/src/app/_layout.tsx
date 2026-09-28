@@ -92,6 +92,13 @@ function RootNavigator() {
           <Stack.Screen name="excluir-conta" />
           <Stack.Screen name="descobrir" />
           <Stack.Screen name="estatisticas" />
+          <Stack.Screen name="conquistas" />
+          <Stack.Screen name="bloqueados" />
+          <Stack.Screen name="clubes/novo" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="clubes/[id]" />
+          <Stack.Screen name="novo-debate/[clubId]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="debates/[clubId]/[postId]" />
+          <Stack.Screen name="diretrizes/[clubId]" />
           <Stack.Screen name="catalogo/[id]" />
           <Stack.Screen
             name="sessao/[id]"
