@@ -116,11 +116,23 @@ it('requires mutual consent and opt-in; blocks revoke friendship and stop future
     bookTitle: 'Livro compartilhado',
     pages: 10,
     minutes: 10,
+    endPage: 20,
   });
+  // The book in progress is shared only while sharing is on; manual books never appear.
+  expect(shared.readingNow).toEqual([
+    {
+      userId: b.id,
+      name: 'Leitora Teste',
+      bookTitle: 'Livro compartilhado',
+      currentPage: 20,
+      totalPages: 300,
+    },
+  ]);
+  expect((await feed(outsider)).readingNow).toEqual([]);
   expect(JSON.stringify(shared)).not.toContain('REFLEXAO_PRIVADA');
   expect((await feed(outsider)).items).toEqual([]);
   await prefs(b, false);
-  expect((await feed(a)).items).toEqual([]);
+  expect(await feed(a)).toEqual({ readingNow: [], items: [] });
   await prefs(b, true);
   expect((await feed(a)).items).toEqual([]);
   expect(

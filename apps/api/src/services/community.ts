@@ -516,6 +516,7 @@ export function toPost(row: PostRowView, ctx: ViewContext): ClubPost {
     quote: locked ? null : row.post.quote,
     reviewRating: locked ? null : row.post.reviewRating,
     isBookReview: row.post.reviewRating !== null,
+    reviewTags: locked ? [] : row.post.reviewTags,
     ...toReactions(row),
   });
 }
@@ -693,6 +694,7 @@ export async function createPost(
       chapter: input.chapter,
       quote: input.quote ? input.quote : null,
       reviewRating: input.reviewRating,
+      reviewTags: input.reviewTags,
     })
     .onConflictDoNothing({ target: clubPosts.id })
     .returning({ id: clubPosts.id });

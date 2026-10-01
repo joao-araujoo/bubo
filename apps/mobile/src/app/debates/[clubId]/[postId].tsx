@@ -19,18 +19,27 @@ import {
   SectionTitle,
   Text,
 } from '../../../design-system';
-import { anchorLabel, relativeTime, TOPIC_KIND_META } from '../../../features/community/meta';
+import {
+  anchorLabel,
+  ratingLabel,
+  relativeTime,
+  REVIEW_TAG_META,
+  TOPIC_KIND_META,
+} from '../../../features/community/meta';
 import { ActionChip } from '../../../features/community/ActionChip';
 import { ReactionBar } from '../../../features/community/ReactionBar';
 import { ReportPanel } from '../../../features/community/ReportPanel';
 import { SpoilerVeil } from '../../../features/community/SpoilerVeil';
+import { StarRating } from '../../../features/community/StarRating';
 import { ApiError } from '../../../lib/api/client';
 import {
   useBlockUser,
+  useChangeFriend,
   useClub,
   useClubTopic,
   useCreateClubReply,
   useDeleteClubContent,
+  useFriends,
   useModerateClubContent,
   useSetReaction,
 } from '../../../lib/api/queries';
@@ -105,6 +114,8 @@ export default function TopicScreen() {
   const moderate = useModerateClubContent(userId, clubId);
   const block = useBlockUser(userId);
   const react = useSetReaction(userId);
+  const friends = useFriends(userId || undefined);
+  const befriend = useChangeFriend(userId);
 
   const replyId = useRef(Crypto.randomUUID());
   const [body, setBody] = useState('');
@@ -150,6 +161,33 @@ export default function TopicScreen() {
   const pageText = page ?? String(defaultPage);
   const peek = () => router.setParams({ reveal: '1' });
   const safe = !post.locked && post.spoilerPage <= readerPage;
+
+  const friendStatus = friends.data?.friends.find(
+    (friend) => friend.userId === post.author.id,
+  )?.status;
+  const addFriend = (action: 'request' | 'accept') =>
+    befriend.mutate(
+      { otherId: post.author.id, action },
+      {
+        onSuccess: () => {
+          haptics.success();
+          setNotice(
+            action === 'accept'
+              ? `Agora você e ${post.author.name} são amigos de leitura.`
+              : `Pedido enviado. ${post.author.name} escolhe se aceita.`,
+          );
+        },
+        onError: (e) => {
+          haptics.error();
+          setNotice(null);
+          setReplyError(
+            e instanceof ApiError && e.code === 'NOT_FOUND'
+              ? 'Esta pessoa não está recebendo pedidos de amizade agora.'
+              : 'Não foi possível enviar o pedido de amizade.',
+          );
+        },
+      },
+    );
 
   const confirmDelete = (target: Target) =>
     Alert.alert(
@@ -353,7 +391,7 @@ export default function TopicScreen() {
 
   return (
     <FormScreen
-      title={post.isBookReview ? 'Resenha do livro' : 'Debate do clube'}
+      title={post.isBookReview ? 'Resenha da comunidade' : 'Debate do clube'}
       eyebrow={eyebrow}
       eyebrowDot
       footer={
@@ -473,9 +511,34 @@ export default function TopicScreen() {
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
             <Pill label={levelTitle(post.author.level)} />
-            <Pill tone={kind.tone} icon={kind.icon} label={kind.label} />
+            {post.isBookReview ? (
+              <Pill tone="gold" icon="edit-note" label="Resenha" />
+            ) : (
+              <Pill tone={kind.tone} icon={kind.icon} label={kind.label} />
+            )}
           </View>
         </View>
+        {post.isMine ? null : friendStatus === 'accepted' ? (
+          <Pill tone="success" icon="people" label="Amigos" />
+        ) : friendStatus === 'outgoing' ? (
+          <Pill tone="neutral" icon="schedule" label="Pedido enviado" />
+        ) : friendStatus === 'incoming' ? (
+          <Button
+            label="Aceitar"
+            icon="how-to-reg"
+            size="md"
+            loading={befriend.isPending}
+            onPress={() => addFriend('accept')}
+          />
+        ) : friends.isSuccess ? (
+          <Button
+            label="Amizade"
+            icon="person-add"
+            size="md"
+            loading={befriend.isPending}
+            onPress={() => addFriend('request')}
+          />
+        ) : null}
       </Raised>
 
       <Raised
@@ -508,6 +571,27 @@ export default function TopicScreen() {
               {relativeTime(post.createdAt)}
             </Text>
           </View>
+          {post.reviewRating !== null ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <StarRating value={post.reviewRating} size={15} />
+              <Text variant="label" style={{ fontSize: 13 }}>
+                {`${post.reviewRating}.0`}
+              </Text>
+              <Pill label={ratingLabel(post.reviewRating)} />
+            </View>
+          ) : null}
+          {post.reviewTags.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+              {post.reviewTags.map((tag) => (
+                <Pill
+                  key={tag}
+                  tone="neutral"
+                  icon={REVIEW_TAG_META[tag].icon}
+                  label={REVIEW_TAG_META[tag].label}
+                />
+              ))}
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
             <Pill
               tone="neutral"
@@ -548,11 +632,6 @@ export default function TopicScreen() {
           <Text variant="body" color="textMuted" style={{ lineHeight: 24 }}>
             {post.body}
           </Text>
-          {post.reviewRating !== null ? (
-            <Text variant="label" color="accentText">
-              Nota do leitor: {post.reviewRating}/5
-            </Text>
-          ) : null}
           {post.quote ? (
             <View
               style={{

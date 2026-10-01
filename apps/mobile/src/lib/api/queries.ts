@@ -314,9 +314,9 @@ export function useClubBookReviews(userId: string | undefined, clubId: string) {
 
 export function useClubCycles(userId: string | undefined, clubId: string) {
   return useQuery({
-    queryKey: ['clubs', userId, 'cycles', clubId],
+    queryKey: ['clubs', userId ?? MISSING_USER, 'cycles', clubId],
     queryFn: ({ signal }) => api.listClubCycles(clubId, signal),
-    enabled: Boolean(userId),
+    enabled: Boolean(userId) && clubId !== '',
   });
 }
 

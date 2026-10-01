@@ -65,46 +65,6 @@ const readerId = (c: Context<AppEnv>) => c.get('session').user.id;
  */
 export function communityRoutes(deps: { now: () => Date }) {
   const routes = new Hono<AppEnv>();
-  routes.get(API_ROUTES.friends, async (c) => c.json(await listFriends(c.get('db'), readerId(c))));
-  routes.get(API_ROUTES.friendsFeed, async (c) =>
-    c.json(await friendsFeed(c.get('db'), readerId(c))),
-  );
-  routes.put(API_ROUTES.friend, async (c) => {
-    writes.hit(readerId(c));
-    const input = await parseJsonBody(c, friendActionSchema);
-    return c.json(
-      await changeFriend(c.get('db'), readerId(c), c.req.param('userId'), input.action, deps.now()),
-    );
-  });
-  routes.put(API_ROUTES.socialPreferences, async (c) =>
-    c.json(
-      await saveSocialPreferences(
-        c.get('db'),
-        readerId(c),
-        await parseJsonBody(c, socialPreferencesSchema),
-        deps.now(),
-      ),
-    ),
-  );
-  routes.get(API_ROUTES.clubCycles, async (c) =>
-    c.json(await listCycles(c.get('db'), readerId(c), c.req.param('id'), deps.now())),
-  );
-  routes.post(API_ROUTES.clubCycles, async (c) => {
-    writes.hit(readerId(c));
-    const input = await parseJsonBody(c, createCycleRequestSchema);
-    return c.json(await startCycle(c.get('db'), readerId(c), c.req.param('id'), input, deps.now()));
-  });
-  routes.post(API_ROUTES.clubCycleClose, async (c) =>
-    c.json(
-      await closeCycle(
-        c.get('db'),
-        readerId(c),
-        c.req.param('id'),
-        c.req.param('cycleId'),
-        deps.now(),
-      ),
-    ),
-  );
   // Writes only (clubs, topics, replies, polls, votes, reports): a flood guard per reader.
   const writes = createRateLimiter({
     limit: 30,
@@ -342,6 +302,49 @@ export function communityRoutes(deps: { now: () => Date }) {
 
   routes.delete(API_ROUTES.block, async (c) =>
     c.json(await unblockUser(c.get('db'), readerId(c), c.req.param('userId'))),
+  );
+
+  // Friends (consented reading activity) and club reading cycles (Task 08).
+  routes.get(API_ROUTES.friends, async (c) => c.json(await listFriends(c.get('db'), readerId(c))));
+  routes.get(API_ROUTES.friendsFeed, async (c) =>
+    c.json(await friendsFeed(c.get('db'), readerId(c))),
+  );
+  routes.put(API_ROUTES.friend, async (c) => {
+    writes.hit(readerId(c));
+    const input = await parseJsonBody(c, friendActionSchema);
+    return c.json(
+      await changeFriend(c.get('db'), readerId(c), c.req.param('userId'), input.action, deps.now()),
+    );
+  });
+  routes.put(API_ROUTES.socialPreferences, async (c) => {
+    writes.hit(readerId(c));
+    return c.json(
+      await saveSocialPreferences(
+        c.get('db'),
+        readerId(c),
+        await parseJsonBody(c, socialPreferencesSchema),
+        deps.now(),
+      ),
+    );
+  });
+  routes.get(API_ROUTES.clubCycles, async (c) =>
+    c.json(await listCycles(c.get('db'), readerId(c), c.req.param('id'), deps.now())),
+  );
+  routes.post(API_ROUTES.clubCycles, async (c) => {
+    writes.hit(readerId(c));
+    const input = await parseJsonBody(c, createCycleRequestSchema);
+    return c.json(await startCycle(c.get('db'), readerId(c), c.req.param('id'), input, deps.now()));
+  });
+  routes.post(API_ROUTES.clubCycleClose, async (c) =>
+    c.json(
+      await closeCycle(
+        c.get('db'),
+        readerId(c),
+        c.req.param('id'),
+        c.req.param('cycleId'),
+        deps.now(),
+      ),
+    ),
   );
 
   return routes;

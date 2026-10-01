@@ -147,95 +147,6 @@ export type ApiRouteDefinition = {
 export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
   {
     method: 'get',
-    path: API_ROUTES.friends,
-    summary: 'Friends, incoming/outgoing requests and privacy preferences.',
-    tags: ['community'],
-    auth: true,
-    responses: {
-      200: { description: 'Own relationships (up to 200).', schema: friendsResponseSchema },
-    },
-  },
-  {
-    method: 'put',
-    path: API_ROUTES.friend,
-    summary: 'Request a shared-club reader, accept incoming request or remove relationship.',
-    tags: ['community'],
-    auth: true,
-    requestBody: friendActionSchema,
-    responses: { 200: { description: 'Relationships.', schema: friendsResponseSchema } },
-  },
-  {
-    method: 'get',
-    path: API_ROUTES.friendsFeed,
-    summary:
-      'Up to 50 catalog-book reading activities shared by accepted friends, after consent. Never reflections.',
-    tags: ['community'],
-    auth: true,
-    responses: { 200: { description: 'Feed.', schema: friendsFeedSchema } },
-  },
-  {
-    method: 'put',
-    path: API_ROUTES.socialPreferences,
-    summary: 'Own friendship and sharing preferences; sharing defaults off.',
-    tags: ['me'],
-    auth: true,
-    requestBody: socialPreferencesSchema,
-    responses: {
-      200: { description: 'Preferences and relationships.', schema: friendsResponseSchema },
-    },
-  },
-  {
-    method: 'get',
-    path: API_ROUTES.clubCycles,
-    summary: 'Recent reading cycles of the shared club book. Members only.',
-    tags: ['community'],
-    auth: true,
-    responses: {
-      200: {
-        description: 'Cycles with session-derived progress.',
-        schema: clubCyclesResponseSchema,
-      },
-    },
-  },
-  {
-    method: 'post',
-    path: API_ROUTES.clubCycles,
-    summary: 'Start one cycle and snapshot participants (owner only, idempotent id).',
-    tags: ['community'],
-    auth: true,
-    requestBody: createCycleRequestSchema,
-    responses: { 200: { description: 'Cycles.', schema: clubCyclesResponseSchema } },
-  },
-  {
-    method: 'post',
-    path: API_ROUTES.clubCycleClose,
-    summary: 'Close a cycle (owner only, idempotent).',
-    tags: ['community'],
-    auth: true,
-    responses: { 200: { description: 'Cycles.', schema: clubCyclesResponseSchema } },
-  },
-  {
-    method: 'get',
-    path: API_ROUTES.moderationQueue,
-    summary:
-      'Open community reports, configured moderators only. Query reveal=1 explicitly includes reported text.',
-    tags: ['community'],
-    auth: true,
-    responses: {
-      200: { description: 'Queue (at most 100 items).', schema: moderationQueueSchema },
-    },
-  },
-  {
-    method: 'post',
-    path: API_ROUTES.moderationQueue,
-    summary: 'Resolve reported content across clubs, configured moderators only.',
-    tags: ['community'],
-    auth: true,
-    requestBody: globalModerationRequestSchema,
-    responses: { 200: { description: 'Moderated.', schema: moderationResponseSchema } },
-  },
-  {
-    method: 'get',
     path: API_ROUTES.memoryStats,
     summary:
       'Recorded review self-assessments by day, book and time of day. Query: today, days (7|30|90|365), tz (UTC offset minutes).',
@@ -699,5 +610,94 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     auth: true,
     requestBody: reactionRequestSchema,
     responses: { 200: { description: 'Counts.', schema: reactionResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.friends,
+    summary: 'Friends, incoming/outgoing requests and privacy preferences.',
+    tags: ['community'],
+    auth: true,
+    responses: {
+      200: { description: 'Own relationships (up to 200).', schema: friendsResponseSchema },
+    },
+  },
+  {
+    method: 'put',
+    path: API_ROUTES.friend,
+    summary: 'Request a shared-club reader, accept incoming request or remove relationship.',
+    tags: ['community'],
+    auth: true,
+    requestBody: friendActionSchema,
+    responses: { 200: { description: 'Relationships.', schema: friendsResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.friendsFeed,
+    summary:
+      'Up to 50 catalog-book reading activities shared by accepted friends, after consent. Never reflections.',
+    tags: ['community'],
+    auth: true,
+    responses: { 200: { description: 'Feed.', schema: friendsFeedSchema } },
+  },
+  {
+    method: 'put',
+    path: API_ROUTES.socialPreferences,
+    summary: 'Own friendship and sharing preferences; sharing defaults off.',
+    tags: ['me'],
+    auth: true,
+    requestBody: socialPreferencesSchema,
+    responses: {
+      200: { description: 'Preferences and relationships.', schema: friendsResponseSchema },
+    },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.clubCycles,
+    summary: 'Recent reading cycles of the shared club book. Members only.',
+    tags: ['community'],
+    auth: true,
+    responses: {
+      200: {
+        description: 'Cycles with session-derived progress.',
+        schema: clubCyclesResponseSchema,
+      },
+    },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.clubCycles,
+    summary: 'Start one cycle and snapshot participants (owner only, idempotent id).',
+    tags: ['community'],
+    auth: true,
+    requestBody: createCycleRequestSchema,
+    responses: { 200: { description: 'Cycles.', schema: clubCyclesResponseSchema } },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.clubCycleClose,
+    summary: 'Close a cycle (owner only, idempotent).',
+    tags: ['community'],
+    auth: true,
+    responses: { 200: { description: 'Cycles.', schema: clubCyclesResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.moderationQueue,
+    summary:
+      'Open community reports, configured moderators only. Query reveal=1 explicitly includes reported text.',
+    tags: ['community'],
+    auth: true,
+    responses: {
+      200: { description: 'Queue (at most 100 items).', schema: moderationQueueSchema },
+    },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.moderationQueue,
+    summary: 'Resolve reported content across clubs, configured moderators only.',
+    tags: ['community'],
+    auth: true,
+    requestBody: globalModerationRequestSchema,
+    responses: { 200: { description: 'Moderated.', schema: moderationResponseSchema } },
   },
 ];

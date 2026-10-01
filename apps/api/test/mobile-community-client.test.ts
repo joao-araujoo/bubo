@@ -1,4 +1,4 @@
-import { meResponseSchema } from '@bubo/contracts';
+import { type CreatePostRequest, meResponseSchema } from '@bubo/contracts';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
 vi.mock('../../mobile/src/lib/auth/client', () => ({ authHeaders: async () => ({}) }));
@@ -224,15 +224,21 @@ it('publishes book reviews with ratings protected by spoilers, reports and block
   });
   await author.api.joinByCode(club.inviteCode ?? '');
   await guest.api.joinByCode(club.inviteCode ?? '');
-  const input = {
+  const input: CreatePostRequest = {
     id: crypto.randomUUID(),
     title: 'Minha leitura do final',
     body: 'Esta leitura deixou perguntas importantes sobre as escolhas dos personagens.',
     spoilerPage: 300,
     reviewRating: 4,
+    reviewTags: ['reflective', 'ending'],
   };
   const review = await author.api.createClubPost(club.id, input);
-  expect(review).toMatchObject({ isBookReview: true, reviewRating: 4, locked: false });
+  expect(review).toMatchObject({
+    isBookReview: true,
+    reviewRating: 4,
+    reviewTags: ['reflective', 'ending'],
+    locked: false,
+  });
   expect((await author.api.createClubPost(club.id, input)).id).toBe(review.id);
   await owner.api.createClubPost(club.id, {
     id: crypto.randomUUID(),
@@ -248,9 +254,13 @@ it('publishes book reviews with ratings protected by spoilers, reports and block
     title: null,
     body: null,
     reviewRating: null,
+    reviewTags: [],
     locked: true,
   });
-  expect((await guest.api.getClubTopic(club.id, review.id, true)).post.reviewRating).toBe(4);
+  expect((await guest.api.getClubTopic(club.id, review.id, true)).post).toMatchObject({
+    reviewRating: 4,
+    reviewTags: ['reflective', 'ending'],
+  });
   const feedReview = (await guest.api.getCommunityFeed()).items.find(
     (item) => item.type === 'topic' && item.post.id === review.id,
   );
@@ -261,14 +271,18 @@ it('publishes book reviews with ratings protected by spoilers, reports and block
   await expect(
     outsider.api.createClubPost(club.id, { ...input, id: crypto.randomUUID() }),
   ).rejects.toMatchObject({ code: 'NOT_FOUND' });
-  for (const overrides of [
+  const invalidReviews: Partial<CreatePostRequest>[] = [
     { reviewRating: 0 },
     { reviewRating: 6 },
     { reviewRating: 2.5 },
     { body: 'Curta' },
     { kind: 'question' as const },
     { spoilerPage: 301 },
-  ]) {
+    { reviewTags: ['ending', 'ending'] },
+    { reviewTags: ['reflective', 'pacing', 'ending', 'characters'] },
+    { reviewRating: null, reviewTags: ['ending'] },
+  ];
+  for (const overrides of invalidReviews) {
     await expect(
       author.api.createClubPost(club.id, { ...input, ...overrides, id: crypto.randomUUID() }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });

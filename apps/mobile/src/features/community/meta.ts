@@ -1,4 +1,4 @@
-import { type ClubIcon, type ReportRequest } from '@bubo/contracts';
+import { type ClubIcon, type ReportRequest, type ReviewTag } from '@bubo/contracts';
 import { type ReactionKind, type TopicKind } from '@bubo/domain';
 import { type ComponentProps } from 'react';
 
@@ -58,6 +58,30 @@ export const REACTION_META: Record<ReactionKind, { label: string; icon: IconName
   counterpoint: { label: 'Bom contraponto', icon: 'compare-arrows' },
 };
 
+/** Stitch "Como essa leitura reverberou?" chips (Material icons, never emoji). */
+export const REVIEW_TAG_META: Record<ReviewTag, { label: string; icon: IconName }> = {
+  reflective: { label: 'Profundo & reflexivo', icon: 'psychology' },
+  pacing: { label: 'Ritmo envolvente', icon: 'hourglass-top' },
+  changedView: { label: 'Mudou minha visão', icon: 'lightbulb-outline' },
+  ending: { label: 'Final arrebatador', icon: 'local-fire-department' },
+  worldbuilding: { label: 'Mundo único', icon: 'account-balance' },
+  characters: { label: 'Personagens marcantes', icon: 'theater-comedy' },
+};
+
+/** Stitch rating caption ("5.0 • Obra-prima inesquecível!"). */
+export const RATING_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: 'Não foi para mim',
+  2: 'Teve seus momentos',
+  3: 'Boa leitura',
+  4: 'Leitura marcante',
+  5: 'Obra-prima inesquecível!',
+};
+
+export function ratingLabel(rating: number): string {
+  const clamped = Math.min(5, Math.max(1, Math.round(rating))) as 1 | 2 | 3 | 4 | 5;
+  return RATING_LABELS[clamped];
+}
+
 export const REPORT_REASONS: { value: ReportRequest['reason']; label: string }[] = [
   { value: 'spoiler', label: 'Spoiler sem página certa' },
   { value: 'offensive', label: 'Ofensivo ou ataque pessoal' },
@@ -109,4 +133,9 @@ export function votesLabel(count: number): string {
 export function anchorLabel(chapter: number | null, page: number): string {
   const pageText = page > 0 ? `Pág. ${page}` : 'Geral';
   return chapter ? `Cap. ${chapter} • ${pageText}` : pageText;
+}
+
+export function wordsLabel(text: string): string {
+  const words = text.trim() ? text.trim().split(/s+/).length : 0;
+  return `${words === 1 ? '1 palavra' : `${words} palavras`} • ${text.trim().length} caracteres`;
 }

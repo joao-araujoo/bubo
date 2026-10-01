@@ -11,10 +11,10 @@ import {
   TabChip,
 } from '../../design-system';
 import { BookStrip } from '../../features/community/BookStrip';
+import { CycleRow } from '../../features/community/club/CycleRow';
 import { ClubProfile } from '../../features/community/club/ClubProfile';
 import { ForumTab } from '../../features/community/club/ForumTab';
 import { BookReviewsTab } from '../../features/community/club/BookReviewsTab';
-import { CyclesTab } from '../../features/community/club/CyclesTab';
 import { GuidelinesTab } from '../../features/community/club/GuidelinesTab';
 import { MembersTab } from '../../features/community/club/MembersTab';
 import { PollsTab } from '../../features/community/club/PollsTab';
@@ -23,8 +23,8 @@ import { useAuthState } from '../../lib/auth/session';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
 
-type Tab = 'forum' | 'resenhas' | 'ciclos' | 'enquetes' | 'membros' | 'diretrizes';
-const TABS: Tab[] = ['forum', 'resenhas', 'ciclos', 'enquetes', 'membros', 'diretrizes'];
+type Tab = 'forum' | 'resenhas' | 'enquetes' | 'membros' | 'diretrizes';
+const TABS: Tab[] = ['forum', 'resenhas', 'enquetes', 'membros', 'diretrizes'];
 
 /**
  * A club (Stitch "Clube de leitura: fórum & enquetes", "Membros & estatísticas", "Diretrizes &
@@ -214,6 +214,13 @@ export default function ClubScreen() {
         size="md"
         onPress={() => router.push({ pathname: '/novo-debate/[clubId]', params: { clubId } })}
       />
+    ) : tab === 'resenhas' ? (
+      <Button
+        label="Escrever resenha"
+        icon="rate-review"
+        size="md"
+        onPress={() => router.push({ pathname: '/nova-resenha/[clubId]', params: { clubId } })}
+      />
     ) : tab === 'enquetes' ? (
       <Button
         label="Nova enquete"
@@ -233,6 +240,7 @@ export default function ClubScreen() {
       floating={floating}
     >
       <BookStrip club={data} />
+      <CycleRow clubId={clubId} userId={userId} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -264,12 +272,6 @@ export default function ClubScreen() {
           onPress={() => setTab('resenhas')}
         />
         <TabChip
-          label="Ciclos"
-          icon="history"
-          selected={tab === 'ciclos'}
-          onPress={() => setTab('ciclos')}
-        />
-        <TabChip
           label="Membros"
           icon="group"
           count={data.memberCount}
@@ -295,7 +297,6 @@ export default function ClubScreen() {
       ) : null}
       {tab === 'forum' ? <ForumTab club={data} userId={userId} /> : null}
       {tab === 'resenhas' ? <BookReviewsTab club={data} userId={userId} /> : null}
-      {tab === 'ciclos' ? <CyclesTab club={data} userId={userId} /> : null}
       {tab === 'enquetes' ? <PollsTab club={data} userId={userId} /> : null}
       {tab === 'membros' ? <MembersTab club={data} userId={userId} /> : null}
       {tab === 'diretrizes' ? <GuidelinesTab club={data} ownerName={data.ownerName} /> : null}

@@ -98,7 +98,7 @@ On Windows use PowerShell or cmd. All scripts are cross-platform Node.
 
 ## Current status and next step
 
-Tasks 01–05 and 07 are complete in code (Task 05 still needs owner/device acceptance, see
+Tasks 01–05, 07 and 08 are complete in code (Task 05 still needs owner/device acceptance, see
 [docs/roadmap.md](docs/roadmap.md)):
 
 - foundation
@@ -107,13 +107,15 @@ Tasks 01–05 and 07 are complete in code (Task 05 still needs owner/device acce
 - Revisar + production readiness
 - Discover + catalog + ISBN
 - Comunidade: clubs + anti-spoiler debates + moderation (Task 07)
+- Comunidade part 2: invites, polls, reviews, friends, cycles, global moderation (Task 08)
 
 **Task 06 (memory and stats)** is done except a documented retention model (curve, Bubo Score).
 **Task 07 (Comunidade: clubs, anti-spoiler debates, reports, blocks; ADR-019)** is complete and
-deployed. **TASK 08 — Comunidade part 2** slice 1 is done and deployed (ADR-020: private clubs +
-invites, members, polls, reactions, club feed; `0009`). **Next in Task 08:** reviews (resenhas),
-friends + friends' feed, club reading cycles, admin moderation; club notifications wait for push
-(Task 09).
+deployed. **Task 08 (Comunidade part 2)** is complete and deployed: slice 1 (ADR-020: private clubs +
+invites, members, polls, reactions, club feed; `0009`) and slice 2 (ADR-021: book reviews with
+tags, friends + opt-in friends feed, club reading cycles, global moderation via
+`MODERATOR_USER_IDS`; `0010`–`0012`). Device acceptance is pending. **Next: Task 09 (Você:
+settings, notifications/push, then club notifications).**
 
 - Owner-only setup lives in [CONFIGURAR.md](CONFIGURAR.md); the screen test script in
   [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md). Keep both current when screens or config change.

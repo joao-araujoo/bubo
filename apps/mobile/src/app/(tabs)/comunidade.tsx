@@ -45,7 +45,15 @@ const FILTERS: {
   { id: 'active', label: 'Mais ativos', icon: 'local-fire-department' },
 ];
 
-function Header({ onSearch, onCreate }: { onSearch: () => void; onCreate: () => void }) {
+function Header({
+  onSearch,
+  onCreate,
+  onFriends,
+}: {
+  onSearch: () => void;
+  onCreate: () => void;
+  onFriends: () => void;
+}) {
   const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
@@ -69,6 +77,13 @@ function Header({ onSearch, onCreate }: { onSearch: () => void; onCreate: () => 
           Comunidade
         </Text>
       </View>
+      <HeaderButton
+        icon="people"
+        label="Amigos de leitura"
+        shape="square"
+        iconColor="accentText"
+        onPress={onFriends}
+      />
       <HeaderButton
         icon="search"
         label="Buscar clubes"
@@ -189,7 +204,11 @@ export default function CommunityScreen() {
     <Screen
       header={
         <View style={{ gap: theme.spacing.md }}>
-          <Header onSearch={() => setSegment('discover')} onCreate={create} />
+          <Header
+            onSearch={() => setSegment('discover')}
+            onCreate={create}
+            onFriends={() => router.push('/amigos')}
+          />
           <SegmentedTabs
             accessibilityLabel="Seções da comunidade"
             value={segment}
@@ -203,13 +222,6 @@ export default function CommunityScreen() {
         </View>
       }
     >
-      <Button
-        label="Amigos de leitura"
-        icon="people"
-        variant="secondary"
-        size="md"
-        onPress={() => router.push('/amigos')}
-      />
       {segment === 'feed' ? (
         feed.isPending || clubs.isPending ? (
           loading

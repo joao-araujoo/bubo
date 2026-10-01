@@ -179,6 +179,13 @@ describe('GET /v1/openapi.json', () => {
       '/v1/clubs/{id}/polls/{pollId}/vote',
       '/v1/clubs/{id}/polls/{pollId}/argument',
       '/v1/reactions',
+      '/v1/community/friends',
+      '/v1/community/friends/{userId}',
+      '/v1/community/friends-feed',
+      '/v1/me/social-preferences',
+      '/v1/clubs/{id}/cycles',
+      '/v1/clubs/{id}/cycles/{cycleId}/close',
+      '/v1/me/moderation',
     ]);
   });
 });

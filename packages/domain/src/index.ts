@@ -2,6 +2,7 @@ export * from './achievements';
 export * from './catalog';
 export * from './clubs';
 export * from './community';
+export * from './cycles';
 export * from './friends';
 export * from './ids';
 export * from './isbn';

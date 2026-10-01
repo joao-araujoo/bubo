@@ -7,8 +7,9 @@
   data, período e fuso. Sem retenção estimada ou Score; aceite em aparelho pendente.
 - As 34 ideias do proprietário estão no [checklist futuro](ideias-futuras.md), com
   critérios de aceite, dependências e sequência sugerida. Ainda não implementadas.
-- Próxima etapa da Comunidade: resenhas com anti-spoiler, denúncia, bloqueio, exclusão
-  e moderação, seguida de amizades e ciclos.
+- Task 08 concluída: resenhas, amigos e feed de amigos, ciclos de leitura do clube e moderação
+  geral publicados (veja a seção da Task 08). Próximo passo: Task 09 (Você: configurações e
+  notificações).
 
 ## ✅ Task 01 — Foundation
 
@@ -194,7 +195,9 @@
   [TESTAR-TELAS.md](TESTAR-TELAS.md) (every screen, how to reach it, what to check).
 - **Task 08** continues below (`diretrizes/[clubId]` became the club's "Diretrizes" tab).
 
-## 🟡 Task 08 — Comunidade part 2 (slice 1 done and deployed, 2026-09-28)
+## ✅ Task 08 — Comunidade part 2 (code complete and deployed, 2026-09-30; device acceptance pending)
+
+### Slice 1 (2026-09-28)
 
 - **Database:** `0009_club_polls_invites` (additive): topic kind/chapter/quote, club visibility +
   invite code, polls (options, votes, arguments), reactions, reports on polls/arguments.
@@ -228,16 +231,50 @@
   migrations (this is how `0009` reached Neon, right after a green verify). Root script fixed and
   `npm run db:migrate:check` added. Club profile used a mascot _state_ `takingNotes` that does not
   exist (now the official _pose_).
-- **Remaining in Task 08:** reviews/resenhas (`livro/[id]/resenha`, `resenhas/[id]`), friends +
-  friends' feed (needs follows and privacy settings), club reading cycles ("Histórico de ciclos"),
-  club notifications + invites inbox (needs push, Task 09), Bubo-wide admin moderation tool,
-  device acceptance of every Comunidade screen.
+
+### Slice 2 (2026-09-30, ADR-021)
+
+- **Database:** `0010_club_book_reviews` (rating 1–5 + up to 3 tags on club topics),
+  `0011_club_reading_cycles` (cycles + participant snapshot), `0012_reader_friendships`
+  (friendships + social preferences). Applied to Neon on 2026-09-30.
+- **API (10 routes):** reviews via `/v1/clubs/:id/posts?reviews=1` and the existing topic routes;
+  `GET|POST /v1/clubs/:id/cycles`, `POST /v1/clubs/:id/cycles/:cycleId/close`;
+  `GET /v1/community/friends`, `PUT /v1/community/friends/:userId`,
+  `GET /v1/community/friends-feed` (with `readingNow`), `PUT /v1/me/social-preferences`;
+  `GET|POST /v1/me/moderation` (`MODERATOR_USER_IDS` only), `isModerator` on `/v1/me`.
+- **Mobile (Stitch layouts):**
+  - `nova-resenha/[clubId]` ("Avaliar & Resenhar"): book card, Bubo tip, 48 pt stars with a
+    caption, "Como essa leitura reverberou?" chips, word count, anti-spoiler toggle with half /
+    my page / ending points and an exact page, "Onde compartilhar".
+  - `resenhas/[clubId]/[postId]`: author card with "Amizade"/"Aceitar", stars, tags, veil and
+    replies. The club **Resenhas** tab and the book detail "Avaliar & resenhar" entry (catalog
+    books only) lead here.
+  - `amigos` ("Feed de amigos"): Atividade / Amigos / Privacidade, "Lendo agora" row, session
+    cards, requests and opt-in toggles. The Comunidade header gained an "Amigos de leitura"
+    button.
+  - `ciclos/[clubId]` ("Ciclos & leituras anteriores"): Bubo historiador, real totals, year chips,
+    current cycle with days left and group progress, timeline, owner start/close. The club Ciclos
+    tab became a row under the book strip.
+  - `moderacao`: queue with counts and reasons, reveal toggle, remove/keep.
+- **Fixed:** `_layout` still registered the deleted `diretrizes/[clubId]` and left nine
+  Comunidade routes outside the signed-in guard; OpenAPI and `me` contract tests were stale; the
+  friend/cycle routes referenced the rate limiter before declaring it; social preference writes
+  were not rate-limited; the cycle query key could hold `undefined`. Query cache key bumped to v4.
+- **Tests:** domain `cycles` (group %, days left, weeks, summary), API friends (`readingNow`,
+  consent windows, blocks), review tags (lock, reveal, duplicates, tags without rating) through
+  the real mobile client, OpenAPI route list.
+- **Production (2026-09-30):** API version `95b22fbd` deployed; two-account smoke test (see
+  [release.md](release.md)).
+- **Deferred:** club notifications and an inbox move to Task 09 (they need push and read state;
+  invites are codes, not per-user invitations). A public review feed, review drafts and "+XP"
+  need product decisions. Device acceptance of every Comunidade screen is pending.
 
 ## Later (see [screens.md](screens.md) for the full list)
 
 - **Task 06 leftovers:** retention model → retention curve and Bubo Score; badge unlock ledger;
   device acceptance of `estatisticas` periods/breakdowns UI (implemented 2026-09-30).
-- **Task 08 leftovers:** see the list above.
+- **Task 08 leftovers:** device acceptance of the Comunidade screens; club notifications go with
+  Task 09.
 - **Task 09, Você:** settings and cognitive preferences, notifications (Expo Push + a Worker cron
   for due reviews).
 - **AI (Gemini, server-side):** recall question suggestions and reflection feedback, inside existing

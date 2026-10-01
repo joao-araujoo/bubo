@@ -1,11 +1,13 @@
 import { type ClubDetail } from '@bubo/contracts';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator } from 'react-native';
-import { Button, EmptyState, InlineMessage, Text } from '../../../design-system';
+
+import { BuboTip, Button, InlineMessage, SectionTitle, Text } from '../../../design-system';
 import { useClubBookReviews, useSetReaction } from '../../../lib/api/queries';
 import { useTheme } from '../../../theme';
 import { TopicCard } from '../TopicCard';
 
+/** Club "Resenhas" tab: reviews of the shared book, spoiler-locked by page like every topic. */
 export function BookReviewsTab({ club, userId }: { club: ClubDetail; userId: string }) {
   const theme = useTheme();
   const router = useRouter();
@@ -16,51 +18,45 @@ export function BookReviewsTab({ club, userId }: { club: ClubDetail; userId: str
       pathname: '/resenhas/[clubId]/[postId]',
       params: { clubId: club.id, postId, ...(reveal ? { reveal: '1' } : {}) },
     });
+
+  if (reviews.isPending)
+    return (
+      <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando resenhas" />
+    );
+  if (reviews.isError)
+    return (
+      <>
+        <InlineMessage tone="error" message="Não foi possível carregar as resenhas." />
+        <Button label="Tentar de novo" icon="refresh" onPress={() => void reviews.refetch()} />
+      </>
+    );
+  if (reviews.data.posts.length === 0)
+    return (
+      <BuboTip pose="takingNotes" title="O que este livro deixou em você?" titleIcon="rate-review">
+        <Text variant="bodySm">
+          {`Ainda não há resenhas de ${club.book.title} que você possa ver. Escreva a primeira: dê sua nota, conte o que ficou e marque a página se falar do desfecho.`}
+        </Text>
+      </BuboTip>
+    );
   return (
     <>
-      <Text variant="bodySm" color="textMuted">
-        Impressões sobre {club.book.title}, compartilhadas somente com membros deste clube. A página
-        protege quem ainda está lendo.
-      </Text>
-      <Button
-        label="Escrever resenha"
-        icon="edit-note"
-        onPress={() =>
-          router.push({ pathname: '/nova-resenha/[clubId]', params: { clubId: club.id } })
-        }
+      <SectionTitle
+        icon="rate-review"
+        title="Resenhas do clube"
+        subtitle="Só para membros. Quem ainda não chegou à página vê o véu."
       />
-      {reviews.isPending ? (
-        <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando resenhas" />
-      ) : reviews.isError ? (
-        <>
-          <InlineMessage tone="error" message="Não foi possível carregar as resenhas." />
-          <Button label="Tentar novamente" onPress={() => void reviews.refetch()} />
-        </>
-      ) : reviews.data.posts.length === 0 ? (
-        <EmptyState
-          mascot="emptyCommunity"
-          title="O que este livro deixou em você?"
-          description="Ainda não há resenhas visíveis neste clube. Compartilhe sua experiência quando quiser."
+      {reviews.data.posts.map((post) => (
+        <TopicCard
+          key={post.id}
+          post={post}
+          readerPage={reviews.data.readerPage}
+          onOpen={() => open(post.id)}
+          onReveal={() => open(post.id, true)}
+          onReact={(kind, active) =>
+            reaction.mutate({ targetType: 'post', targetId: post.id, kind, active })
+          }
         />
-      ) : (
-        <>
-          <Text variant="caption" color="textMuted">
-            Resenhas recentes
-          </Text>
-          {reviews.data.posts.map((post) => (
-            <TopicCard
-              key={post.id}
-              post={post}
-              readerPage={reviews.data.readerPage}
-              onOpen={() => open(post.id)}
-              onReveal={() => open(post.id, true)}
-              onReact={(kind, active) =>
-                reaction.mutate({ targetType: 'post', targetId: post.id, kind, active })
-              }
-            />
-          ))}
-        </>
-      )}
+      ))}
       {reaction.isError ? (
         <InlineMessage tone="error" message="Não foi possível registrar a reação." />
       ) : null}

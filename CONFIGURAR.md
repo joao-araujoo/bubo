@@ -5,19 +5,19 @@ depende de mais nada: o que está aqui é o que falta para o Bubo funcionar "per
 produção e nas lojas. Estado técnico detalhado: [docs/release.md](docs/release.md) → "Current
 remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
-Última atualização: 2026-09-28 (Task 08 — Comunidade parte 2, etapa 1).
+Última atualização: 2026-09-30 (Task 08 concluída — resenhas, amigos, ciclos e moderação geral).
 
 ---
 
 ## 1. O que já está no ar (feito por mim, sem precisar de você)
 
-| Item                           | Estado                                                                                                                                                                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API de produção                | `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`). `/v1/health` e `/v1/ready` respondem 200.                                                                                                                                                  |
-| Banco Neon                     | Migrations `0001` a `0009` aplicadas, nenhuma pendente.                                                                                                                                                                                                 |
-| Segredos no Cloudflare         | `DATABASE_URL`, `BETTER_AUTH_SECRET` (gerado aleatoriamente), `BETTER_AUTH_URL`.                                                                                                                                                                        |
-| Armazenamento R2               | Bucket `bubo` existe e está ligado ao Worker como `MEDIA` (sem acesso público ainda).                                                                                                                                                                   |
-| Testes automáticos em produção | Cadastro, catálogo, ISBN, sessões, cards, conquistas, clubes, debates anti-spoiler, clube privado com convite, enquetes, argumentos, reações, membros, feed, denúncia, bloqueio e exclusão de conta: todos passaram. As contas de teste foram apagadas. |
+| Item                           | Estado                                                                                                                                                                                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API de produção                | `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`). `/v1/health` e `/v1/ready` respondem 200.                                                                                                                                                                            |
+| Banco Neon                     | Migrations `0001` a `0012` aplicadas, nenhuma pendente.                                                                                                                                                                                                                           |
+| Segredos no Cloudflare         | `DATABASE_URL`, `BETTER_AUTH_SECRET` (gerado aleatoriamente), `BETTER_AUTH_URL`.                                                                                                                                                                                                  |
+| Armazenamento R2               | Bucket `bubo` existe e está ligado ao Worker como `MEDIA` (sem acesso público ainda).                                                                                                                                                                                             |
+| Testes automáticos em produção | Cadastro, catálogo, ISBN, sessões, cards, conquistas, clubes, debates anti-spoiler, clube privado com convite, enquetes, argumentos, reações, membros, feed, resenhas, amigos, ciclos, denúncia, bloqueio e exclusão de conta: todos passaram. As contas de teste foram apagadas. |
 
 ---
 
@@ -113,15 +113,25 @@ e que exista um contato público. Falta:
 
 1. Um e-mail de suporte (ex.: `suporte@seu-dominio.com`) para colocar nas lojas e na Política de
    Privacidade.
-2. Uma rotina para ver denúncias. Até existir um painel de administração, dá para consultar no
-   Neon (SQL Editor, **somente leitura**):
+2. Liberar o **painel de moderação geral** (Você → Moderação geral) para a sua conta:
+   1. Descubra o id da sua conta no Neon (SQL Editor, somente leitura):
+      `select id, email from users where email = 'seu-email@exemplo.com';`
+   2. Grave o id (ou vários, separados por vírgula) no Worker:
+      ```powershell
+      cd apps/api
+      npx wrangler secret put MODERATOR_USER_IDS --env production
+      ```
+   3. Saia e entre de novo no app: a entrada "Moderação geral" aparece em Você. Lá você vê as
+      denúncias abertas de todos os clubes e decide "Remover" ou "Manter".
+3. Se preferir consultar direto no banco, as denúncias abertas estão em (SQL Editor, **somente
+   leitura**):
    ```sql
    select r.created_at, r.reason, r.target_type, r.target_id, c.name as clube
    from reading_club_reports r join reading_clubs c on c.id = r.club_id
    where r.status = 'open' order by r.created_at desc;
    ```
-   Para remover algo grave, peça para mim (ou a um desenvolvedor) com o `target_id`: a remoção deve
-   usar o mesmo caminho da API para registrar e resolver as denúncias.
+   Remova sempre pelo painel (ou pela API), nunca editando o banco: assim as denúncias são
+   resolvidas e a decisão fica registrada.
 
 ### 3.6 Política de Privacidade e Termos de Uso
 
@@ -210,8 +220,8 @@ Depois, siga o roteiro de telas em [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
 Para você não procurar o que ainda não foi feito:
 
-- Comunidade: resenhas, amigos e feed de amigos, ciclos de leitura do clube, notificações e caixa
-  de convites, painel de moderação geral (próximas etapas da Task 08).
+- Comunidade: notificações dos clubes e caixa de convites (vão junto com as notificações push da
+  Task 09). Rascunho de resenha e feed público de resenhas (decisão de produto).
 - Curva de retenção e Bubo Score (precisam de um modelo de memória documentado).
 - Login com Google/Apple, verificação de e-mail, exportação de dados (LGPD).
 - Configurações e notificações push (Task 09). Recursos de IA (Gemini) dentro dos fluxos.

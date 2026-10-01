@@ -451,7 +451,7 @@ export default function BookScreen() {
       {/* Remount on status change (e.g. "Terminado" moves the page to the end). */}
       <ProgressEditor key={entry.status} entry={entry} userId={userId} />
       <SessionHistory sessions={sessions} />
-      <BookClubReviews userId={userId} bookId={entry.book.id} />
+      {entry.book.catalogId ? <BookClubReviews userId={userId} bookId={entry.book.id} /> : null}
       <RecallCards entry={entry} cards={cards} userId={userId} />
       {remove.isError ? (
         <InlineMessage tone="error" message="Não foi possível remover agora." />

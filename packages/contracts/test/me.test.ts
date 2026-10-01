@@ -73,7 +73,8 @@ describe('meResponseSchema', () => {
       profile: { readingHabit: null, goals: [], interests: [], onboardingCompletedAt: null },
       onboardingCompleted: false,
     };
-    expect(meResponseSchema.parse(me)).toEqual(me);
+    // Older API responses without the flag default to a non-moderator.
+    expect(meResponseSchema.parse(me)).toEqual({ ...me, isModerator: false });
   });
 });
 

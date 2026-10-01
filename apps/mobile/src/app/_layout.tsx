@@ -98,7 +98,15 @@ function RootNavigator() {
           <Stack.Screen name="clubes/[id]" />
           <Stack.Screen name="novo-debate/[clubId]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="debates/[clubId]/[postId]" />
-          <Stack.Screen name="diretrizes/[clubId]" />
+          <Stack.Screen name="nova-enquete/[clubId]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="enquetes/[clubId]/[pollId]" />
+          <Stack.Screen name="nova-resenha/[clubId]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="resenhas/[clubId]/[postId]" />
+          <Stack.Screen name="ciclos/[clubId]" />
+          <Stack.Screen name="convidar/[clubId]" />
+          <Stack.Screen name="convite/[code]" />
+          <Stack.Screen name="amigos" />
+          <Stack.Screen name="moderacao" />
           <Stack.Screen name="catalogo/[id]" />
           <Stack.Screen
             name="sessao/[id]"

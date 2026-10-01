@@ -6,9 +6,10 @@ import { Avatar, Icon, Pill, Raised, Text } from '../../design-system';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
 import { type ClubBadge } from './ClubBadge';
-import { anchorLabel, relativeTime, TOPIC_KIND_META } from './meta';
+import { anchorLabel, ratingLabel, relativeTime, REVIEW_TAG_META, TOPIC_KIND_META } from './meta';
 import { ReactionBar } from './ReactionBar';
 import { SpoilerVeil } from './SpoilerVeil';
+import { StarRating } from './StarRating';
 
 type FeedClub = { name: string; icon: Parameters<typeof ClubBadge>[0]['icon']; bookTitle: string };
 
@@ -23,7 +24,7 @@ function StatusPill({ post, readerPage }: { post: ClubPost; readerPage: number }
       />
     );
   }
-  if (post.isBookReview) return <Pill icon="edit-note" label="Resenha" />;
+  if (post.isBookReview) return <Pill tone="gold" icon="edit-note" label="Resenha" />;
   if (post.kind !== 'discussion') {
     const meta = TOPIC_KIND_META[post.kind];
     return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
@@ -133,9 +134,19 @@ export function TopicCard({
             {post.title}
           </Text>
           {post.reviewRating !== null ? (
-            <Text variant="label" color="accentText">
-              Nota do leitor: {post.reviewRating}/5
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <StarRating value={post.reviewRating} size={14} />
+              <Text variant="label" color="textMuted" style={{ fontSize: 12 }}>
+                {ratingLabel(post.reviewRating)}
+              </Text>
+            </View>
+          ) : null}
+          {post.reviewTags.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+              {post.reviewTags.map((tag) => (
+                <Pill key={tag} tone="neutral" label={REVIEW_TAG_META[tag].label} />
+              ))}
+            </View>
           ) : null}
           <Text variant="bodySm" color="textMuted" numberOfLines={3}>
             {post.quote ? `“${post.quote}” ` : ''}

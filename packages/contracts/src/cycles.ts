@@ -1,12 +1,14 @@
-import { MAX_BOOK_PAGES } from '@bubo/domain';
+import { CYCLE_DURATIONS_DAYS, MAX_BOOK_PAGES } from '@bubo/domain';
 import { z } from 'zod';
 
+/** POST /v1/clubs/:id/cycles — owner only, idempotent on the client id. */
 export const createCycleRequestSchema = z.object({
   id: z.uuid(),
   goalPages: z.number().int().min(1).max(MAX_BOOK_PAGES),
-  durationDays: z.union([z.literal(7), z.literal(14), z.literal(30), z.literal(60), z.literal(90)]),
+  durationDays: z.union(CYCLE_DURATIONS_DAYS.map((days) => z.literal(days))),
 });
 export type CreateCycleRequest = z.infer<typeof createCycleRequestSchema>;
+/** GET /v1/clubs/:id/cycles — newest first, at most 50, progress derived from sessions. */
 export const clubCyclesResponseSchema = z.object({
   cycles: z.array(
     z.object({

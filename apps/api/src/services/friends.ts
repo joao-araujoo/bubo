@@ -123,23 +123,42 @@ export async function saveSocialPreferences(
   return listFriends(db, userId);
 }
 
+/** Accepted friends with sharing on, excluding blocks in either direction. */
+const sharingFriends = (userId: string) => sql`
+  SELECT u.id, u.name, f.accepted_at, p.sharing_since
+  FROM reading_club_friendships f
+  JOIN users u ON u.id = CASE WHEN f.sender_id = ${userId} THEN f.recipient_id ELSE f.sender_id END
+  JOIN reading_club_social_preferences p ON p.user_id = u.id AND p.share_activity = true
+  WHERE (f.sender_id = ${userId} OR f.recipient_id = ${userId}) AND f.accepted_at IS NOT NULL
+    AND p.sharing_since IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM user_blocks x WHERE (x.blocker_user_id = ${userId} AND x.blocked_user_id = u.id) OR (x.blocker_user_id = u.id AND x.blocked_user_id = ${userId}))
+`;
+
 export async function friendsFeed(db: Executor, userId: string) {
-  const result = await db.execute(sql`
-    SELECT s.id, u.id AS "userId", u.name, b.title AS "bookTitle",
+  const sessions = await db.execute(sql`
+    SELECT s.id, fr.id AS "userId", fr.name, b.title AS "bookTitle",
       floor(s.focused_seconds / 60.0)::int AS minutes, (s.end_page - s.start_page)::int AS pages,
-      s.ended_at AS "endedAt"
-    FROM reading_club_friendships f
-    JOIN users u ON u.id = CASE WHEN f.sender_id = ${userId} THEN f.recipient_id ELSE f.sender_id END
-    JOIN reading_club_social_preferences p ON p.user_id = u.id AND p.share_activity = true
-    JOIN reading_sessions s ON s.user_id = u.id AND s.started_at >= greatest(f.accepted_at, p.sharing_since)
-    JOIN shelf_entries e ON e.id = s.shelf_entry_id AND e.user_id = u.id
+      s.end_page AS "endPage", s.ended_at AS "endedAt"
+    FROM (${sharingFriends(userId)}) fr
+    JOIN reading_sessions s ON s.user_id = fr.id AND s.started_at >= greatest(fr.accepted_at, fr.sharing_since)
+    JOIN shelf_entries e ON e.id = s.shelf_entry_id AND e.user_id = fr.id
     JOIN books b ON b.id = e.book_id AND b.catalog_key IS NOT NULL
-    WHERE (f.sender_id = ${userId} OR f.recipient_id = ${userId}) AND f.accepted_at IS NOT NULL AND p.sharing_since IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM user_blocks x WHERE (x.blocker_user_id = ${userId} AND x.blocked_user_id = u.id) OR (x.blocker_user_id = u.id AND x.blocked_user_id = ${userId}))
     ORDER BY s.ended_at DESC, s.id DESC LIMIT 50
   `);
+  // One book per friend: the catalog book in progress they touched last.
+  const reading = await db.execute(sql`
+    SELECT DISTINCT ON (fr.id) fr.id AS "userId", fr.name, b.title AS "bookTitle",
+      e.current_page AS "currentPage", coalesce(e.total_pages, b.total_pages) AS "totalPages"
+    FROM (${sharingFriends(userId)}) fr
+    JOIN shelf_entries e ON e.user_id = fr.id AND e.status = 'reading'
+    JOIN books b ON b.id = e.book_id AND b.catalog_key IS NOT NULL
+    ORDER BY fr.id, e.updated_at DESC, e.id
+  `);
   return friendsFeedSchema.parse({
-    items: result.rows.map((row) => ({
+    readingNow: [...reading.rows].sort((a, b) =>
+      String(a.name).localeCompare(String(b.name), 'pt-BR'),
+    ),
+    items: sessions.rows.map((row) => ({
       ...row,
       endedAt: new Date(String(row.endedAt)).toISOString(),
     })),

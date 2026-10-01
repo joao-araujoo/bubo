@@ -13,6 +13,19 @@ export const CLUB_ICONS = ['planet', 'classics', 'mind', 'spark', 'library', 'he
 export const clubIconSchema = z.enum(CLUB_ICONS);
 export type ClubIcon = z.infer<typeof clubIconSchema>;
 
+/** Stitch "Como essa leitura reverberou?": up to three per book review. */
+export const REVIEW_TAGS = [
+  'reflective',
+  'pacing',
+  'changedView',
+  'ending',
+  'worldbuilding',
+  'characters',
+] as const;
+export const reviewTagSchema = z.enum(REVIEW_TAGS);
+export type ReviewTag = z.infer<typeof reviewTagSchema>;
+export const REVIEW_TAGS_MAX = 3;
+
 export const WEEKLY_GOAL_OPTIONS = [50, 75, 100] as const;
 
 export const CLUB_NAME_MAX = 60;
@@ -152,6 +165,8 @@ export const clubPostSchema = z.object({
   /** A book review's rating; null on regular discussions or while spoiler-locked. */
   reviewRating: z.number().int().min(1).max(5).nullable().default(null),
   isBookReview: z.boolean().default(false),
+  /** A review's tags; empty on discussions or while spoiler-locked. */
+  reviewTags: z.array(reviewTagSchema).default([]),
   reactions: reactionCountsSchema,
   myReactions: z.array(reactionKindSchema),
 });
@@ -197,6 +212,7 @@ export const createPostRequestSchema = z
     chapter: z.number().int().min(1).max(999).nullable().default(null),
     quote: z.string().trim().max(POST_QUOTE_MAX).nullable().default(null),
     reviewRating: z.number().int().min(1).max(5).nullable().default(null),
+    reviewTags: z.array(reviewTagSchema).max(REVIEW_TAGS_MAX).default([]),
   })
   .refine(
     (input) =>
@@ -206,6 +222,12 @@ export const createPostRequestSchema = z
       path: ['body'],
       message: 'Book reviews need at least 30 characters and kind discussion.',
     },
+  )
+  .refine(
+    (input) =>
+      new Set(input.reviewTags).size === input.reviewTags.length &&
+      (input.reviewRating !== null || input.reviewTags.length === 0),
+    { path: ['reviewTags'], message: 'Tags are unique and only allowed on book reviews.' },
   );
 export type CreatePostRequest = z.input<typeof createPostRequestSchema>;
 export type CreatePostInput = z.output<typeof createPostRequestSchema>;

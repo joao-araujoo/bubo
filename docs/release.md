@@ -5,22 +5,23 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 
 ## Current remote state (keep this updated after every remote change)
 
-Last updated 2026-09-28 (Task 08 slice 1 deploy). Owner-facing checklist in Portuguese:
+Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Portuguese:
 [../CONFIGURAR.md](../CONFIGURAR.md).
 
 - **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
-  `a71892ff-995b-4e5a-a804-0af8a8d1c694`). The account's `workers.dev` subdomain `bubo-api` was
+  `95b22fbd-93a9-41ea-889b-042a4d7292fa`, 2026-09-30). The account's `workers.dev` subdomain `bubo-api` was
   registered automatically by the first deploy; renaming it changes every Worker URL on the account.
 - **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),
   `BETTER_AUTH_SECRET` (random, stored only in Cloudflare; rotating it signs everyone out),
   `BETTER_AUTH_URL` = the URL above. **Not set:** `RESEND_API_KEY`/`EMAIL_FROM` (password reset
   answers 503), `GOOGLE_BOOKS_API_KEY` (Google 429; Open Library/BrasilAPI answer),
-  `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`.
-- **Neon:** migrations `0001`–`0009` applied, 0 pending (`0009_club_polls_invites` on 2026-09-28). Production and the owner's local
+  `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`, `MODERATOR_USER_IDS` (the
+  moderation queue answers 403 to everyone until the owner adds their user id).
+- **Neon:** migrations `0001`–`0012` applied, 0 pending (`0010`–`0012` on 2026-09-30). Production and the owner's local
   `dev:api` share this database — split into a `production` branch before real users.
 - **Legacy tables in Neon:** about 40 empty tables that no Bubo migration created (`clubs`,
   `club_members`, `club_polls`, `content_reports`, `posts`, `blocks`, `works`, `editions`, …). They
-  are untouched. New Bubo tables must not reuse those names (hence `reading_club_*` in 0008 and 0009).
+  are untouched. New Bubo tables must not reuse those names (hence `reading_club_*` in 0008–0012).
 - **R2:** bucket `bubo` bound as `MEDIA`; public delivery not configured.
 - **Plan:** Workers Paid not confirmed (password hashing can exceed Free CPU limits under load).
 - **Expo Go vs production:** production trusts only `bubo://`; Expo Go (`exp://`) works only with a
@@ -30,6 +31,12 @@ Last updated 2026-09-28 (Task 08 slice 1 deploy). Owner-facing checklist in Port
   Comunidade flow with two accounts both passed; every test account was deleted.
 - **Smoke test (2026-09-28, Task 08):** private club + invite, polls, arguments, reactions,
   members, feed, report/restore, code rotation — 27/27 passed with two accounts, both deleted.
+- **Smoke test (2026-09-30, Task 08 slice 2):** catalog book, private club, review with tags
+  (lock, reveal, idempotent retry, invalid tags 422), friend request/accept, feed empty before
+  opt-in, sharing on, session shared without its reflection, `readingNow`, cycle start (member 403),
+  participation and close, moderation 403 and `isModerator` false, 401 without session — 28/28,
+  both accounts deleted. Catalog search is intermittent (Google 429 without a key, slow Open
+  Library), and this machine clock was ~15 s behind the Worker.
 - **Migration check:** use `npm run db:migrate:check` (read-only). Until 2026-09-28 the root
   `db:migrate -- --check` applied migrations because npm swallowed `--check`; fixed.
 
@@ -53,7 +60,7 @@ Last updated 2026-09-28 (Task 08 slice 1 deploy). Owner-facing checklist in Port
    # PowerShell: $env:DATABASE_URL="postgres://…"; npm run db:migrate
    DATABASE_URL="postgres://…" npm run db:migrate
    ```
-   Expected output lists only applied pending files (currently through `0007_shelf_entry_pages.sql`),
+   Expected output lists only applied pending files (currently through `0012_reader_friendships.sql`),
    or `migrations up to date`.
 3. Keep a Neon branch per environment. Never point development at production.
 

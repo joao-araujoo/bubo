@@ -154,6 +154,10 @@ export const clubPosts = pgTable(
     chapter: integer('chapter'),
     quote: text('quote'),
     reviewRating: integer('review_rating'),
+    reviewTags: text('review_tags')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
