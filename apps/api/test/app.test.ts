@@ -169,6 +169,16 @@ describe('GET /v1/openapi.json', () => {
       '/v1/reports',
       '/v1/blocks',
       '/v1/blocks/{userId}',
+      '/v1/community/feed',
+      '/v1/clubs/join',
+      '/v1/clubs/invite/{code}',
+      '/v1/clubs/{id}/invite-code',
+      '/v1/clubs/{id}/members',
+      '/v1/clubs/{id}/polls',
+      '/v1/clubs/{id}/polls/{pollId}',
+      '/v1/clubs/{id}/polls/{pollId}/vote',
+      '/v1/clubs/{id}/polls/{pollId}/argument',
+      '/v1/reactions',
     ]);
   });
 });

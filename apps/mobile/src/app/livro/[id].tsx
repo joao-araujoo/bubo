@@ -36,6 +36,7 @@ import {
 import { formatDuration } from '../../features/session/useFocusTimer';
 import { STATUS_META, STATUS_ORDER, shortDate } from '../../features/shelf/labels';
 import { MemoryPath } from '../../features/shelf/MemoryPath';
+import { BookClubReviews } from '../../features/community/BookClubReviews';
 import { ApiError } from '../../lib/api/client';
 import { dueLabel } from '../../features/recall/grades';
 import {
@@ -450,6 +451,7 @@ export default function BookScreen() {
       {/* Remount on status change (e.g. "Terminado" moves the page to the end). */}
       <ProgressEditor key={entry.status} entry={entry} userId={userId} />
       <SessionHistory sessions={sessions} />
+      <BookClubReviews userId={userId} bookId={entry.book.id} />
       <RecallCards entry={entry} cards={cards} userId={userId} />
       {remove.isError ? (
         <InlineMessage tone="error" message="Não foi possível remover agora." />

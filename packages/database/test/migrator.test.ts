@@ -41,6 +41,10 @@ describe('applyMigrations (PGlite)', () => {
       '0006_catalog.sql',
       '0007_shelf_entry_pages.sql',
       '0008_community.sql',
+      '0009_club_polls_invites.sql',
+      '0010_club_book_reviews.sql',
+      '0011_club_reading_cycles.sql',
+      '0012_reader_friendships.sql',
     ]);
   });
 
@@ -197,5 +201,58 @@ describe('reading sessions constraints', () => {
       `SELECT (SELECT count(*) FROM "reading_clubs") + (SELECT count(*) FROM "reading_club_posts") + (SELECT count(*) FROM "reading_club_reports")::int AS n`,
     );
     expect(Number(rows[0]?.n)).toBe(0);
+  });
+
+  it('enforces 0009 constraints: invite codes, poll options, reactions and report targets', async () => {
+    await applyMigrations(client(), loadMigrations());
+    await insertUser('u1');
+    await pg.query(
+      `INSERT INTO "books" ("id", "title", "catalog_key") VALUES ('b1', 'Duna', 'ol:1')`,
+    );
+    await pg.query(
+      `INSERT INTO "reading_clubs" ("id", "owner_user_id", "name", "icon", "book_id", "invite_code") VALUES ('c1', 'u1', 'Clube', 'planet', 'b1', 'ABCD2345')`,
+    );
+    const { rows } = await pg.query<{ visibility: string }>(
+      `SELECT "visibility" FROM "reading_clubs" WHERE "id" = 'c1'`,
+    );
+    expect(rows[0]?.visibility).toBe('public');
+    // Ambiguous characters (O, I, L, 0, 1) and duplicates are refused.
+    await expect(
+      pg.query(
+        `INSERT INTO "reading_clubs" ("id", "owner_user_id", "name", "icon", "book_id", "invite_code") VALUES ('c2', 'u1', 'Clube', 'planet', 'b1', 'ABCD234O')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      pg.query(
+        `INSERT INTO "reading_clubs" ("id", "owner_user_id", "name", "icon", "book_id", "invite_code") VALUES ('c3', 'u1', 'Clube', 'planet', 'b1', 'ABCD2345')`,
+      ),
+    ).rejects.toThrow();
+    await pg.query(
+      `INSERT INTO "reading_club_polls" ("id", "club_id", "author_user_id", "question", "spoiler_page", "closes_at") VALUES ('p1', 'c1', 'u1', 'Qual é o tema?', 0, now() + interval '3 days')`,
+    );
+    const option = (id: string, position: number) =>
+      pg.query(
+        `INSERT INTO "reading_club_poll_options" ("id", "poll_id", "position", "label") VALUES ($1, 'p1', $2, 'Opção')`,
+        [id, position],
+      );
+    await option('o1', 0);
+    await expect(option('o2', 0)).rejects.toThrow();
+    await expect(option('o3', 4)).rejects.toThrow();
+    const react = (kind: string) =>
+      pg.query(
+        `INSERT INTO "reading_club_reactions" ("user_id", "club_id", "target_type", "target_id", "kind") VALUES ('u1', 'c1', 'post', 'x', $1)`,
+        [kind],
+      );
+    await react('insight');
+    await expect(react('insight')).rejects.toThrow();
+    await expect(react('love')).rejects.toThrow();
+    const report = (type: string) =>
+      pg.query(
+        `INSERT INTO "reading_club_reports" ("id", "reporter_user_id", "club_id", "target_type", "target_id", "reason") VALUES ($1, 'u1', 'c1', $2, $1, 'spam')`,
+        [`r-${type}`, type],
+      );
+    await report('poll');
+    await report('argument');
+    await expect(report('club')).rejects.toThrow();
   });
 });

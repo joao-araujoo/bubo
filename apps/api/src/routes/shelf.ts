@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 
 import { type AppEnv } from '../env';
 import { parseJsonBody } from '../lib/validation';
-import { listEntryCards, listEntryReviews } from '../services/recall';
+import { entryReviewTotals, listEntryCards, listEntryReviews } from '../services/recall';
 import { listEntrySessions, recordSession } from '../services/sessions';
 import { type CatalogProvider, resolveCatalogBook } from './catalog';
 import {
@@ -49,6 +49,7 @@ export function shelfRoutes(deps: { now: () => Date; catalog: CatalogProvider })
       sessions: await listEntrySessions(db, user.id, entry.id),
       cards: await listEntryCards(db, user.id, entry.id, book.title),
       reviews: await listEntryReviews(db, user.id, entry.id),
+      reviewTotals: await entryReviewTotals(db, user.id, entry.id),
     });
   });
 

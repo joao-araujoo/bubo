@@ -134,6 +134,10 @@ export const shelfEntryDetailSchema = z.object({
   cards: z.array(recallCardSchema),
   /** Most recent reviews first. Defaults to [] for API versions without the field. */
   reviews: z.array(bookReviewSchema).default([]),
+  /** All graded attempts on this book's cards (not only the last 20). */
+  reviewTotals: z
+    .object({ total: z.number().int().nonnegative(), remembered: z.number().int().nonnegative() })
+    .default({ total: 0, remembered: 0 }),
 });
 export type ShelfEntryDetail = z.infer<typeof shelfEntryDetailSchema>;
 

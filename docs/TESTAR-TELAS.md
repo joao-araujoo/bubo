@@ -4,7 +4,7 @@ Lista de **todas as telas que existem hoje**, como chegar em cada uma e o que co
 terminar as configurações de [../CONFIGURAR.md](../CONFIGURAR.md). Status de cada tela frente ao
 Stitch: [screens.md](screens.md).
 
-Última atualização: 2026-09-27 (Task 07 — Comunidade). Total: 34 telas, mais 2 de desenvolvimento.
+Última atualização: 2026-09-28 (Task 08 — Comunidade parte 2). Total: 39 telas, mais 2 de desenvolvimento.
 
 ---
 
@@ -84,23 +84,56 @@ outra conta): uma cria o clube e escreve, a outra entra e vê o bloqueio anti-sp
 
 ## 5. Memória e progresso
 
+Continuação de 2026-09-30 — Você → Minha memória:
+
+- Alternar 7, 30, 90 e 365 dias, inclusive rapidamente e sem conexão.
+- Conferir carregamento, erro/retry e vazio de cada período, sem dados do filtro anterior.
+- Rolar o histórico diário; conferir datas, autoavaliações e totais.
+- Conferir foco mesmo sem revisões, horários locais e abrir cada livro listado.
+- Revisar um card e voltar: dados devem atualizar; trocar conta não pode mostrar a anterior.
+- Validar tema claro/escuro, fonte ampliada e leitor de tela em aparelho (aceite pendente).
+
 | #   | Tela                 | Como chegar                | O que conferir                                                                                             |
 | --- | -------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | 25  | Revisão "sem espiar" | Revisar → Ainda lembro?    | Tentar → mostrar → Lembrei/Quase/Esqueci; falha ao salvar mantém o card; resumo no fim.                    |
-| 26  | Minha memória        | Você → Minha memória       | 7 dias de Lembrei/Quase/Esqueci em gráfico; aviso "não é medida de retenção"; vazio explica como começar.  |
+| 26  | Minha memória        | Você → Minha memória       | 7/30/90/365 dias; gráfico, foco, horários, dados por livro; aviso de autoavaliações; vazio e retry.        |
 | 27  | Mural de conquistas  | Você → Mural de conquistas | Nível pelo XP real; 13 conquistas; bloqueadas mostram progresso (ex.: 3/10); nenhuma é dada sem atividade. |
 
-## 6. Comunidade (nova na Task 07) — use duas contas: **A** e **B**
+## 6. Comunidade (Tasks 07 e 08) — use duas contas: **A** e **B**
 
-| #   | Tela                | Como chegar                                    | O que conferir                                                                                                                                                                                                                        |
-| --- | ------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 28  | Comunidade (aba)    | Aba Comunidade                                 | Sem clubes: card do Bubo "Clubes sem spoiler". Busca por nome do clube ou do livro. "Meus clubes" separado de "Descobrir clubes".                                                                                                     |
-| 29  | Criar novo clube    | Comunidade → Criar um clube                    | Nome (3–60), proposta, ícone, livro **do catálogo** da sua Estante (livro manual não aparece), meta semanal. Limite de 5 clubes.                                                                                                      |
-| 30  | Clube               | Tocar num clube                                | **B (não membro):** vê o livro e "Entrar e aceitar as diretrizes"; ao entrar, o livro vai para a Estante dele. **Membro:** faixa "Blindagem anti-spoiler ativa" com a página. Menu ⋮: diretrizes, sair (membro) ou excluir (criador). |
-| 31  | Novo debate         | Clube → Novo debate                            | Título, página (com −10/−1/+1/+10), texto. Página maior que o livro é recusada. Página 0 = debate geral.                                                                                                                              |
-| 32  | Debate              | Tocar num debate                               | Respostas nunca têm página menor que o debate. Ações: Apagar (seu), Denunciar, Bloquear autor, e para o criador Remover/Restaurar.                                                                                                    |
-| 33  | Diretrizes do clube | Clube → ⋮ → Diretrizes, ou "Ler as diretrizes" | 4 regras, exemplo certo/errado, sua página atual, como funciona a moderação.                                                                                                                                                          |
-| 34  | Leitores bloqueados | Você → Leitores bloqueados                     | Lista quem você bloqueou; "Desbloquear" faz o conteúdo voltar.                                                                                                                                                                        |
+| #   | Tela                 | Como chegar                                                             | O que conferir                                                                                                                                                                                                                                                                                                                                      |
+| --- | -------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 28  | Comunidade (aba)     | Aba Comunidade                                                          | Abas "Feed Geral / Seus Clubes / Descobrir". Sem clubes: card do Bubo "Clubes sem spoiler". Feed: chips dos seus clubes, "Radar dos clubes" (novos nas últimas 24 h), debates e enquetes dos seus clubes, cobertos se passam da sua página. Descobrir: busca, filtros (Na sua estante, Com meta semanal, Mais ativos), caixa "Recebeu um convite?". |
+| 29  | Criar novo clube     | Comunidade → "+ Clube"                                                  | Nome (3–60), proposta, ícone, livro **do catálogo** da sua Estante (livro manual não aparece), meta semanal, **público ou privado**. Limite de 5 clubes.                                                                                                                                                                                            |
+| 30  | Clube                | Tocar num clube                                                         | **B (não membro):** perfil do clube (topo roxo, estatísticas, dica do Bubo com sua página) e "Entrar e aceitar as diretrizes"; ao entrar, o livro vai para a Estante dele. **Membro:** abas Debates & Fórum / Enquetes / Membros / Diretrizes. Menu ⋮: "Sobre o clube", sair (membro) ou excluir (criador).                                         |
+| 31  | Novo debate          | Clube → "Novo tópico"                                                   | Título, tipo de discussão, capítulo, página (com −10/−1/+1/+10), citação opcional, texto. Página maior que o livro é recusada. Página 0 = debate geral.                                                                                                                                                                                             |
+| 32  | Debate               | Tocar num debate                                                        | Tipo e âncora (Cap./Pág.), citação, reações (Fez pensar, Novo ponto, Bom contraponto — não dá para reagir ao próprio). Respostas nunca têm página menor que o debate. Ações: Apagar (seu), Denunciar, Bloquear autor, e para o criador Remover/Restaurar.                                                                                           |
+| 33  | Diretrizes do clube  | Clube → aba Diretrizes, ou "Ler as diretrizes" no perfil                | 4 regras, exemplo certo/errado, sua página atual, o criador como guardião, perguntas frequentes.                                                                                                                                                                                                                                                    |
+| 34  | Leitores bloqueados  | Você → Leitores bloqueados                                              | Lista quem você bloqueou; "Desbloquear" faz o conteúdo voltar.                                                                                                                                                                                                                                                                                      |
+| 35  | Nova enquete         | Clube → aba Enquetes → "Nova enquete"                                   | Pergunta (5+ letras), 2 a 4 opções diferentes, 3 ou 7 dias, única ou múltipla, página de bloqueio. Ao lançar, abre a enquete.                                                                                                                                                                                                                       |
+| 36  | Enquete & Resultados | Tocar numa enquete (feed ou aba Enquetes)                               | Antes de votar **não** aparecem percentuais. Votou → barras, % e votos; "Alterar meu voto". "Atualizado há Xs" enquanto aberta (atualiza a cada 15 s). Síntese do Bubo calculada dos votos. Argumentos: só depois de votar, um por pessoa, editável; reações; denunciar/bloquear/apagar.                                                            |
+| 37  | Membros              | Clube → aba Membros                                                     | Páginas reais de cada membro, média do clube, distribuição por faixa de páginas (a sua destacada), totais (páginas, discussões, votos), busca e filtros.                                                                                                                                                                                            |
+| 38  | Convidar membros     | Clube → ícone de pessoa com "+" no topo, ou "Convidar amigos" no perfil | QR de verdade, código ABCD-2345, link com "Copiar", WhatsApp/Telegram/E-mail/Mais. Só o criador vê "Gerar novo código" (o antigo para de funcionar).                                                                                                                                                                                                |
+| 39  | Abrir convite        | Link do convite, QR, ou Descobrir → "Recebeu um convite?"               | Mostra o perfil do clube (inclusive privado) e "Aceitar convite". Código errado/antigo: "Convite expirado". Se você já é membro, vai direto ao clube.                                                                                                                                                                                               |
+
+### Roteiro de convite e clube privado
+
+1. **A** cria um clube **privado** → **B** procura em Descobrir: o clube **não** aparece.
+2. **A** abre "Convidar membros" → copia o código (ou compartilha o link).
+3. **B** digita o código em Descobrir → "Recebeu um convite?" → vê o perfil → "Aceitar convite" →
+   entra no clube.
+4. **A** toca "Gerar novo código" → **B** (ou uma conta C) tenta o código antigo → "Convite
+   expirado".
+5. No aparelho com o app instalado (build EAS), a câmera lendo o QR abre o convite direto. No Expo
+   Go o link é `exp://…` e só funciona na mesma rede do computador.
+
+### Roteiro de enquete
+
+1. **A** cria uma enquete na página 0 com 2 opções. **B** abre: sem percentuais até votar.
+2. **B** vota → vê 100% na opção dele → escreve um argumento → **A** reage "Fez pensar" → o
+   contador sobe.
+3. **A** cria outra enquete na página 100 → para **B** (página 0) ela aparece coberta, sem a
+   pergunta, com "Revelar".
 
 ### Roteiro anti-spoiler (o teste mais importante da Comunidade)
 
@@ -135,8 +168,8 @@ outra conta): uma cria o clube e escreve, a outra entra e vê o bloqueio anti-sp
 
 ## 8. O que ainda não existe (não é defeito)
 
-- Comunidade: clubes privados e convites, membros e estatísticas do clube, enquetes, resenhas,
-  feed de amigos, notificações (Task 08).
-- Curva de retenção, Bubo Score, ciclos de leitura do clube.
+- Comunidade: resenhas, amigos e feed de amigos, ciclos de leitura do clube, notificações e caixa
+  de convites (Task 08, próximas etapas). Sugestões de amigos em "Convidar membros".
+- Curva de retenção e Bubo Score.
 - Configurações, notificações push, login com Google/Apple, verificação de e-mail, exportação de
   dados, recursos de IA.

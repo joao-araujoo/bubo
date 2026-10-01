@@ -102,6 +102,8 @@ export function createApp(deps: AppDeps = {}) {
     API_ROUTES.reports,
     API_ROUTES.blocks,
     `${API_ROUTES.blocks}/*`,
+    API_ROUTES.reactions,
+    '/community/*',
   ]) {
     app.use(`${API_PREFIX}${path}`, database, auth, requireSession);
   }

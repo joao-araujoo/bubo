@@ -5,19 +5,19 @@ depende de mais nada: o que está aqui é o que falta para o Bubo funcionar "per
 produção e nas lojas. Estado técnico detalhado: [docs/release.md](docs/release.md) → "Current
 remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
-Última atualização: 2026-09-27 (Task 07 — Comunidade).
+Última atualização: 2026-09-28 (Task 08 — Comunidade parte 2, etapa 1).
 
 ---
 
 ## 1. O que já está no ar (feito por mim, sem precisar de você)
 
-| Item                           | Estado                                                                                                                                                                         |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| API de produção                | `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`). `/v1/health` e `/v1/ready` respondem 200.                                                                         |
-| Banco Neon                     | Migrations `0001` a `0008` aplicadas, nenhuma pendente.                                                                                                                        |
-| Segredos no Cloudflare         | `DATABASE_URL`, `BETTER_AUTH_SECRET` (gerado aleatoriamente), `BETTER_AUTH_URL`.                                                                                               |
-| Armazenamento R2               | Bucket `bubo` existe e está ligado ao Worker como `MEDIA` (sem acesso público ainda).                                                                                          |
-| Testes automáticos em produção | Cadastro, catálogo, ISBN, sessões, cards, conquistas, clubes, debates anti-spoiler, denúncia, bloqueio e exclusão de conta: todos passaram. As contas de teste foram apagadas. |
+| Item                           | Estado                                                                                                                                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API de produção                | `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`). `/v1/health` e `/v1/ready` respondem 200.                                                                                                                                                  |
+| Banco Neon                     | Migrations `0001` a `0009` aplicadas, nenhuma pendente.                                                                                                                                                                                                 |
+| Segredos no Cloudflare         | `DATABASE_URL`, `BETTER_AUTH_SECRET` (gerado aleatoriamente), `BETTER_AUTH_URL`.                                                                                                                                                                        |
+| Armazenamento R2               | Bucket `bubo` existe e está ligado ao Worker como `MEDIA` (sem acesso público ainda).                                                                                                                                                                   |
+| Testes automáticos em produção | Cadastro, catálogo, ISBN, sessões, cards, conquistas, clubes, debates anti-spoiler, clube privado com convite, enquetes, argumentos, reações, membros, feed, denúncia, bloqueio e exclusão de conta: todos passaram. As contas de teste foram apagadas. |
 
 ---
 
@@ -173,6 +173,10 @@ e que exista um contato público. Falta:
    e o `EXPO_PUBLIC_API_URL` do EAS (3.3). Faça um novo build do app.
 3. Observação: o subdomínio `bubo-api.workers.dev` da sua conta foi registrado automaticamente no
    primeiro deploy. Trocar o nome dele muda a URL de todos os Workers da conta.
+4. **Links de convite em `https://`:** hoje o convite de clube é `bubo://convite/CODIGO` (abre o
+   app se ele estiver instalado) mais o código digitável. Um link `https://seu-dominio.com/convite/…`
+   que abre o app ou a loja precisa de um domínio com os arquivos de associação (Android App Links
+   e iOS Universal Links). Quando tiver o domínio, me avise.
 
 ### 3.11 Rotacionar credenciais antigas
 
@@ -206,8 +210,8 @@ Depois, siga o roteiro de telas em [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
 Para você não procurar o que ainda não foi feito:
 
-- Comunidade: clubes privados e convites, lista de membros, enquetes, resenhas, feed de amigos,
-  notificações (Task 08).
+- Comunidade: resenhas, amigos e feed de amigos, ciclos de leitura do clube, notificações e caixa
+  de convites, painel de moderação geral (próximas etapas da Task 08).
 - Curva de retenção e Bubo Score (precisam de um modelo de memória documentado).
 - Login com Google/Apple, verificação de e-mail, exportação de dados (LGPD).
 - Configurações e notificações push (Task 09). Recursos de IA (Gemini) dentro dos fluxos.

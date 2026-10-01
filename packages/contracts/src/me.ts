@@ -38,6 +38,7 @@ export const meResponseSchema = z.object({
   user: userSchema,
   profile: readerProfileSchema,
   onboardingCompleted: z.boolean(),
+  isModerator: z.boolean().default(false),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 

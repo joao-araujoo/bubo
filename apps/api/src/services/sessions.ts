@@ -78,8 +78,6 @@ export async function recordSession(
   input: CreateSessionRequest,
   now: Date,
 ): Promise<{ result: SessionResult; created: boolean }> {
-  assertPlausible(input, now);
-
   return db.transaction(async (tx) => {
     const [existing] = await tx
       .select()
@@ -90,6 +88,9 @@ export async function recordSession(
       if (existing.userId !== userId) throw new AppError('CONFLICT', 'Session id already used.');
       return { result: await resultFor(tx, userId, existing), created: false };
     }
+
+    // An already accepted UUID remains retryable after the 48-hour creation window.
+    assertPlausible(input, now);
 
     const { entry, book } = await findEntry(tx, userId, input.shelfEntryId);
     const startPage = entry.currentPage;

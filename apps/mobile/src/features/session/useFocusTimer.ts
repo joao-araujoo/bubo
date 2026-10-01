@@ -1,31 +1,14 @@
-import { MAX_SESSION_SECONDS } from '@bubo/domain';
+import {
+  MAX_SESSION_SECONDS,
+  focusElapsedMs,
+  pauseFocusClock,
+  resumeFocusClock,
+} from '@bubo/domain';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { type SessionDraft } from './draft-storage';
 
 const KEEP_AWAKE_TAG = 'bubo-focus-session';
-
-type TimerState = {
-  status: 'idle' | 'running' | 'paused';
-  /** Wall-clock time of the first start. */
-  startedAt: Date | null;
-  /** Focused milliseconds accumulated before the current run. */
-  accumulatedMs: number;
-  /** When the current run began (epoch ms), or null when not running. */
-  runningSince: number | null;
-};
-
-const INITIAL: TimerState = {
-  status: 'idle',
-  startedAt: null,
-  accumulatedMs: 0,
-  runningSince: null,
-};
-
-/** Focused time in ms. Uses timestamps (not tick counts), so it stays exact in the background. */
-export function focusedMs(state: TimerState, now: number): number {
-  const running = state.runningSince !== null ? now - state.runningSince : 0;
-  return Math.min(state.accumulatedMs + running, MAX_SESSION_SECONDS * 1000);
-}
 
 /** mm:ss, or h:mm:ss from one hour on. */
 export function formatDuration(totalSeconds: number): string {
@@ -38,78 +21,42 @@ export function formatDuration(totalSeconds: number): string {
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-/**
- * Focus timer for a reading session: start / pause / resume, keeps the screen awake while
- * running and stops at the 4-hour cap.
- */
-export function useFocusTimer() {
-  const [state, setState] = useState<TimerState>(INITIAL);
+/** Transitions are persisted before the UI confirms them. Ticks never write to disk. */
+export function useFocusTimer(
+  draft: SessionDraft,
+  persist: (draft: SessionDraft) => Promise<void>,
+) {
   const [now, setNow] = useState(() => Date.now());
-
+  const running = draft.runningSince !== null;
+  const elapsedMs = focusElapsedMs(draft, now);
+  const reachedCap = elapsedMs >= MAX_SESSION_SECONDS * 1000;
   useEffect(() => {
-    if (state.status !== 'running') return;
+    if (!running) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [state.status]);
-
-  useEffect(() => {
-    if (state.status !== 'running') return;
     activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
     return () => {
+      clearInterval(id);
       deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined);
     };
-  }, [state.status]);
+  }, [running]);
 
-  const elapsedMs = focusedMs(state, now);
-  const reachedCap = elapsedMs >= MAX_SESSION_SECONDS * 1000;
-
-  const pause = useCallback(() => {
-    setState((s) => {
-      if (s.status !== 'running' || s.runningSince === null) return s;
-      const stamp = Date.now();
-      return { ...s, status: 'paused', accumulatedMs: focusedMs(s, stamp), runningSince: null };
-    });
-    setNow(Date.now());
-  }, []);
-
-  useEffect(() => {
-    if (reachedCap && state.status === 'running') pause();
-  }, [reachedCap, state.status, pause]);
-
-  const start = useCallback(() => {
+  async function pause() {
     const stamp = Date.now();
+    await persist({ ...draft, ...pauseFocusClock(draft, stamp) });
     setNow(stamp);
-    setState((s) => {
-      if (s.status === 'running') return s;
-      return {
-        ...s,
-        status: 'running',
-        startedAt: s.startedAt ?? new Date(stamp),
-        runningSince: stamp,
-      };
-    });
-  }, []);
-
-  /** Freezes the timer and returns its final values (for saving the session). */
-  const finish = useCallback(() => {
+  }
+  async function start() {
     const stamp = Date.now();
-    const final = {
-      ...state,
-      accumulatedMs: focusedMs(state, stamp),
-      runningSince: null,
-      status: 'paused' as const,
-    };
-    setState(final);
+    await persist({ ...draft, ...resumeFocusClock(draft, stamp) });
     setNow(stamp);
-    return {
-      startedAt: final.startedAt ?? new Date(stamp),
-      endedAt: new Date(stamp),
-      focusedSeconds: Math.floor(final.accumulatedMs / 1000),
-    };
-  }, [state]);
-
+  }
+  async function finish() {
+    const stamp = Date.now();
+    await persist({ ...draft, ...pauseFocusClock(draft, stamp), endedAt: stamp });
+    setNow(stamp);
+  }
   return {
-    status: state.status,
+    status: draft.startedAt === null ? 'idle' : running && !reachedCap ? 'running' : 'paused',
     elapsedSeconds: Math.floor(elapsedMs / 1000),
     reachedCap,
     start,

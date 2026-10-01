@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const achievementSchema = z.object({
   id: z.string(),
   category: z.enum(['reading', 'memory', 'consistency']),
+  tier: z.enum(['bronze', 'silver', 'gold', 'diamond']),
   title: z.string(),
   description: z.string(),
   progress: z.number().int().nonnegative(),

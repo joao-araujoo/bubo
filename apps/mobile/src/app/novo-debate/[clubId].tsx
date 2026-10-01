@@ -1,23 +1,28 @@
-import { POST_BODY_MAX, POST_TITLE_MAX } from '@bubo/contracts';
-import { MAX_BOOK_PAGES } from '@bubo/domain';
+import { POST_BODY_MAX, POST_QUOTE_MAX, POST_TITLE_MAX } from '@bubo/contracts';
+import { MAX_BOOK_PAGES, type TopicKind } from '@bubo/domain';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import {
   BookCover,
-  BuboMascot,
+  BuboTip,
   Button,
   Card,
-  Chip,
   EmptyState,
   FormScreen,
   Icon,
+  IconTile,
   InlineMessage,
+  Pill,
+  Raised,
+  Stepper,
   Text,
   TextField,
+  Toggle,
 } from '../../design-system';
+import { membersLabel, TOPIC_KIND_CHOICES, TOPIC_KIND_META } from '../../features/community/meta';
 import { ApiError } from '../../lib/api/client';
 import { useClub, useCreateClubPost } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
@@ -39,19 +44,23 @@ export default function NewTopicScreen() {
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [kind, setKind] = useState<TopicKind>('philosophical');
+  const [chapter, setChapter] = useState('');
   const [page, setPage] = useState<string | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quote, setQuote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (club.isPending) {
     return (
-      <FormScreen title="Novo debate">
+      <FormScreen leading="close" title="Novo tópico de debate">
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando clube" />
       </FormScreen>
     );
   }
   if (club.isError || !club.data.membership) {
     return (
-      <FormScreen title="Novo debate">
+      <FormScreen leading="close" title="Novo tópico de debate">
         <EmptyState
           mascot="notFound"
           title="Entre no clube para debater"
@@ -66,12 +75,8 @@ export default function NewTopicScreen() {
   const maxPage = data.book.totalPages ?? MAX_BOOK_PAGES;
   const pageText = page ?? String(readerPage);
   const pageNumber = /^\d+$/.test(pageText.trim()) ? Number(pageText.trim()) : null;
-
-  function step(delta: number) {
-    const next = Math.min(maxPage, Math.max(0, (pageNumber ?? readerPage) + delta));
-    haptics.selection();
-    setPage(String(next));
-  }
+  const chapterNumber =
+    chapter.trim() === '' ? null : /^\d+$/.test(chapter.trim()) ? Number(chapter.trim()) : NaN;
 
   async function publish() {
     if (title.trim().length < 3) {
@@ -86,6 +91,13 @@ export default function NewTopicScreen() {
       setError(`Informe uma página entre 0 e ${maxPage}.`);
       return;
     }
+    if (
+      Number.isNaN(chapterNumber) ||
+      (chapterNumber !== null && (chapterNumber < 1 || chapterNumber > 999))
+    ) {
+      setError('O capítulo precisa ser um número de 1 a 999 (ou deixe em branco).');
+      return;
+    }
     setError(null);
     try {
       const post = await create.mutateAsync({
@@ -93,6 +105,9 @@ export default function NewTopicScreen() {
         title: title.trim(),
         body: body.trim(),
         spoilerPage: pageNumber,
+        kind,
+        chapter: chapterNumber,
+        quote: quoteOpen && quote.trim() ? quote.trim() : null,
       });
       haptics.success();
       router.replace({
@@ -105,33 +120,22 @@ export default function NewTopicScreen() {
         e instanceof ApiError && e.code === 'RATE_LIMITED'
           ? 'Muitas publicações seguidas. Espere um minuto.'
           : e instanceof ApiError && e.code === 'VALIDATION_FAILED'
-            ? 'Confira o título, o texto e a página.'
+            ? 'Confira o título, o texto, o capítulo e a página.'
             : 'Não foi possível publicar agora. Tente de novo.',
       );
     }
   }
 
-  const stepper = (delta: number, label: string) => (
-    <Button
-      label={label}
-      variant="secondary"
-      size="md"
-      compact
-      style={{ flex: 1 }}
-      onPress={() => step(delta)}
-      accessibilityHint={`${delta > 0 ? 'Aumenta' : 'Diminui'} a página em ${Math.abs(delta)}`}
-    />
-  );
-
   return (
     <FormScreen
-      title="Novo debate"
-      eyebrow={data.name}
+      leading="close"
+      title="Novo tópico de debate"
+      eyebrow="Clube de leitura"
       footer={
         <>
           {error ? <InlineMessage tone="error" message={error} /> : null}
           <Button
-            label="Publicar debate"
+            label="Publicar debate no clube"
             icon="campaign"
             fullWidth
             loading={create.isPending}
@@ -148,86 +152,252 @@ export default function NewTopicScreen() {
             coverUrls={data.book.coverUrls}
             width={48}
           />
-          <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-            <Text variant="bodyStrong" numberOfLines={2}>
-              {data.book.title}
+          <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <Icon name="group" size={15} color="accentText" />
+              <Text variant="bodySm" color="accentText" numberOfLines={1} style={{ flex: 1 }}>
+                {`${data.name} • ${membersLabel(data.memberCount)}`}
+              </Text>
+            </View>
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {[data.book.author, data.book.totalPages ? `${data.book.totalPages} páginas` : null]
+                .filter(Boolean)
+                .join(' • ') || data.book.title}
             </Text>
-            <Chip label={`Seu progresso: pág. ${readerPage}`} tone="primary" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                Seu progresso atual:
+              </Text>
+              <Pill label={`Página ${readerPage}`} />
+            </View>
           </View>
         </View>
       </Card>
 
-      <Card tone="muted">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-          <BuboMascot state="recallPrompt" size={72} />
-          <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-            <Text variant="caption" color="accentText">
-              Mediação do Bubo
-            </Text>
-            <Text variant="bodySm">
-              Informe a página exata de que o debate fala. Quem ainda não chegou lá vê só um aviso.
-            </Text>
-          </View>
-        </View>
-      </Card>
+      <BuboTip state="recallPrompt" caps={false} title="Mediação do Bubo">
+        Informe o capítulo e a página exata do debate. O Bubo ativa a blindagem automática para os
+        colegas que ainda não chegaram aí!
+      </BuboTip>
 
       <Card>
-        <TextField
-          label="Pergunta ou título do debate"
-          placeholder="Ex.: A presciência de Paul é uma prisão?"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={POST_TITLE_MAX}
-        />
         <View style={{ gap: theme.spacing.xs }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+            <Text variant="label" style={{ flex: 1 }}>
+              Pergunta ou título do debate
+              <Text variant="label" color="accentText">
+                {' *'}
+              </Text>
+            </Text>
+            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+              Provocação reflexiva
+            </Text>
+          </View>
           <TextField
-            label="Página do livro"
-            keyboardType="number-pad"
-            value={pageText}
-            onChangeText={setPage}
-            hint={
-              data.book.totalPages
-                ? `de ${data.book.totalPages}. Use 0 para um debate geral.`
-                : 'Use 0 para um debate geral.'
-            }
+            label="Pergunta ou título do debate"
+            hideLabel
+            placeholder="A presciência de Paul é uma prisão trágica ou…"
+            value={title}
+            onChangeText={setTitle}
+            maxLength={POST_TITLE_MAX}
           />
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            {stepper(-10, '−10')}
-            {stepper(-1, '−1')}
-            {stepper(1, '+1')}
-            {stepper(10, '+10')}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+          <Text variant="label" style={{ flex: 1 }}>
+            Tipo de discussão
+          </Text>
+          <Text variant="bodySm" color="accentText" style={{ fontSize: 12 }}>
+            Selecione 1
+          </Text>
+        </View>
+        <View
+          accessibilityRole="radiogroup"
+          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}
+        >
+          {TOPIC_KIND_CHOICES.map((option) => {
+            const meta = TOPIC_KIND_META[option];
+            const selected = option === kind;
+            return (
+              <Pressable
+                key={option}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={meta.label}
+                style={{ width: '48%' }}
+                onPress={() => {
+                  haptics.selection();
+                  setKind(option);
+                }}
+              >
+                {({ pressed }) => (
+                  <Raised
+                    faceColor={selected ? theme.colors.surfaceMuted : theme.colors.surface}
+                    borderColor={selected ? theme.colors.primary : theme.colors.border}
+                    rimColor={selected ? theme.colors.primaryRim : theme.colors.secondaryRim}
+                    radius={theme.radii.lg}
+                    depth={3}
+                    pressed={pressed}
+                    faceStyle={{
+                      alignItems: 'center',
+                      gap: theme.spacing.xs,
+                      paddingVertical: theme.spacing.md,
+                    }}
+                  >
+                    <Icon
+                      name={meta.icon}
+                      size={24}
+                      color={selected ? 'accentText' : 'textMuted'}
+                    />
+                    <Text variant="label" color={selected ? 'accentText' : 'text'} align="center">
+                      {meta.label}
+                    </Text>
+                  </Raised>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View
+          style={{
+            gap: theme.spacing.md,
+            padding: theme.spacing.md,
+            borderRadius: theme.radii.lg,
+            borderWidth: 1,
+            borderColor: theme.colors.primarySoft,
+            backgroundColor: theme.colors.surfaceMuted,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Icon name="bookmark-border" size={20} color="accentText" />
+            <Text variant="label" style={{ flex: 1 }}>
+              Ponto do livro
+            </Text>
+            <Pill label="Base da blindagem" />
+          </View>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-end' }}>
+            <View style={{ width: 104 }}>
+              <TextField
+                label="Capítulo"
+                keyboardType="number-pad"
+                placeholder="—"
+                value={chapter}
+                onChangeText={setChapter}
+                maxLength={3}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Stepper
+                label="Página"
+                value={pageText}
+                onChangeText={setPage}
+                max={maxPage}
+                suffix={data.book.totalPages ? `de ${data.book.totalPages}` : undefined}
+              />
+            </View>
           </View>
         </View>
-        <TextField
-          label="Sua argumentação ou reflexão"
-          placeholder="O que você pensa sobre isso?"
-          value={body}
-          onChangeText={setBody}
-          maxLength={POST_BODY_MAX}
-          multiline
-          textAlignVertical="top"
-        />
-      </Card>
 
-      <View
-        style={{
-          flexDirection: 'row',
-          gap: theme.spacing.md,
-          alignItems: 'center',
-          padding: theme.spacing.lg,
-          borderRadius: theme.radii.card,
-          borderWidth: theme.sizes.borderWidth,
-          borderColor: theme.colors.primary,
-          backgroundColor: theme.colors.primarySoft,
-        }}
-      >
-        <Icon name="shield" size={28} color="accentText" />
-        <Text variant="bodySm" color="accentText" style={{ flex: 1 }}>
-          {pageNumber && pageNumber > 0
-            ? `Escudo anti-spoiler: leitores antes da pág. ${pageNumber} verão só um aviso.`
-            : 'Debate geral (pág. 0): visível para todos os membros. Não conte o que acontece no livro.'}
-        </Text>
-      </View>
+        <View style={{ gap: theme.spacing.xs }}>
+          <Text variant="label">
+            Sua argumentação ou reflexão
+            <Text variant="label" color="accentText">
+              {' *'}
+            </Text>
+          </Text>
+          <TextField
+            label="Sua argumentação ou reflexão"
+            hideLabel
+            placeholder="Ao observar a transformação de Paul no deserto, fica claro que…"
+            value={body}
+            onChangeText={setBody}
+            maxLength={POST_BODY_MAX}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+
+        {quoteOpen ? (
+          <TextField
+            label="Citação do trecho (opcional)"
+            icon="format-quote"
+            placeholder="“Não terei medo. O medo é o assassino da mente…”"
+            value={quote}
+            onChangeText={setQuote}
+            maxLength={POST_QUOTE_MAX}
+            multiline
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Vincular citação do trecho"
+            onPress={() => setQuoteOpen(true)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.md,
+              minHeight: theme.sizes.touchTarget,
+              padding: theme.spacing.md,
+              borderRadius: theme.radii.lg,
+              borderWidth: 1,
+              borderStyle: 'dashed',
+              borderColor: theme.colors.purpleLight,
+            }}
+          >
+            <Icon name="format-quote" size={22} color="accentText" />
+            <View style={{ flex: 1 }}>
+              <Text variant="label">Vincular citação do trecho</Text>
+              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                Um trecho curto da página, para ancorar o debate
+              </Text>
+            </View>
+            <Text variant="label" color="accentText">
+              Adicionar
+            </Text>
+          </Pressable>
+        )}
+
+        <View
+          style={{
+            gap: theme.spacing.md,
+            padding: theme.spacing.md,
+            borderRadius: theme.radii.lg,
+            borderWidth: theme.sizes.borderWidth,
+            borderColor: theme.colors.purpleLight,
+            backgroundColor: theme.colors.surfaceMuted,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+            <IconTile icon="shield" size={40} solid />
+            <View style={{ flex: 1 }}>
+              <Toggle
+                title="Escudo anti-spoiler ativo"
+                description={`Protege quem está antes da pág. ${pageNumber ?? 0}`}
+                value
+                locked
+              />
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: theme.spacing.sm,
+              padding: theme.spacing.md,
+              borderRadius: theme.radii.md,
+              borderWidth: 1,
+              borderColor: theme.colors.primarySoft,
+              backgroundColor: theme.colors.surface,
+            }}
+          >
+            <Icon name="verified-user" size={18} color="accentText" />
+            <Text variant="bodySm" color="accentText" style={{ flex: 1 }}>
+              {pageNumber && pageNumber > 0
+                ? `O conteúdo recebe o véu protetor automático para leitores abaixo da página ${pageNumber}.`
+                : 'Página 0: debate geral, visível para todos os membros. Não conte o que acontece no livro.'}
+            </Text>
+          </View>
+        </View>
+      </Card>
     </FormScreen>
   );
 }

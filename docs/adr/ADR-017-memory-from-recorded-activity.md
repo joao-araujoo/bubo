@@ -27,14 +27,21 @@ activity (ADR-014).
 - The grade split (Lembrei ≥ 4, Quase = 3, Esqueci ≤ 2) is `reviewOutcome` in `@bubo/domain` and
   matches the SQL in `getMemoryStats`.
 
+## Extension — 2026-09-30
+
+The existing API supports bounded 7/30/90/365-day windows, per-book counts, local day
+parts and reading focus. Mobile now exposes these periods, scrollable daily columns and
+links to book details. Cache includes user, date, period and device UTC offset. Focus is
+visible even without reviews; current card inventory is separate from period activity.
+Self-assessments do not imply retention or an optimal learning time. Device acceptance
+remains pending.
+
 ## Not done (deliberately)
 
 - Retention curve, per-book retention percentage and the Bubo Score: need a documented model
   (for example FSRS-style stability from review history) and its own ADR before any number is
   shown.
 - Fixed "Fase 1…5" labels from Stitch: they would imply a programme the reader did not follow.
-- 30-day / quarter ranges: the endpoint is bounded to seven days; wider windows need an
-  aggregated query with a bounded range parameter.
 
 ## Consequences
 

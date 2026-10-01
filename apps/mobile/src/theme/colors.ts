@@ -34,6 +34,15 @@ export const palette = {
   nightText: '#F4EEFF',
   nightTextMuted: '#B3A9C9',
   purpleOnDark: '#C4B5FD',
+  /** Stitch secondary (#6E3ACA): eyebrows and headings on lavender. */
+  purpleInk: '#6E3ACA',
+  purpleNight: '#3B1680',
+  greenInk: '#0B7A3B',
+  greenSoft: '#E3F9EC',
+  amberInk: '#9A5B00',
+  redInk: '#BA1A1A',
+  blue: '#3B82F6',
+  blueSoft: '#E6EEFF',
   transparent: 'transparent',
 } as const;
 
@@ -68,6 +77,25 @@ export type ColorTokens = {
   orangeSoft: string;
   scrim: string;
   cardShadow: string;
+  /** Uppercase eyebrows and small headings (Stitch secondary). */
+  accentDeep: string;
+  /** Text/icons on soft green, amber and red pills (readable contrast). */
+  successText: string;
+  successSoft: string;
+  warningText: string;
+  errorText: string;
+  /** Blue icon backplate (Stitch "Meta semanal", "Páginas lidas"). */
+  blue: string;
+  blueSoft: string;
+  /** Purple hero gradient (club profile, memory index). */
+  heroStart: string;
+  heroEnd: string;
+  /** Decorative circles and muted text on the purple hero. */
+  heroGlow: string;
+  heroGlowSoft: string;
+  onHeroMuted: string;
+  /** Top highlight stripe of the 16 pt progress "tube" (DESIGN.md §4). */
+  tubeHighlight: string;
   transparent: string;
 };
 
@@ -102,6 +130,19 @@ export const lightColors: ColorTokens = {
   orangeSoft: palette.orangeSoft,
   scrim: 'rgba(33, 21, 47, 0.5)',
   cardShadow: palette.line,
+  accentDeep: palette.purpleInk,
+  successText: palette.greenInk,
+  successSoft: palette.greenSoft,
+  warningText: palette.amberInk,
+  errorText: palette.redInk,
+  blue: palette.blue,
+  blueSoft: palette.blueSoft,
+  heroStart: palette.purple,
+  heroEnd: palette.purpleNight,
+  heroGlow: 'rgba(255, 255, 255, 0.10)',
+  heroGlowSoft: 'rgba(255, 255, 255, 0.06)',
+  onHeroMuted: 'rgba(255, 255, 255, 0.82)',
+  tubeHighlight: 'rgba(255, 255, 255, 0.35)',
   transparent: palette.transparent,
 };
 
@@ -136,8 +177,24 @@ export const darkColors: ColorTokens = {
   orangeSoft: '#3B2415',
   scrim: 'rgba(0, 0, 0, 0.6)',
   cardShadow: '#0C0714',
+  accentDeep: palette.purpleOnDark,
+  successText: '#6EE7A0',
+  successSoft: '#133A25',
+  warningText: '#FFC96B',
+  errorText: '#FF9A9A',
+  blue: '#7FB0FF',
+  blueSoft: '#1B2A4A',
+  heroStart: palette.purpleDeep,
+  heroEnd: palette.purpleNight,
+  heroGlow: 'rgba(255, 255, 255, 0.08)',
+  heroGlowSoft: 'rgba(255, 255, 255, 0.05)',
+  onHeroMuted: 'rgba(255, 255, 255, 0.78)',
+  tubeHighlight: 'rgba(255, 255, 255, 0.22)',
   transparent: palette.transparent,
 };
+
+/** QR codes stay dark-on-light in both themes: many scanners fail on inverted codes. */
+export const qrPalette = { dark: palette.ink, light: palette.white } as const;
 
 /**
  * Typographic fallback covers (BookCover), after the Stitch "Descobrir" covers: a deep, saturated

@@ -42,6 +42,8 @@ export const serverEnvSchema = z
     /** Google Books identification; keyless requests are best-effort and may have zero quota. */
     GOOGLE_BOOKS_API_KEY: optionalString,
     CATALOG_CONTACT_EMAIL: optionalString.pipe(z.email().optional()),
+    /** Explicit user ids allowed to review reported community content; empty disables access. */
+    MODERATOR_USER_IDS: optionalString,
     MEDIA_PUBLIC_URL: optionalUrl.pipe(
       z
         .string()

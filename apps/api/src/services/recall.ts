@@ -193,6 +193,25 @@ export async function listEntryReviews(
   );
 }
 
+/** All graded attempts on this book's cards (owner-scoped). */
+export async function entryReviewTotals(db: Executor, userId: string, entryId: string) {
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*)`.mapWith(Number),
+      remembered: sql<number>`count(*) filter (where ${reviewLogs.grade} >= 4)`.mapWith(Number),
+    })
+    .from(reviewLogs)
+    .innerJoin(recallCards, eq(recallCards.id, reviewLogs.cardId))
+    .where(
+      and(
+        eq(reviewLogs.userId, userId),
+        eq(recallCards.userId, userId),
+        eq(recallCards.shelfEntryId, entryId),
+      ),
+    );
+  return { total: row?.total ?? 0, remembered: row?.remembered ?? 0 };
+}
+
 /**
  * Grades one recall attempt and reschedules the card with SM-2. Idempotent on the client id.
  * Reviewing before the due date is refused (it would distort the schedule).

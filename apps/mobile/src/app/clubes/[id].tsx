@@ -1,83 +1,81 @@
-import { readingProgress } from '@bubo/domain';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView } from 'react-native';
 
 import {
-  BookCover,
   Button,
-  Card,
-  Chip,
   EmptyState,
   FormScreen,
   HeaderButton,
-  Icon,
   InlineMessage,
-  LinkButton,
-  ProgressBar,
-  SectionHeader,
-  Text,
+  TabChip,
 } from '../../design-system';
-import { ClubBadge } from '../../features/community/ClubBadge';
-import { membersLabel, topicsLabel } from '../../features/community/meta';
-import { PostCard } from '../../features/community/PostCard';
-import {
-  useClub,
-  useClubPosts,
-  useDeleteClub,
-  useJoinClub,
-  useLeaveClub,
-} from '../../lib/api/queries';
+import { BookStrip } from '../../features/community/BookStrip';
+import { ClubProfile } from '../../features/community/club/ClubProfile';
+import { ForumTab } from '../../features/community/club/ForumTab';
+import { BookReviewsTab } from '../../features/community/club/BookReviewsTab';
+import { CyclesTab } from '../../features/community/club/CyclesTab';
+import { GuidelinesTab } from '../../features/community/club/GuidelinesTab';
+import { MembersTab } from '../../features/community/club/MembersTab';
+import { PollsTab } from '../../features/community/club/PollsTab';
+import { useClub, useDeleteClub, useJoinClub, useLeaveClub } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
 
+type Tab = 'forum' | 'resenhas' | 'ciclos' | 'enquetes' | 'membros' | 'diretrizes';
+const TABS: Tab[] = ['forum', 'resenhas', 'ciclos', 'enquetes', 'membros', 'diretrizes'];
+
 /**
- * Club profile + debates (Stitch `bubo_perfil_do_clube_de_leitura_mobile_1` and
- * `bubo_clubes_anti_spoiler_mobile`). Every number is real; locked topics carry no text.
+ * A club (Stitch "Clube de leitura: fórum & enquetes", "Membros & estatísticas", "Diretrizes &
+ * blindagem", "Perfil do clube"). Members land on the forum; visitors on the profile.
  */
 export default function ClubScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const clubId = typeof id === 'string' ? id : '';
+  const params = useLocalSearchParams<{ id: string; tab?: string; view?: string }>();
+  const clubId = typeof params.id === 'string' ? params.id : '';
+  const initialTab = TABS.includes(params.tab as Tab) ? (params.tab as Tab) : 'forum';
+  const [tab, setTab] = useState<Tab>(initialTab);
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : '';
   const club = useClub(userId || undefined, clubId);
-  const isMember = Boolean(club.data?.membership);
-  const posts = useClubPosts(userId || undefined, clubId, isMember);
-  const join = useJoinClub(userId, clubId);
+  const join = useJoinClub(userId);
   const leave = useLeaveClub(userId, clubId);
   const remove = useDeleteClub(userId, clubId);
 
   if (club.isPending) {
     return (
-      <FormScreen title="Clube de leitura">
+      <FormScreen title="Clube de leitura" align="left">
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando clube" />
       </FormScreen>
     );
   }
   if (club.isError) {
     return (
-      <FormScreen title="Clube de leitura">
+      <FormScreen title="Clube de leitura" align="left">
         <EmptyState
           mascot="notFound"
           title="Clube não encontrado"
-          description="Ele pode ter sido excluído pelo criador."
+          description="Ele pode ter sido excluído, ou é privado e só abre com um convite."
         />
       </FormScreen>
     );
   }
 
   const data = club.data;
-  const isOwner = data.membership === 'owner';
-  const readerPage = data.readerPage ?? 0;
-  const progress = readingProgress(readerPage, data.book.totalPages ?? 0);
-  const openTopic = (postId: string, reveal = false) =>
-    router.push({
-      pathname: '/debates/[clubId]/[postId]',
-      params: reveal ? { clubId, postId, reveal: '1' } : { clubId, postId },
+  const member = data.membership !== null;
+  const owner = data.membership === 'owner';
+  const showProfile = !member || params.view === 'perfil';
+  const invite = () => router.push({ pathname: '/convidar/[clubId]', params: { clubId } });
+  const joinClub = () =>
+    join.mutate(clubId, {
+      onSuccess: () => {
+        haptics.success();
+        router.setParams({ view: undefined });
+      },
+      onError: () => haptics.error(),
     });
-  const guidelines = () => router.push({ pathname: '/diretrizes/[clubId]', params: { clubId } });
 
   const confirmLeave = () =>
     Alert.alert('Sair do clube?', 'Seus debates continuam lá. Você pode voltar quando quiser.', [
@@ -87,19 +85,6 @@ export default function ClubScreen() {
         style: 'destructive',
         onPress: () =>
           leave.mutate(undefined, {
-            onSuccess: () => haptics.success(),
-            onError: () => haptics.error(),
-          }),
-      },
-    ]);
-  const confirmDelete = () =>
-    Alert.alert('Excluir o clube?', 'Todos os debates e respostas serão apagados para sempre.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: () =>
-          remove.mutate(undefined, {
             onSuccess: () => {
               haptics.success();
               router.back();
@@ -108,198 +93,212 @@ export default function ClubScreen() {
           }),
       },
     ]);
+  const confirmDelete = () =>
+    Alert.alert(
+      'Excluir o clube?',
+      'Todos os debates, enquetes e respostas serão apagados para sempre.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () =>
+            remove.mutate(undefined, {
+              onSuccess: () => {
+                haptics.success();
+                router.back();
+              },
+              onError: () => haptics.error(),
+            }),
+        },
+      ],
+    );
   const menu = () =>
     Alert.alert(data.name, undefined, [
-      { text: 'Diretrizes do clube', onPress: guidelines },
-      isOwner
+      showProfile
+        ? { text: 'Voltar ao fórum', onPress: () => router.setParams({ view: undefined }) }
+        : { text: 'Sobre o clube', onPress: () => router.setParams({ view: 'perfil' }) },
+      owner
         ? { text: 'Excluir clube', style: 'destructive', onPress: confirmDelete }
         : { text: 'Sair do clube', style: 'destructive', onPress: confirmLeave },
       { text: 'Cancelar', style: 'cancel' },
     ]);
 
+  const headerRight = member ? (
+    <>
+      <HeaderButton
+        icon="person-add"
+        label="Convidar membros"
+        shape="square"
+        iconColor="accentText"
+        onPress={invite}
+      />
+      <HeaderButton icon="more-vert" label="Opções do clube" shape="square" onPress={menu} />
+    </>
+  ) : null;
+
+  if (showProfile && tab !== 'diretrizes') {
+    return (
+      <FormScreen
+        align="left"
+        eyebrow="Clube de leitura"
+        eyebrowDot
+        title={data.name}
+        headerRight={headerRight}
+        footer={
+          member ? undefined : (
+            <>
+              {join.isError ? (
+                <InlineMessage tone="error" message="Não foi possível entrar agora." />
+              ) : null}
+              <Button
+                label="Entrar e aceitar as diretrizes"
+                icon="group-add"
+                fullWidth
+                loading={join.isPending}
+                onPress={joinClub}
+              />
+            </>
+          )
+        }
+      >
+        <ClubProfile
+          club={data}
+          joining={join.isPending}
+          onJoin={joinClub}
+          onInvite={invite}
+          onGuidelines={() => {
+            setTab('diretrizes');
+            if (member) router.setParams({ view: undefined });
+          }}
+        />
+      </FormScreen>
+    );
+  }
+
+  if (!member) {
+    return (
+      <FormScreen
+        align="left"
+        eyebrow="Clube de leitura"
+        title="Diretrizes & blindagem"
+        headerRight={
+          <HeaderButton
+            icon="info-outline"
+            label="Voltar ao perfil do clube"
+            shape="square"
+            iconColor="accentText"
+            onPress={() => setTab('forum')}
+          />
+        }
+        footer={
+          <Button
+            label="Entrar e aceitar as diretrizes"
+            icon="group-add"
+            fullWidth
+            loading={join.isPending}
+            onPress={joinClub}
+          />
+        }
+      >
+        <GuidelinesTab club={data} ownerName={data.ownerName} />
+      </FormScreen>
+    );
+  }
+
+  const floating =
+    tab === 'forum' ? (
+      <Button
+        label="Novo tópico"
+        icon="add-comment"
+        size="md"
+        onPress={() => router.push({ pathname: '/novo-debate/[clubId]', params: { clubId } })}
+      />
+    ) : tab === 'enquetes' ? (
+      <Button
+        label="Nova enquete"
+        icon="how-to-vote"
+        size="md"
+        onPress={() => router.push({ pathname: '/nova-enquete/[clubId]', params: { clubId } })}
+      />
+    ) : undefined;
+
   return (
     <FormScreen
-      title={data.name}
+      align="left"
       eyebrow="Clube de leitura"
-      headerRight={
-        isMember ? <HeaderButton icon="more-vert" label="Opções do clube" onPress={menu} /> : null
-      }
-      footer={
-        isMember ? (
-          <Button
-            label="Novo debate"
-            icon="add-comment"
-            fullWidth
-            onPress={() => router.push({ pathname: '/novo-debate/[clubId]', params: { clubId } })}
-          />
-        ) : (
-          <>
-            {join.isError ? (
-              <InlineMessage tone="error" message="Não foi possível entrar agora." />
-            ) : null}
-            <Button
-              label="Entrar e aceitar as diretrizes"
-              icon="group-add"
-              fullWidth
-              loading={join.isPending}
-              onPress={() =>
-                join.mutate(undefined, {
-                  onSuccess: () => haptics.success(),
-                  onError: () => haptics.error(),
-                })
-              }
-            />
-          </>
-        )
-      }
+      eyebrowDot
+      title={data.name}
+      headerRight={headerRight}
+      floating={floating}
     >
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-          <ClubBadge icon={data.icon} size={64} />
-          <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-            <Text variant="heading" accessibilityRole="header" numberOfLines={3}>
-              {data.name}
-            </Text>
-            {isOwner ? <Chip label="Você criou" tone="primary" icon="star-outline" /> : null}
-          </View>
-        </View>
-        {data.description ? <Text variant="body">{data.description}</Text> : null}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          <Chip label={membersLabel(data.memberCount)} tone="neutral" icon="group" />
-          <Chip label={topicsLabel(data.topicCount)} tone="neutral" icon="forum" />
-          {data.weeklyGoalPages ? (
-            <Chip label={`Meta: ${data.weeklyGoalPages} págs./semana`} tone="gold" icon="flag" />
-          ) : null}
-        </View>
-      </Card>
-
-      <Card>
-        <SectionHeader title="Obra do clube" icon="menu-book" />
-        <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' }}>
-          <BookCover
-            title={data.book.title}
-            author={data.book.author}
-            coverUrls={data.book.coverUrls}
-            width={72}
-          />
-          <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-            <Text variant="titleSm" numberOfLines={3}>
-              {data.book.title}
-            </Text>
-            <Text variant="bodySm" color="textMuted">
-              {[data.book.author, data.book.totalPages ? `${data.book.totalPages} págs.` : null]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          </View>
-        </View>
-        {isMember && progress.totalPages > 0 ? (
-          <View style={{ gap: theme.spacing.xs }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="label" color="accentText">
-                Você: pág. {readerPage}
-              </Text>
-              <Text variant="bodySm" color="textMuted">
-                {progress.percent}%
-              </Text>
-            </View>
-            <ProgressBar
-              percent={progress.percent}
-              accessibilityLabel={`Seu progresso no livro do clube: ${progress.percent}%`}
-            />
-          </View>
-        ) : null}
-      </Card>
-
-      {isMember ? (
-        <View
-          accessible
-          accessibilityLabel={`Blindagem anti-spoiler ativa. Você está na página ${readerPage}. Debates de páginas à frente ficam ocultos.`}
-          style={{
-            flexDirection: 'row',
-            gap: theme.spacing.md,
-            alignItems: 'center',
-            padding: theme.spacing.lg,
-            borderRadius: theme.radii.card,
-            borderWidth: theme.sizes.borderWidth,
-            borderColor: theme.colors.primary,
-            backgroundColor: theme.colors.primarySoft,
-          }}
-        >
-          <Icon name="shield" size={32} color="accentText" />
-          <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-            <Text variant="bodyStrong" color="accentText">
-              Blindagem anti-spoiler ativa
-            </Text>
-            <Text variant="bodySm">
-              Você está na pág. {readerPage}. Debates de páginas à frente ficam ocultos. Atualize
-              seu progresso na Estante para liberar.
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <Card tone="muted">
-          <SectionHeader title="Antes de entrar" icon="shield" />
-          <Text variant="bodySm" color="textMuted">
-            Ao entrar, o livro vai para a sua Estante (se ainda não estiver) e você aceita as
-            diretrizes: ancorar cada debate na página certa, debater ideias e nunca pessoas.
-          </Text>
-          <LinkButton label="Ler as diretrizes" align="left" onPress={guidelines} />
-        </Card>
-      )}
-
-      {isOwner && data.openReports ? (
+      <BookStrip club={data} />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        accessibilityRole="tablist"
+        style={{ marginHorizontal: -theme.sizes.gutter }}
+        contentContainerStyle={{
+          gap: theme.spacing.sm,
+          paddingHorizontal: theme.sizes.gutter,
+          paddingBottom: 2,
+        }}
+      >
+        <TabChip
+          label="Debates & Fórum"
+          icon="forum"
+          selected={tab === 'forum'}
+          onPress={() => setTab('forum')}
+        />
+        <TabChip
+          label="Enquetes"
+          icon="how-to-vote"
+          count={data.pollCount}
+          selected={tab === 'enquetes'}
+          onPress={() => setTab('enquetes')}
+        />
+        <TabChip
+          label="Resenhas"
+          icon="edit-note"
+          selected={tab === 'resenhas'}
+          onPress={() => setTab('resenhas')}
+        />
+        <TabChip
+          label="Ciclos"
+          icon="history"
+          selected={tab === 'ciclos'}
+          onPress={() => setTab('ciclos')}
+        />
+        <TabChip
+          label="Membros"
+          icon="group"
+          count={data.memberCount}
+          selected={tab === 'membros'}
+          onPress={() => setTab('membros')}
+        />
+        <TabChip
+          label="Diretrizes"
+          icon="gavel"
+          selected={tab === 'diretrizes'}
+          onPress={() => setTab('diretrizes')}
+        />
+      </ScrollView>
+      {data.openReports ? (
         <InlineMessage
           tone="info"
           message={
             data.openReports === 1
-              ? 'Há 1 denúncia aberta. Os itens denunciados aparecem marcados nos debates.'
-              : `Há ${data.openReports} denúncias abertas. Os itens denunciados aparecem marcados nos debates.`
+              ? 'Há 1 denúncia aberta. O item denunciado aparece marcado.'
+              : `Há ${data.openReports} denúncias abertas. Os itens denunciados aparecem marcados.`
           }
         />
       ) : null}
-
-      {isMember ? (
-        <View style={{ gap: theme.spacing.sm }}>
-          <SectionHeader title="Debates" icon="forum" />
-          {posts.isPending ? (
-            <ActivityIndicator
-              color={theme.colors.primary}
-              accessibilityLabel="Carregando debates"
-            />
-          ) : posts.isError ? (
-            <Card>
-              <InlineMessage tone="error" message="Não foi possível carregar os debates." />
-              <Button
-                label="Tentar de novo"
-                variant="secondary"
-                size="md"
-                icon="refresh"
-                onPress={() => void posts.refetch()}
-              />
-            </Card>
-          ) : posts.data.posts.length === 0 ? (
-            <Card>
-              <EmptyState
-                compact
-                mascot="emptyCommunity"
-                title="Nenhum debate ainda"
-                description="Abra o primeiro: escolha uma ideia do livro e diga de que página ela é."
-              />
-            </Card>
-          ) : (
-            posts.data.posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                readerPage={posts.data.readerPage}
-                onOpen={() => openTopic(post.id)}
-                onPeek={() => openTopic(post.id, true)}
-              />
-            ))
-          )}
-        </View>
-      ) : null}
+      {tab === 'forum' ? <ForumTab club={data} userId={userId} /> : null}
+      {tab === 'resenhas' ? <BookReviewsTab club={data} userId={userId} /> : null}
+      {tab === 'ciclos' ? <CyclesTab club={data} userId={userId} /> : null}
+      {tab === 'enquetes' ? <PollsTab club={data} userId={userId} /> : null}
+      {tab === 'membros' ? <MembersTab club={data} userId={userId} /> : null}
+      {tab === 'diretrizes' ? <GuidelinesTab club={data} ownerName={data.ownerName} /> : null}
     </FormScreen>
   );
 }

@@ -12,15 +12,16 @@ type Props = {
   icon: ComponentProps<typeof Icon>['name'];
   selected: boolean;
   onPress: () => void;
+  role?: 'checkbox' | 'radio';
 };
 
 /** Multi-select pill (genres). 48pt tall for comfortable touch. */
-export function ToggleChip({ label, icon, selected, onPress }: Props) {
+export function ToggleChip({ label, icon, selected, onPress, role = 'checkbox' }: Props) {
   const theme = useTheme();
   const scale = useMotionValue(selected ? 1.08 : 1);
   return (
     <Pressable
-      accessibilityRole="checkbox"
+      accessibilityRole={role}
       accessibilityState={{ checked: selected }}
       accessibilityLabel={label}
       onPress={() => {

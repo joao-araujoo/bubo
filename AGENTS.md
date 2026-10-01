@@ -46,7 +46,11 @@ npm install            # root only
 npm run verify         # MUST pass before you finish any task
 npm run dev:mobile | dev:api | lint | format | typecheck | test | doctor
 npm run assets:build | assets:check | audit:repo | package:zip
+npm run db:migrate:check   # read-only; `db:migrate` applies (Neon from apps/api/.dev.vars)
 ```
+
+After adding a screen, run `npx expo start` once in `apps/mobile` (a few seconds is enough) so
+`.expo/types/router.d.ts` knows the new route; otherwise typecheck rejects typed `router.push`.
 
 On Windows use PowerShell or cmd. All scripts are cross-platform Node.
 
@@ -106,8 +110,10 @@ Tasks 01–05 and 07 are complete in code (Task 05 still needs owner/device acce
 
 **Task 06 (memory and stats)** is done except a documented retention model (curve, Bubo Score).
 **Task 07 (Comunidade: clubs, anti-spoiler debates, reports, blocks; ADR-019)** is complete and
-deployed. **Next: TASK 08 — Comunidade part 2** (private clubs + invites, members, polls, reviews,
-friends' feed, notifications, admin moderation).
+deployed. **TASK 08 — Comunidade part 2** slice 1 is done and deployed (ADR-020: private clubs +
+invites, members, polls, reactions, club feed; `0009`). **Next in Task 08:** reviews (resenhas),
+friends + friends' feed, club reading cycles, admin moderation; club notifications wait for push
+(Task 09).
 
 - Owner-only setup lives in [CONFIGURAR.md](CONFIGURAR.md); the screen test script in
   [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md). Keep both current when screens or config change.
@@ -117,7 +123,7 @@ friends' feed, notifications, admin moderation).
   [docs/release.md](docs/release.md) → "Current remote state". Update it after every remote
   change.
 - The owner authorized applying Neon migrations and deploying the API to Cloudflare as part of
-  task work (2026-09-27): `verify` → `db:migrate -- --check` → `db:migrate` → `deploy:api` →
+  task work (2026-09-27): `verify` → `db:migrate:check` → `db:migrate` → `deploy:api` →
   smoke test `/v1/health` and `/v1/ready`. Commits still only when asked.
 
 - The per-screen build plan is [docs/screens.md](docs/screens.md). Update it whenever a screen

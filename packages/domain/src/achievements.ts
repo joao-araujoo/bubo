@@ -23,9 +23,13 @@ export type AchievementMetrics = {
 
 type Metric = keyof AchievementMetrics;
 
+/** Stitch medal tiers: a fixed difficulty class per badge (never earned separately). */
+export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'diamond';
+
 export type AchievementDefinition = {
   id: string;
   category: AchievementCategory;
+  tier: AchievementTier;
   title: string;
   description: string;
   metric: Metric;
@@ -37,6 +41,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'first_session',
     category: 'reading',
+    tier: 'bronze',
     title: 'Primeira página',
     description: 'Conclua sua primeira sessão de leitura focada.',
     metric: 'sessions',
@@ -45,6 +50,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'ten_sessions',
     category: 'reading',
+    tier: 'silver',
     title: 'Leitor focado',
     description: 'Conclua 10 sessões de leitura focada.',
     metric: 'sessions',
@@ -53,6 +59,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'ten_hours',
     category: 'reading',
+    tier: 'gold',
     title: 'Dez horas de foco',
     description: 'Some 600 minutos de leitura focada.',
     metric: 'focusedMinutes',
@@ -61,6 +68,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'thousand_pages',
     category: 'reading',
+    tier: 'gold',
     title: 'Mil páginas',
     description: 'Avance 1.000 páginas em sessões de leitura.',
     metric: 'pagesRead',
@@ -69,6 +77,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'first_book',
     category: 'reading',
+    tier: 'silver',
     title: 'Livro concluído',
     description: 'Marque um livro como terminado na sua estante.',
     metric: 'booksFinished',
@@ -77,6 +86,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'five_books',
     category: 'reading',
+    tier: 'diamond',
     title: 'Estante viva',
     description: 'Termine 5 livros.',
     metric: 'booksFinished',
@@ -85,6 +95,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'first_review',
     category: 'memory',
+    tier: 'bronze',
     title: 'Primeira lembrança',
     description: 'Faça sua primeira revisão sem espiar.',
     metric: 'reviews',
@@ -93,6 +104,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'ten_remembered',
     category: 'memory',
+    tier: 'silver',
     title: 'Recall puro',
     description: 'Marque “Lembrei” em 10 revisões.',
     metric: 'remembered',
@@ -101,6 +113,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'fifty_reviews',
     category: 'memory',
+    tier: 'gold',
     title: 'Revisor dedicado',
     description: 'Complete 50 revisões.',
     metric: 'reviews',
@@ -109,6 +122,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'five_reflections',
     category: 'memory',
+    tier: 'silver',
     title: 'Leitor reflexivo',
     description: 'Escreva o que ficou com você ao fim de 5 sessões.',
     metric: 'reflections',
@@ -117,6 +131,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'streak_3',
     category: 'consistency',
+    tier: 'bronze',
     title: 'Três dias seguidos',
     description: 'Leia ou revise em 3 dias consecutivos.',
     metric: 'longestStreak',
@@ -125,6 +140,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'streak_14',
     category: 'consistency',
+    tier: 'gold',
     title: 'Hábito de ferro',
     description: 'Leia ou revise em 14 dias consecutivos.',
     metric: 'longestStreak',
@@ -133,6 +149,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: 'streak_100',
     category: 'consistency',
+    tier: 'diamond',
     title: 'Centurião',
     description: 'Leia ou revise em 100 dias consecutivos.',
     metric: 'longestStreak',

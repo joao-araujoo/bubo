@@ -1,8 +1,14 @@
 import { type SessionResult, type ShelfEntry } from '@bubo/contracts';
-import { MAX_REFLECTION_LENGTH, MIN_SESSION_SECONDS, toLocalIsoDate } from '@bubo/domain';
+import {
+  MAX_REFLECTION_LENGTH,
+  MIN_SESSION_SECONDS,
+  focusElapsedMs,
+  pauseFocusClock,
+  toLocalIsoDate,
+} from '@bubo/domain';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 
 import {
@@ -18,15 +24,19 @@ import {
   TextField,
 } from '../../design-system';
 import { formatDuration, useFocusTimer } from '../../features/session/useFocusTimer';
+import {
+  clearSessionDraft,
+  readSessionDraft,
+  writeSessionDraft,
+  type SessionDraft,
+} from '../../features/session/draft-storage';
 import { ApiError } from '../../lib/api/client';
 import { useRecordSession, useShelfEntry } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
 
-type Finished = { startedAt: Date; endedAt: Date; focusedSeconds: number; id: string };
-
-/** Leaving while a session is in progress asks for confirmation (it would be lost). */
+/** Leaving keeps the durable draft, including its running/paused state. */
 function useConfirmLeave(active: boolean) {
   const navigation = useNavigation();
   useEffect(
@@ -34,14 +44,17 @@ function useConfirmLeave(active: boolean) {
       navigation.addListener('beforeRemove', (event) => {
         if (!active) return;
         event.preventDefault();
-        Alert.alert('Descartar esta sessão?', 'O tempo desta leitura não será salvo.', [
-          { text: 'Continuar', style: 'cancel' },
-          {
-            text: 'Descartar',
-            style: 'destructive',
-            onPress: () => navigation.dispatch(event.data.action),
-          },
-        ]);
+        Alert.alert(
+          'Sair da leitura?',
+          'Sua sessão fica guardada neste aparelho para continuar depois.',
+          [
+            { text: 'Continuar', style: 'cancel' },
+            {
+              text: 'Sair e guardar',
+              onPress: () => navigation.dispatch(event.data.action),
+            },
+          ],
+        );
       }),
     [navigation, active],
   );
@@ -49,13 +62,21 @@ function useConfirmLeave(active: boolean) {
 
 function TimerStep({
   entry,
-  onFinish,
+  draft,
+  persist,
+  busy,
+  error,
+  onDiscard,
 }: {
   entry: ShelfEntry;
-  onFinish: (value: Omit<Finished, 'id'>) => void;
+  draft: SessionDraft;
+  persist: (draft: SessionDraft) => Promise<void>;
+  busy: boolean;
+  error: string | null;
+  onDiscard: () => void;
 }) {
   const theme = useTheme();
-  const timer = useFocusTimer();
+  const timer = useFocusTimer(draft, persist);
   const canFinish = timer.elapsedSeconds >= MIN_SESSION_SECONDS;
   const active = timer.status !== 'idle';
   useConfirmLeave(active);
@@ -64,21 +85,23 @@ function TimerStep({
     <FormScreen
       footer={
         <>
+          {error ? <InlineMessage tone="error" message={error} /> : null}
           {timer.status === 'running' ? (
             <Button
               label="Pausar"
               icon="pause"
               variant="secondary"
               fullWidth
-              onPress={timer.pause}
+              disabled={busy}
+              onPress={() => void timer.pause().catch(() => undefined)}
             />
           ) : (
             <Button
               label={timer.status === 'idle' ? 'Começar a ler' : 'Retomar'}
               icon="play-arrow"
               fullWidth
-              disabled={timer.reachedCap}
-              onPress={timer.start}
+              disabled={timer.reachedCap || busy}
+              onPress={() => void timer.start().catch(() => undefined)}
             />
           )}
           <Button
@@ -86,12 +109,19 @@ function TimerStep({
             icon="flag"
             variant="success"
             fullWidth
-            disabled={!canFinish}
+            disabled={!canFinish || busy}
             accessibilityHint={canFinish ? undefined : 'Disponível a partir de 1 minuto de leitura'}
             onPress={() => {
               haptics.commit();
-              onFinish(timer.finish());
+              void timer.finish().catch(() => undefined);
             }}
+          />
+          <Button
+            label="Descartar sessão"
+            variant="secondary"
+            size="md"
+            disabled={busy}
+            onPress={onDiscard}
           />
         </>
       }
@@ -168,28 +198,37 @@ function TimerStep({
 function FinishStep({
   entry,
   userId,
-  finished,
+  draft,
+  persist,
+  onDiscard,
   onSaved,
 }: {
   entry: ShelfEntry;
   userId: string;
-  finished: Finished;
+  draft: SessionDraft;
+  persist: (draft: SessionDraft) => Promise<void>;
+  onDiscard: () => void;
   onSaved: (result: SessionResult) => void;
 }) {
   const theme = useTheme();
   const save = useRecordSession(userId);
   useConfirmLeave(!save.isSuccess);
   const total = entry.book.totalPages;
-  const [page, setPage] = useState(String(entry.currentPage));
-  const [reflection, setReflection] = useState('');
+  const [page, setPage] = useState(draft.page);
+  const [reflection, setReflection] = useState(draft.reflection);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const [sending, setSending] = useState(false);
 
   async function submit() {
+    if (submitting.current) return;
     const endPage = Number(page.trim());
     if (
-      !/^\d+$/.test(page.trim()) ||
-      endPage < entry.currentPage ||
-      (total !== null && endPage > total)
+      !draft.submission &&
+      (!/^\d+$/.test(page.trim()) ||
+        endPage < entry.currentPage ||
+        (total !== null && endPage > total))
     ) {
       setPageError(
         total !== null
@@ -200,21 +239,33 @@ function FinishStep({
       return;
     }
     setPageError(null);
+    submitting.current = true;
+    setSending(true);
     try {
-      const result = await save.mutateAsync({
-        id: finished.id,
+      const submission = draft.submission ?? {
+        id: draft.id,
         shelfEntryId: entry.id,
-        startedAt: finished.startedAt.toISOString(),
-        endedAt: finished.endedAt.toISOString(),
-        focusedSeconds: finished.focusedSeconds,
+        startedAt: new Date(draft.startedAt ?? 0).toISOString(),
+        endedAt: new Date(draft.endedAt ?? 0).toISOString(),
+        focusedSeconds: Math.floor(draft.accumulatedMs / 1000),
         endPage,
         reflection: reflection.trim() === '' ? null : reflection.trim(),
-        localDate: toLocalIsoDate(finished.endedAt),
-      });
+        localDate: toLocalIsoDate(new Date(draft.endedAt ?? 0)),
+      };
+      await persist({ ...draft, page, reflection, submission });
+      const result = await save.mutateAsync(submission);
+      await clearSessionDraft(userId);
       haptics.success();
       onSaved(result);
-    } catch {
+    } catch (error) {
       haptics.error();
+      if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
+        await persist({ ...draft, page, reflection, submission: null }).catch(() => undefined);
+      }
+      setLocalError('Não foi possível concluir. O registro foi mantido para tentar novamente.');
+    } finally {
+      submitting.current = false;
+      setSending(false);
     }
   }
 
@@ -228,13 +279,15 @@ function FinishStep({
     <FormScreen
       back={false}
       footer={
-        <Button
-          label="Salvar sessão"
-          icon="check"
-          fullWidth
-          loading={save.isPending}
-          onPress={submit}
-        />
+        <>
+          <Button label="Salvar sessão" icon="check" fullWidth loading={sending} onPress={submit} />
+          <Button
+            label="Descartar registro local"
+            variant="secondary"
+            disabled={sending}
+            onPress={onDiscard}
+          />
+        </>
       }
     >
       <View style={{ gap: theme.spacing.xs }}>
@@ -242,16 +295,30 @@ function FinishStep({
           Boa leitura!
         </Text>
         <Text variant="body" color="textMuted">
-          Você leu com foco por {formatDuration(finished.focusedSeconds)}. Registre até onde chegou.
+          Você leu com foco por {formatDuration(draft.accumulatedMs / 1000)}. Registre até onde
+          chegou.
         </Text>
       </View>
       {save.isError ? <InlineMessage tone="error" message={errorMessage} /> : null}
+      {localError ? <InlineMessage tone="error" message={localError} /> : null}
+      {draft.submission ? (
+        <InlineMessage
+          tone="info"
+          message="Este envio está guardado. Tentar novamente usa os mesmos dados para evitar duplicações."
+        />
+      ) : null}
       <TextField
         label="Até que página você chegou?"
         icon="bookmark-border"
         keyboardType="number-pad"
         value={page}
-        onChangeText={setPage}
+        editable={!draft.submission && !sending}
+        onChangeText={(value) => {
+          setPage(value);
+          void persist({ ...draft, page: value.slice(0, 10), reflection }).catch(() =>
+            setLocalError('Não foi possível guardar o rascunho neste aparelho.'),
+          );
+        }}
         error={pageError}
         hint={
           total !== null ? `Você estava na página ${entry.currentPage} de ${total}.` : undefined
@@ -262,7 +329,14 @@ function FinishStep({
         icon="edit-note"
         placeholder="Uma ideia, uma frase, uma pergunta…"
         value={reflection}
-        onChangeText={(value) => setReflection(value.slice(0, MAX_REFLECTION_LENGTH))}
+        editable={!draft.submission && !sending}
+        onChangeText={(value) => {
+          const text = value.slice(0, MAX_REFLECTION_LENGTH);
+          setReflection(text);
+          void persist({ ...draft, page, reflection: text }).catch(() =>
+            setLocalError('Não foi possível guardar o rascunho neste aparelho.'),
+          );
+        }}
         multiline
         textAlignVertical="top"
         hint="Explicar com suas palavras ajuda a lembrar depois."
@@ -346,10 +420,6 @@ export default function ReadingSessionScreen() {
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : undefined;
   const detail = useShelfEntry(userId, typeof id === 'string' ? id : '');
-  const [finished, setFinished] = useState<Finished | null>(null);
-  const [result, setResult] = useState<SessionResult | null>(null);
-
-  if (result) return <ResultStep result={result} />;
   if (detail.isPending || !userId) {
     return (
       <FormScreen>
@@ -369,15 +439,201 @@ export default function ReadingSessionScreen() {
     );
   }
 
-  const entry = detail.data.entry;
-  if (finished) {
-    return <FinishStep entry={entry} userId={userId} finished={finished} onSaved={setResult} />;
+  return (
+    <DurableSession
+      key={`${userId}:${detail.data.entry.id}`}
+      userId={userId}
+      entry={detail.data.entry}
+    />
+  );
+}
+
+function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }) {
+  const router = useRouter();
+  const [draft, setDraft] = useState<SessionDraft | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [recover, setRecover] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<SessionResult | null>(null);
+  const pendingWrites = useRef(0);
+
+  function fresh(): SessionDraft {
+    return {
+      version: 1,
+      id: Crypto.randomUUID(),
+      shelfEntryId: entry.id,
+      startedAt: null,
+      accumulatedMs: 0,
+      runningSince: null,
+      endedAt: null,
+      page: String(entry.currentPage),
+      reflection: '',
+      submission: null,
+    };
   }
+
+  useEffect(() => {
+    let active = true;
+    readSessionDraft(userId)
+      .then(async (stored) => {
+        if (!active) return;
+        if (stored?.runningSince !== null && stored) {
+          stored = { ...stored, ...pauseFocusClock(stored, Date.now()) };
+          await writeSessionDraft(userId, stored);
+        }
+        if (!active) return;
+        setDraft(
+          stored ?? {
+            version: 1,
+            id: Crypto.randomUUID(),
+            shelfEntryId: entry.id,
+            startedAt: null,
+            accumulatedMs: 0,
+            runningSince: null,
+            endedAt: null,
+            page: String(entry.currentPage),
+            reflection: '',
+            submission: null,
+          },
+        );
+        setRecover(stored !== null);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (active) {
+          setError('Não foi possível recuperar a sessão neste aparelho.');
+          setLoaded(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId, entry.id, entry.currentPage]);
+
+  async function persist(next: SessionDraft) {
+    pendingWrites.current += 1;
+    setBusy(true);
+    try {
+      await writeSessionDraft(userId, next);
+      setDraft(next);
+      setError(null);
+    } catch (e) {
+      setError('Não foi possível guardar a sessão neste aparelho. Tente novamente.');
+      throw e;
+    } finally {
+      pendingWrites.current -= 1;
+      setBusy(pendingWrites.current > 0);
+    }
+  }
+
+  function discard() {
+    Alert.alert(
+      'Descartar registro local?',
+      'O tempo não enviado será perdido. Uma sessão já recebida pela API continua no histórico.',
+      [
+        { text: 'Manter', style: 'cancel' },
+        {
+          text: 'Descartar',
+          style: 'destructive',
+          onPress: () => {
+            setBusy(true);
+            void clearSessionDraft(userId)
+              .then(() => {
+                setDraft(fresh());
+                setRecover(false);
+                setError(null);
+              })
+              .catch(() => setError('Não foi possível descartar. Tente novamente.'))
+              .finally(() => setBusy(false));
+          },
+        },
+      ],
+    );
+  }
+
+  if (result) return <ResultStep result={result} />;
+  if (!loaded)
+    return (
+      <FormScreen title="Sua leitura">
+        <ActivityIndicator accessibilityLabel="Recuperando sessão" />
+      </FormScreen>
+    );
+  if (!draft)
+    return (
+      <FormScreen title="Sua leitura">
+        <InlineMessage tone="error" message={error ?? 'Sessão indisponível.'} />
+        <Button label="Descartar registro local" onPress={discard} disabled={busy} />
+      </FormScreen>
+    );
+  if (recover) {
+    const sameBook = draft.shelfEntryId === entry.id;
+    return (
+      <FormScreen title="Você tinha uma leitura em andamento">
+        <Text>
+          Seu registro ficou guardado neste aparelho.{' '}
+          {draft.endedAt
+            ? 'Falta salvar a página e a reflexão.'
+            : 'Você pode continuar ou encerrar.'}
+        </Text>
+        <Text variant="titleSm">{formatDuration(focusElapsedMs(draft, Date.now()) / 1000)}</Text>
+        {draft.startedAt !== null && Date.now() - draft.startedAt > 48 * 60 * 60 * 1000 ? (
+          <InlineMessage
+            tone="info"
+            message="Este registro tem mais de 48 horas. A API só aceita novas sessões dentro desse prazo. Você pode consultar sua reflexão; um envio já recebido pode ser confirmado novamente."
+          />
+        ) : null}
+        {error ? <InlineMessage tone="error" message={error} /> : null}
+        <Button
+          label={sameBook ? 'Continuar' : 'Abrir a leitura em andamento'}
+          disabled={busy}
+          onPress={() => {
+            if (!sameBook) {
+              router.replace({ pathname: '/sessao/[id]', params: { id: draft.shelfEntryId } });
+              return;
+            }
+            // Stop counting while the reader decides; resuming is always explicit.
+            void persist({ ...draft, ...pauseFocusClock(draft, Date.now()) })
+              .then(() => setRecover(false))
+              .catch(() => undefined);
+          }}
+        />
+        {sameBook && !draft.endedAt ? (
+          <Button
+            label="Encerrar"
+            variant="success"
+            disabled={busy || focusElapsedMs(draft, Date.now()) < MIN_SESSION_SECONDS * 1000}
+            onPress={() => {
+              const stamp = Date.now();
+              void persist({ ...draft, ...pauseFocusClock(draft, stamp), endedAt: stamp })
+                .then(() => setRecover(false))
+                .catch(() => undefined);
+            }}
+          />
+        ) : null}
+        <Button label="Descartar" variant="secondary" disabled={busy} onPress={discard} />
+      </FormScreen>
+    );
+  }
+  if (draft.endedAt !== null)
+    return (
+      <FinishStep
+        entry={entry}
+        userId={userId}
+        draft={draft}
+        persist={persist}
+        onDiscard={discard}
+        onSaved={setResult}
+      />
+    );
   return (
     <TimerStep
       entry={entry}
-      // The id is fixed once, so retrying a failed save never records the session twice.
-      onFinish={(value) => setFinished({ ...value, id: Crypto.randomUUID() })}
+      draft={draft}
+      persist={persist}
+      busy={busy}
+      error={error}
+      onDiscard={discard}
     />
   );
 }

@@ -9,6 +9,8 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createHarness } from './harness';
+import { recordSession } from '../src/services/sessions';
+import { createSessionRequestSchema } from '@bubo/contracts';
 
 // Fixed "server now" so session plausibility and streak dates are deterministic.
 const NOW = new Date('2026-09-26T15:00:00.000Z');
@@ -202,6 +204,28 @@ describe('reading sessions', () => {
       xpTotal: 25,
       sessionsCount: 1,
     });
+    const parsed = createSessionRequestSchema.parse(body);
+    const user = await h.database.pg.query<{ user_id: string }>(
+      'SELECT user_id FROM shelf_entries WHERE id = $1',
+      [entry.id],
+    );
+    const userId = user.rows[0]?.user_id ?? '';
+    const recovered = await recordSession(
+      h.database.db,
+      userId,
+      parsed,
+      new Date('2026-09-30T15:00:00Z'),
+    );
+    expect(recovered.created).toBe(false);
+    expect(recovered.result.stats.sessionsCount).toBe(1);
+    await expect(
+      recordSession(
+        h.database.db,
+        userId,
+        { ...parsed, id: sessionId() },
+        new Date('2026-09-30T15:00:00Z'),
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 
   it('caps XP per session and finishes the book on the last page', async () => {

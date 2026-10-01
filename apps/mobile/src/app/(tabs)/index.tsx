@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Screen } from '../../design-system';
 import { HomeHeader } from '../../features/home/HomeHeader';
 import { ReadingNowSection } from '../../features/home/ReadingNowSection';
+import { RecoveryCard } from '../../features/session/RecoveryCard';
 import {
   ActiveRecallSection,
   CognitiveWeekSection,
@@ -26,6 +27,7 @@ export default function TodayScreen() {
 
   const reading = shelf.data?.entries.find((entry) => entry.status === 'reading') ?? null;
   const sections = [
+    <RecoveryCard key={`recovery-${auth.userId}`} userId={auth.userId} />,
     <ReadingNowSection key="reading" userId={auth.userId} />,
     <ActiveRecallSection
       key="recall"

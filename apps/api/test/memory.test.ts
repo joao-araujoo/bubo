@@ -79,4 +79,22 @@ it('counts persisted grades once, scopes the owner and bounds the date window', 
   ]) {
     expect(result.days.every((day) => day.remembered + day.almost + day.forgot === 0)).toBe(true);
   }
+
+  // Breakdowns (ADR-020): per book, by local time of day, cards and the period length.
+  const month = await read(cookie, '/v1/me/memory?today=2026-09-27&days=30&tz=-180');
+  expect(month.days).toHaveLength(30);
+  expect(month.days[0]?.date).toBe('2026-08-29');
+  expect(month.books).toEqual([
+    expect.objectContaining({ shelfEntryId: entry.id, cards: 4, total: 4, remembered: 2 }),
+  ]);
+  expect(month).toMatchObject({ cardsTotal: 4, booksWithCards: 1 });
+  expect(month.focus).toEqual({ focusedMinutes: 0, readingDays: 0 });
+  // Reviewed at 15:00 UTC: 12:00 in São Paulo (afternoon), 05:00 at UTC−10 (dawn).
+  expect(month.dayParts.afternoon).toEqual({ total: 4, remembered: 2 });
+  const hawaii = await read(cookie, '/v1/me/memory?today=2026-09-27&tz=-600');
+  expect(hawaii.dayParts.dawn).toEqual({ total: 4, remembered: 2 });
+  expect(hawaii.dayParts.afternoon).toEqual({ total: 0, remembered: 0 });
+  for (const bad of ['days=14', 'tz=900', 'days=abc']) {
+    expect((await h.call(`${path}&${bad}`, { cookie })).status).toBe(422);
+  }
 });

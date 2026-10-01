@@ -17,8 +17,9 @@ export const CACHE_MAX_AGE_MS = 24 * 60 * 60_000;
 const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
   // Bump when a persisted response shape gains a required field (v2: shelf detail `reviews`,
-  // Task 06), so an OTA update with the same app version never reads an older shape.
-  key: 'bubo.query-cache.v2',
+  // Task 06; v3: community and memory shapes, Task 08), so an OTA update with the same app
+  // version never reads an older shape.
+  key: 'bubo.query-cache.v3',
   throttleTime: 1_000,
 });
 
@@ -28,7 +29,8 @@ export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
   buster: Constants.expoConfig?.version ?? 'dev',
   dehydrateOptions: {
     shouldDehydrateQuery: (query) =>
-      query.state.status === 'success' && query.queryKey[0] !== 'system',
+      query.state.status === 'success' &&
+      !['system', 'moderation', 'friends-feed'].includes(String(query.queryKey[0])),
   },
 };
 

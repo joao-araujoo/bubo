@@ -1,7 +1,17 @@
 import {
+  moderationQueueSchema,
+  clubCyclesResponseSchema,
+  type CreateCycleRequest,
+  friendsResponseSchema,
+  friendsFeedSchema,
+  type FriendAction,
+  type SocialPreferences,
+  type GlobalModerationRequest,
   type AddBookRequest,
   type CreateCardRequest,
   type CreateClubRequest,
+  type CreatePollRequest,
+  type ReactionRequest,
   type CreatePostRequest,
   type CreateReplyRequest,
   type ModerationRequest,
@@ -15,6 +25,15 @@ import {
   achievementsResponseSchema,
   blocksResponseSchema,
   clubDetailSchema,
+  clubMembersResponseSchema,
+  clubPollDetailSchema,
+  clubPollSchema,
+  clubPollsResponseSchema,
+  communityFeedResponseSchema,
+  inviteCodeResponseSchema,
+  invitePreviewSchema,
+  pollArgumentSchema,
+  reactionResponseSchema,
   clubPostSchema,
   clubPostsResponseSchema,
   clubReplySchema,
@@ -184,9 +203,9 @@ export function createApiClient({
       request(`${API_ROUTES.stats}?today=${encodeURIComponent(today)}`, statsResponseSchema, {
         signal,
       }),
-    getMemoryStats: (today: string, signal?: AbortSignal) =>
+    getMemoryStats: (query: { today: string; days: number; tz: number }, signal?: AbortSignal) =>
       request(
-        `${API_ROUTES.memoryStats}?today=${encodeURIComponent(today)}`,
+        `${API_ROUTES.memoryStats}?today=${encodeURIComponent(query.today)}&days=${query.days}&tz=${query.tz}`,
         memoryStatsResponseSchema,
         { signal },
       ),
@@ -209,6 +228,38 @@ export function createApiClient({
       }),
     listClubPosts: (id: string, signal?: AbortSignal) =>
       request(apiPath(API_ROUTES.clubPosts, { id }), clubPostsResponseSchema, { signal }),
+    listClubBookReviews: (id: string, signal?: AbortSignal) =>
+      request(`${apiPath(API_ROUTES.clubPosts, { id })}?reviews=1`, clubPostsResponseSchema, {
+        signal,
+      }),
+    listClubCycles: (id: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.clubCycles, { id }), clubCyclesResponseSchema, { signal }),
+    listFriends: (signal?: AbortSignal) =>
+      request(API_ROUTES.friends, friendsResponseSchema, { signal }),
+    getFriendsFeed: (signal?: AbortSignal) =>
+      request(API_ROUTES.friendsFeed, friendsFeedSchema, { signal }),
+    changeFriend: (userId: string, action: FriendAction) =>
+      request(apiPath(API_ROUTES.friend, { userId }), friendsResponseSchema, {
+        method: 'PUT',
+        body: { action },
+      }),
+    saveSocialPreferences: (body: SocialPreferences) =>
+      request(API_ROUTES.socialPreferences, friendsResponseSchema, { method: 'PUT', body }),
+    startClubCycle: (id: string, body: CreateCycleRequest) =>
+      request(apiPath(API_ROUTES.clubCycles, { id }), clubCyclesResponseSchema, {
+        method: 'POST',
+        body,
+      }),
+    closeClubCycle: (id: string, cycleId: string) =>
+      request(apiPath(API_ROUTES.clubCycleClose, { id, cycleId }), clubCyclesResponseSchema, {
+        method: 'POST',
+      }),
+    getModerationQueue: (reveal: boolean, signal?: AbortSignal) =>
+      request(`${API_ROUTES.moderationQueue}${reveal ? '?reveal=1' : ''}`, moderationQueueSchema, {
+        signal,
+      }),
+    moderateReportedContent: (body: GlobalModerationRequest) =>
+      request(API_ROUTES.moderationQueue, moderationResponseSchema, { method: 'POST', body }),
     getClubTopic: (id: string, postId: string, reveal: boolean, signal?: AbortSignal) =>
       request(
         `${apiPath(API_ROUTES.clubPost, { id, postId })}${reveal ? '?reveal=1' : ''}`,
@@ -243,6 +294,51 @@ export function createApiClient({
       request(API_ROUTES.blocks, blocksResponseSchema, { method: 'POST', body: { userId } }),
     unblockUser: (userId: string) =>
       request(apiPath(API_ROUTES.block, { userId }), blocksResponseSchema, { method: 'DELETE' }),
+    getCommunityFeed: (signal?: AbortSignal) =>
+      request(API_ROUTES.communityFeed, communityFeedResponseSchema, { signal }),
+    getInvitePreview: (code: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.clubInvite, { code }), invitePreviewSchema, { signal }),
+    joinByCode: (code: string) =>
+      request(API_ROUTES.clubsJoin, clubDetailSchema, {
+        method: 'POST',
+        body: { code, acceptGuidelines: true },
+      }),
+    regenerateInviteCode: (id: string) =>
+      request(apiPath(API_ROUTES.clubInviteCode, { id }), inviteCodeResponseSchema, {
+        method: 'POST',
+      }),
+    listClubMembers: (id: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.clubMembers, { id }), clubMembersResponseSchema, { signal }),
+    listClubPolls: (id: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.clubPolls, { id }), clubPollsResponseSchema, { signal }),
+    getClubPoll: (id: string, pollId: string, reveal: boolean, signal?: AbortSignal) =>
+      request(
+        `${apiPath(API_ROUTES.clubPoll, { id, pollId })}${reveal ? '?reveal=1' : ''}`,
+        clubPollDetailSchema,
+        { signal },
+      ),
+    createClubPoll: (id: string, body: CreatePollRequest) =>
+      request(apiPath(API_ROUTES.clubPolls, { id }), clubPollSchema, { method: 'POST', body }),
+    deleteClubPoll: (id: string, pollId: string) =>
+      request(apiPath(API_ROUTES.clubPoll, { id, pollId }), deleteResponseSchema, {
+        method: 'DELETE',
+      }),
+    votePoll: (id: string, pollId: string, optionIds: string[]) =>
+      request(apiPath(API_ROUTES.clubPollVote, { id, pollId }), clubPollSchema, {
+        method: 'PUT',
+        body: { optionIds },
+      }),
+    savePollArgument: (id: string, pollId: string, body: string) =>
+      request(apiPath(API_ROUTES.clubPollArgument, { id, pollId }), pollArgumentSchema, {
+        method: 'PUT',
+        body: { body },
+      }),
+    deletePollArgument: (id: string, pollId: string) =>
+      request(apiPath(API_ROUTES.clubPollArgument, { id, pollId }), deleteResponseSchema, {
+        method: 'DELETE',
+      }),
+    setReaction: (body: ReactionRequest) =>
+      request(API_ROUTES.reactions, reactionResponseSchema, { method: 'PUT', body }),
     getAchievements: (today: string, signal?: AbortSignal) =>
       request(
         `${API_ROUTES.achievements}?today=${encodeURIComponent(today)}`,

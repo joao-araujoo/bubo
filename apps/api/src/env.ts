@@ -15,6 +15,7 @@ export type Bindings = {
   GEMINI_MODEL?: string;
   GOOGLE_BOOKS_API_KEY?: string;
   CATALOG_CONTACT_EMAIL?: string;
+  MODERATOR_USER_IDS?: string;
   MEDIA_PUBLIC_URL?: string;
   /** R2 bucket "bubo" (covers, avatars, uploads). */
   MEDIA: MediaBucket;

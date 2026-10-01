@@ -5,6 +5,8 @@ import { View } from 'react-native';
 import { BuboMascot, Button, FormScreen, InlineMessage, Text, TextField } from '../design-system';
 import { authErrorMessage } from '../features/auth/messages';
 import { authClient } from '../lib/auth/client';
+import { useAuthState } from '../lib/auth/session';
+import { clearSessionDraft } from '../features/session/draft-storage';
 import { haptics } from '../lib/haptics';
 import { clearQueryCache } from '../lib/query/persist';
 import { useTheme } from '../theme';
@@ -15,6 +17,7 @@ import { useTheme } from '../theme';
  */
 export default function DeleteAccountScreen() {
   const theme = useTheme();
+  const auth = useAuthState();
   const queryClient = useQueryClient();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export default function DeleteAccountScreen() {
       return;
     }
     haptics.success();
+    if (auth.status === 'ready') await clearSessionDraft(auth.userId);
     // Session is gone: drop cached data; the guard returns to the welcome screen.
     await clearQueryCache(queryClient);
   }

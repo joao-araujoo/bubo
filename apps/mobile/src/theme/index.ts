@@ -3,6 +3,7 @@ export {
   darkColors,
   lightColors,
   palette,
+  qrPalette,
   type ColorTokens,
   type CoverPalette,
 } from './colors';

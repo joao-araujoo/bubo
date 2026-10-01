@@ -1,5 +1,15 @@
 # Roadmap
 
+## Continuação — 2026-09-30
+
+- Minha memória: interface de 7/30/90/365 dias, histórico diário com rolagem, foco,
+  horários das tentativas e revisões por livro com acesso ao detalhe. Cache por conta,
+  data, período e fuso. Sem retenção estimada ou Score; aceite em aparelho pendente.
+- As 34 ideias do proprietário estão no [checklist futuro](ideias-futuras.md), com
+  critérios de aceite, dependências e sequência sugerida. Ainda não implementadas.
+- Próxima etapa da Comunidade: resenhas com anti-spoiler, denúncia, bloqueio, exclusão
+  e moderação, seguida de amizades e ciclos.
+
 ## ✅ Task 01 — Foundation
 
 - Monorepo, tooling and quality gates.
@@ -182,15 +192,52 @@
   "Descobrir livros" button (compass) in its header.
 - **Owner guides:** [../CONFIGURAR.md](../CONFIGURAR.md) (everything left to configure) and
   [TESTAR-TELAS.md](TESTAR-TELAS.md) (every screen, how to reach it, what to check).
-- **Remaining for Comunidade (Task 08):** private clubs + invites, members and stats, polls,
-  reviews, friends' feed, club reading cycles, notifications, Bubo-wide moderation tooling.
+- **Task 08** continues below (`diretrizes/[clubId]` became the club's "Diretrizes" tab).
+
+## 🟡 Task 08 — Comunidade part 2 (slice 1 done and deployed, 2026-09-28)
+
+- **Database:** `0009_club_polls_invites` (additive): topic kind/chapter/quote, club visibility +
+  invite code, polls (options, votes, arguments), reactions, reports on polls/arguments.
+- **API (ADR-020):** 12 new routes — `GET /v1/community/feed`, `POST /v1/clubs/join`,
+  `GET /v1/clubs/invite/:code`, `POST /v1/clubs/:id/invite-code`, `GET /v1/clubs/:id/members`,
+  `GET|POST /v1/clubs/:id/polls`, `GET|DELETE /v1/clubs/:id/polls/:pollId`,
+  `PUT /v1/clubs/:id/polls/:pollId/vote`, `PUT|DELETE /v1/clubs/:id/polls/:pollId/argument`,
+  `PUT /v1/reactions`. Private clubs are invisible (404) without the code; poll results stay
+  hidden until the reader votes; everything spoiler-locked like topics.
+- **Mobile (Stitch layouts):** Comunidade tab rebuilt (Feed Geral / Seus Clubes / Descobrir, filters,
+  "Recebeu um convite?"), `clubes/[id]` with tabs Debates & Fórum / Enquetes / Membros / Diretrizes
+  and the "Perfil do clube" hero, `clubes/novo` (public/private), `novo-debate/[clubId]` (type,
+  chapter, quote), `nova-enquete/[clubId]`, `enquetes/[clubId]/[pollId]` (live results,
+  synthesis from real votes, arguments with reactions, composer), `convidar/[clubId]` (real QR,
+  link with copy, WhatsApp/Telegram/e-mail/share, owner rotates the code) and `convite/[code]`
+  (deep link `bubo://convite/CODE` → preview → join). New design-system primitives: ActionRow,
+  BottomSheet, BuboTip, GradientCard, IconTile, Pill, SectionTitle, SegmentedTabs, StatTile,
+  Stepper, TabChip, Toggle. New deps: `qrcode-generator` (pure JS QR) and `expo-clipboard`
+  (SDK module, included in Expo Go).
+- **Task 06 follow-up in the same slice (API only):** `/v1/me/memory` takes `days`
+  (7/30/90/365) and `tz`, adds per-book tallies, time-of-day attempts, card totals and focus; shelf
+  detail adds `reviewTotals`; badges get a fixed medal tier. `estatisticas` still shows 7 days.
+- **Tests:** domain (percentages, invite codes, page buckets, day parts, recall strength, tiers),
+  DB constraints, API suites `community-clubs-2` and `community-polls`, memory breakdowns, and the
+  real mobile client driving invites/polls/arguments/reactions/members/feed.
+- **Production (2026-09-28):** `0009` applied to Neon, API version `a71892ff` deployed, two-account
+  smoke test (private club, discover hidden, 404 for outsiders, preview, join by code, poll +
+  idempotent retry, hidden results, vote, argument, reaction, members, feed, report, owner restore,
+  code rotation, old code 404, member cannot rotate, delete club, delete accounts) passed 27/27.
+- **Fixed in this audit:** root `db:migrate -- --check` did not forward `--check` and applied
+  migrations (this is how `0009` reached Neon, right after a green verify). Root script fixed and
+  `npm run db:migrate:check` added. Club profile used a mascot _state_ `takingNotes` that does not
+  exist (now the official _pose_).
+- **Remaining in Task 08:** reviews/resenhas (`livro/[id]/resenha`, `resenhas/[id]`), friends +
+  friends' feed (needs follows and privacy settings), club reading cycles ("Histórico de ciclos"),
+  club notifications + invites inbox (needs push, Task 09), Bubo-wide admin moderation tool,
+  device acceptance of every Comunidade screen.
 
 ## Later (see [screens.md](screens.md) for the full list)
 
-- **Task 06 leftovers:** retention model → retention curve and Bubo Score; badge unlock ledger.
-- **Task 08, Comunidade (part 2):** private clubs and invites, members/stats, polls, reviews,
-  friends' feed, club reading cycles ("Histórico de ciclos"), club notifications, an admin
-  moderation tool.
+- **Task 06 leftovers:** retention model → retention curve and Bubo Score; badge unlock ledger;
+  device acceptance of `estatisticas` periods/breakdowns UI (implemented 2026-09-30).
+- **Task 08 leftovers:** see the list above.
 - **Task 09, Você:** settings and cognitive preferences, notifications (Expo Push + a Worker cron
   for due reviews).
 - **AI (Gemini, server-side):** recall question suggestions and reflection feedback, inside existing

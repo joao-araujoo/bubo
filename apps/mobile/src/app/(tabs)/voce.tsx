@@ -182,11 +182,19 @@ export default function YouScreen() {
         />
       ) : null}
       <AppearancePicker />
+      {auth.status === 'ready' && auth.me.isModerator ? (
+        <Button
+          label="Moderação geral"
+          icon="gavel"
+          variant="secondary"
+          onPress={() => router.push('/moderacao')}
+        />
+      ) : null}
       <Button
         label="Minha memória"
         variant="secondary"
         icon="insights"
-        accessibilityHint="Abre suas revisões dos últimos 7 dias"
+        accessibilityHint="Abre suas revisões por período e por livro"
         onPress={() => router.push('/estatisticas')}
       />
       <Button

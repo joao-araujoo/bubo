@@ -1,7 +1,13 @@
 import {
   type AddBookRequest,
+  type GlobalModerationRequest,
+  type CreateCycleRequest,
+  type FriendAction,
+  type SocialPreferences,
   type CreateCardRequest,
   type CreateClubRequest,
+  type CreatePollRequest,
+  type ReactionRequest,
   type CreatePostRequest,
   type CreateReplyRequest,
   type ModerationRequest,
@@ -27,7 +33,8 @@ export const queryKeys = {
   shelf: (userId: string) => ['shelf', userId] as const,
   shelfEntry: (userId: string, entryId: string) => ['shelf', userId, entryId] as const,
   stats: (userId: string, today: string) => ['stats', userId, today] as const,
-  memory: (userId: string, today: string) => ['memory', userId, today] as const,
+  memory: (userId: string, today: string, days: number, tz: number) =>
+    ['memory', userId, today, days, tz] as const,
   achievements: (userId: string, today: string) => ['achievements', userId, today] as const,
   clubs: (userId: string, q: string) => ['clubs', userId, 'list', q] as const,
   club: (userId: string, clubId: string) => ['clubs', userId, 'club', clubId] as const,
@@ -35,6 +42,12 @@ export const queryKeys = {
   clubTopic: (userId: string, clubId: string, postId: string, reveal: boolean) =>
     ['clubs', userId, 'topic', clubId, postId, reveal] as const,
   blocks: (userId: string) => ['blocks', userId] as const,
+  communityFeed: (userId: string) => ['clubs', userId, 'feed'] as const,
+  clubMembers: (userId: string, clubId: string) => ['clubs', userId, 'members', clubId] as const,
+  clubPolls: (userId: string, clubId: string) => ['clubs', userId, 'polls', clubId] as const,
+  clubPoll: (userId: string, clubId: string, pollId: string, reveal: boolean) =>
+    ['clubs', userId, 'poll', clubId, pollId, reveal] as const,
+  invite: (userId: string, code: string) => ['clubs', userId, 'invite', code] as const,
   due: (userId: string, today: string) => ['recall', userId, today] as const,
   catalogSearch: (userId: string, q: string) => ['catalog', userId, 'search-v2', q] as const,
   catalogBook: (userId: string, catalogId: string) =>
@@ -130,11 +143,15 @@ export function useStats(userId: string | undefined) {
   });
 }
 
-export function useMemoryStats(userId: string | undefined) {
-  const today = toLocalIsoDate(new Date());
+/** "Minha memória" for the reader's local today, over 7/30/90/365 days, in the device's zone. */
+export function useMemoryStats(userId: string | undefined, days: 7 | 30 | 90 | 365 = 7) {
+  const now = new Date();
+  const today = toLocalIsoDate(now);
+  // getTimezoneOffset() is minutes *behind* UTC (BRT = 180); the API wants the UTC offset (−180).
+  const tz = -now.getTimezoneOffset();
   return useQuery({
-    queryKey: queryKeys.memory(userId ?? 'anonymous', today),
-    queryFn: ({ signal }) => api.getMemoryStats(today, signal),
+    queryKey: queryKeys.memory(userId ?? 'anonymous', today, days, tz),
+    queryFn: ({ signal }) => api.getMemoryStats({ today, days, tz }, signal),
     enabled: Boolean(userId),
   });
 }
@@ -287,6 +304,96 @@ export function useClubPosts(userId: string | undefined, clubId: string, enabled
   });
 }
 
+export function useClubBookReviews(userId: string | undefined, clubId: string) {
+  return useQuery({
+    queryKey: ['clubs', userId ?? MISSING_USER, 'book-reviews', clubId],
+    queryFn: ({ signal }) => api.listClubBookReviews(clubId, signal),
+    enabled: Boolean(userId) && clubId !== '',
+  });
+}
+
+export function useClubCycles(userId: string | undefined, clubId: string) {
+  return useQuery({
+    queryKey: ['clubs', userId, 'cycles', clubId],
+    queryFn: ({ signal }) => api.listClubCycles(clubId, signal),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useFriends(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['friends', userId],
+    queryFn: ({ signal }) => api.listFriends(signal),
+    enabled: Boolean(userId),
+  });
+}
+export function useFriendsFeed(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['friends-feed', userId],
+    queryFn: ({ signal }) => api.getFriendsFeed(signal),
+    enabled: Boolean(userId),
+    gcTime: 0,
+    staleTime: 0,
+  });
+}
+export function useChangeFriend(userId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ otherId, action }: { otherId: string; action: FriendAction }) =>
+      api.changeFriend(otherId, action),
+    onSuccess: async (data) => {
+      client.setQueryData(['friends', userId], data);
+      await client.invalidateQueries({ queryKey: ['friends-feed', userId] });
+    },
+  });
+}
+export function useSaveSocialPreferences(userId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SocialPreferences) => api.saveSocialPreferences(body),
+    onSuccess: async (data) => {
+      client.setQueryData(['friends', userId], data);
+      await client.invalidateQueries({ queryKey: ['friends-feed', userId] });
+    },
+  });
+}
+export function useStartClubCycle(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: CreateCycleRequest) => api.startClubCycle(clubId, body),
+    onSuccess: invalidate,
+  });
+}
+export function useCloseClubCycle(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (cycleId: string) => api.closeClubCycle(clubId, cycleId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useModerationQueue(userId: string | undefined, reveal: boolean) {
+  return useQuery({
+    queryKey: ['moderation', userId, reveal],
+    queryFn: ({ signal }) => api.getModerationQueue(reveal, signal),
+    enabled: Boolean(userId),
+    gcTime: 0,
+    staleTime: 0,
+  });
+}
+export function useGlobalModeration(userId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GlobalModerationRequest) => api.moderateReportedContent(body),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['moderation', userId] }),
+        client.invalidateQueries({ queryKey: ['clubs', userId] }),
+      ]);
+    },
+  });
+}
+
 export function useClubTopic(
   userId: string | undefined,
   clubId: string,
@@ -318,9 +425,13 @@ export function useCreateClub(userId: string) {
   });
 }
 
-export function useJoinClub(userId: string, clubId: string) {
+/** Joins a public club; the club id is given per call so lists can join any of their clubs. */
+export function useJoinClub(userId: string) {
   const invalidate = useInvalidateCommunity(userId);
-  return useMutation({ mutationFn: () => api.joinClub(clubId), onSuccess: invalidate });
+  return useMutation({
+    mutationFn: (clubId: string) => api.joinClub(clubId),
+    onSuccess: invalidate,
+  });
 }
 
 export function useLeaveClub(userId: string, clubId: string) {
@@ -397,6 +508,8 @@ function useInvalidateBlocks(userId: string) {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.blocks(userId) }),
       queryClient.invalidateQueries({ queryKey: ['clubs', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['friends', userId] }),
+      queryClient.removeQueries({ queryKey: ['friends-feed', userId] }),
     ]);
 }
 
@@ -412,6 +525,121 @@ export function useUnblockUser(userId: string) {
   const invalidate = useInvalidateBlocks(userId);
   return useMutation({
     mutationFn: (target: string) => api.unblockUser(target),
+    onSuccess: invalidate,
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Comunidade part 2 (Task 08)
+// ---------------------------------------------------------------------------------------------
+
+export function useCommunityFeed(userId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.communityFeed(userId ?? MISSING_USER),
+    queryFn: ({ signal }) => api.getCommunityFeed(signal),
+    enabled: Boolean(userId) && enabled,
+  });
+}
+
+export function useClubMembers(userId: string | undefined, clubId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.clubMembers(userId ?? MISSING_USER, clubId),
+    queryFn: ({ signal }) => api.listClubMembers(clubId, signal),
+    enabled: Boolean(userId) && clubId !== '' && enabled,
+  });
+}
+
+export function useClubPolls(userId: string | undefined, clubId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.clubPolls(userId ?? MISSING_USER, clubId),
+    queryFn: ({ signal }) => api.listClubPolls(clubId, signal),
+    enabled: Boolean(userId) && clubId !== '' && enabled,
+  });
+}
+
+/** Poll results change while it is open: refresh every 15 s while the screen is visible. */
+export function useClubPoll(
+  userId: string | undefined,
+  clubId: string,
+  pollId: string,
+  reveal: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.clubPoll(userId ?? MISSING_USER, clubId, pollId, reveal),
+    queryFn: ({ signal }) => api.getClubPoll(clubId, pollId, reveal, signal),
+    enabled: Boolean(userId) && clubId !== '' && pollId !== '',
+    refetchInterval: (query) => (query.state.data?.poll.isOpen ? 15_000 : false),
+  });
+}
+
+export function useInvitePreview(userId: string | undefined, code: string) {
+  return useQuery({
+    queryKey: queryKeys.invite(userId ?? MISSING_USER, code),
+    queryFn: ({ signal }) => api.getInvitePreview(code, signal),
+    enabled: Boolean(userId) && code !== '',
+    retry: false,
+  });
+}
+
+export function useJoinByCode(userId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({ mutationFn: (code: string) => api.joinByCode(code), onSuccess: invalidate });
+}
+
+export function useRegenerateInviteCode(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: () => api.regenerateInviteCode(clubId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateClubPoll(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: CreatePollRequest) => api.createClubPoll(clubId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteClubPoll(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (pollId: string) => api.deleteClubPoll(clubId, pollId),
+    onSuccess: invalidate,
+  });
+}
+
+/** Votes on any poll of a club (the poll id is given per call so lists can reuse one hook). */
+export function useVotePoll(userId: string, clubId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: ({ pollId, optionIds }: { pollId: string; optionIds: string[] }) =>
+      api.votePoll(clubId, pollId, optionIds),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSavePollArgument(userId: string, clubId: string, pollId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: string) => api.savePollArgument(clubId, pollId, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeletePollArgument(userId: string, clubId: string, pollId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: () => api.deletePollArgument(clubId, pollId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetReaction(userId: string) {
+  const invalidate = useInvalidateCommunity(userId);
+  return useMutation({
+    mutationFn: (body: ReactionRequest) => api.setReaction(body),
     onSuccess: invalidate,
   });
 }
