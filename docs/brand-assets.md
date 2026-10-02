@@ -97,7 +97,9 @@ The brand board _shows_ these, but no standalone official file exists. They are 
 - logo vertical
 - "Ícone minimal" (colour and black)
 - app icon "Colorido" (purple background) and "Dark"
-- Android monochrome (themed) icon
+- Android monochrome (themed) icon — `needs-confirmation`. Until an official file exists, the
+  notification small icon references the official transparent `adaptive-icon-foreground.png`
+  (Android renders only its alpha shape; the file is not modified). Task 09, ADR-022.
 
 We use the official symbol on white as the app icon. Request the missing files from the brand owner
 if needed.
@@ -108,3 +110,15 @@ if needed.
   images (same dimensions, different bytes). Not canonical. Always use `Bubo - Assets/`.
 - `…10_14_19_pm_1`: early mascot renders (8 poses). Reference only.
 - `…10_14_19_pm_2`: the brand board (palette, icon, logo variants, pose names). Reference only.
+
+## System widgets (ADR-023, ADR-026)
+
+Native widget assets are copied byte for byte from the registry's canonical files, without
+redrawing or recolouring (`WIDGET_POSES` in `@bubo/contracts`). Read today → `celebrating`;
+reviewed only → `cheering`; weekly goal → `achievement`; reviews waiting → `review`; book in
+progress → `reading`; streak to keep → `happy`; no streak → `welcome`; evening at risk →
+`worried`, 21h → `surprised`, 22h → `worried`; night → `sleeping`; stale data → `doubt`;
+signed out → `welcome`. The Duolingo-style “peeking” look is the widget bounds clipping the
+bottom of the pose (layout only, about 70% visible); the PNG itself is never cropped. Scene
+backgrounds are saturated non-purple gradients so the purple Bubo stands out. The in-app previews use `BuboMascot`; native targets use generated copies of those
+same PNGs. Asset hashes are verified by the native-generation tests.

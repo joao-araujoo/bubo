@@ -2,14 +2,24 @@
 
 ## Continuação — 2026-09-30
 
+- Emails (2026-10-01; ADR-025): boas-vindas/confirmação opcional, recuperação e aviso de senha
+  alterada implementados com arte oficial. Teste Resend entregue e encontrado no Gmail INBOX.
+  `bubo.nyoneo.com.br` preparado; dono adiou DNS/ativação pública. Veja [emails.md](emails.md).
+
 - Minha memória: interface de 7/30/90/365 dias, histórico diário com rolagem, foco,
   horários das tentativas e revisões por livro com acesso ao detalhe. Cache por conta,
   data, período e fuso. Sem retenção estimada ou Score; aceite em aparelho pendente.
 - As 34 ideias do proprietário estão no [checklist futuro](ideias-futuras.md), com
-  critérios de aceite, dependências e sequência sugerida. Ainda não implementadas.
+  critérios de aceite, dependências e sequência sugerida; os widgets 29–33 avançaram na Task 09.
 - Task 08 concluída: resenhas, amigos e feed de amigos, ciclos de leitura do clube e moderação
-  geral publicados (veja a seção da Task 08). Próximo passo: Task 09 (Você: configurações e
-  notificações).
+  geral publicados (veja a seção da Task 08).
+- Task 09 concluída (2026-10-01): Preferências cognitivas com efeito real, Notificações, push com
+  lembrete diário de revisão e Você refeito no layout do Stitch. Push no aparelho depende da
+  configuração do dono (EAS + Firebase).
+- Task 09 ampliada (2026-10-01): widgets nativos Android/iOS, prévias e preferências em
+  **Você → Bubo na sua tela**. APK Android compilado/assinado; iOS e aceite em aparelhos pendentes.
+  Veja [widgets.md](widgets.md) e ADR-023. Próxima fase principal continua sendo o modelo
+  documentado de retenção da Task 06; Live Activity é um recorte separado do backlog.
 
 ## ✅ Task 01 — Foundation
 
@@ -269,19 +279,105 @@
   invites are codes, not per-user invitations). A public review feed, review drafts and "+XP"
   need product decisions. Device acceptance of every Comunidade screen is pending.
 
+## 🟡 Task 09 — Você, preferences, notifications, push and widgets (core deployed; native widget acceptance pending)
+
+- **Database:** `0013_reader_preferences_notifications` — `reader_preferences`, `reader_push_tokens`,
+  `reader_notifications` (legacy `notifications`/`push_devices`/`user_settings` exist in Neon,
+  hence `reader_`). ADR-022.
+- **API (6 routes + cron):** `GET|PUT /v1/me/preferences`, `POST /v1/me/push-token`,
+  `DELETE /v1/me/push-token/:token`, `GET /v1/notifications`, `POST /v1/notifications/read`.
+  Replies, friend requests/acceptances and new cycles write the inbox and push (names only, never
+  content; per-category switches; unregistered tokens deleted). Hourly cron sends the review
+  reminder at each reader's local hour, once a day, only when cards are due.
+- **Preferences with real effect:** review rigor scales SM-2 intervals (1.25 / 1 / 0.8); the daily
+  review limit caps `/v1/recall/due` (`dailyLimit`, `reviewedToday`); the daily focus goal drives
+  Hoje's mission (`focusedMinutesToday`); the yearly goal appears in Você.
+- **Mobile (Stitch layouts):**
+  - `configuracoes` ("Preferências cognitivas"): Bubo tip, SM-2 rigor tiles, cards per day,
+    focus goal tiles, yearly goal, palette tiles, haptics, push status/permission, reminder +
+    hour chips, community/friends switches, anti-spoiler shield (locked on), save footer.
+  - `notificacoes`: Todas / Memória / Comunidade, live "Hora de revisar" card, Guardião Bubo
+    summary, Hoje / Esta semana / Antes, accept/decline friend requests inline, mark all read.
+  - `(tabs)/voce` rebuilt from "Meu perfil": squircle avatar, level pill, XP to next level, books
+    read / Lembrei 30 dias / streak, recent badges, yearly goal ring, reading profile, account
+    rows; bell with the real unread count and settings gear (also a bell in Hoje).
+  - New primitives: `OptionTiles`, `HeaderButton` badge. Theme and haptics are saved on the
+    device (`lib/device-preferences.tsx`) and load before the first frame.
+  - Push: `lib/notifications.ts` (Android channels `lembretes`/`comunidade`, Android 13
+    permission after channels, Expo token, allowlisted deep links on tap, token removed on
+    sign-out). `expo-notifications` added with `npx expo install`.
+- **Android pass:** `FormScreen` keyboard uses `padding` on Android too (edge-to-edge in SDK 57
+  no longer resizes the window, so composers and publish buttons were hidden by the keyboard);
+  badge text without font padding; alerts checked for the 3-button limit; hardware back on the
+  focus session already confirms through `beforeRemove`.
+- **Fixed from earlier phases:** the theme choice was never saved (reset on every start);
+  duplicated doc comment in the stats contract; Revisar/Hoje/tab badge now show what is offered
+  today.
+- **Tests:** domain `preferences` (rigor, limit, local clock); DB constraints and cascades for
+  `0013`; API `notifications.test.ts` (preferences validation, tokens moving between accounts,
+  grouped replies without content, switches, blocks, read state, friend and cycle events,
+  unregistered tokens, daily limit + rigor, focus minutes, cron once per local day); mobile client
+  for the new routes.
+- **Needs the owner:** EAS project id (`eas init`) and Firebase/FCM for Android push; an official
+  monochrome notification icon (`needs-confirmation`). See CONFIGURAR.md.
+- **Not built (no data or decision):** "Alerta de curva crítica" (needs a retention model),
+  "Paisagem sonora", sepia palette, Anki/Notion export, cloud-sync badge, invitations to specific
+  readers.
+
+### Slice 2 — Native widgets (2026-10-01, ADR-023)
+
+- **Android:** three resizable home widgets (Continuar leitura, Ritmo da semana, Bubo completo),
+  system pin request when supported, real book/page/progress, reading-day activity, capped review
+  counts and guarded deep links. No Android keyguard widget is registered.
+- **iOS:** reading/rhythm small/medium/large; complete medium/large and compact lock screen
+  variants. App Group and embedded WidgetKit target configured by the local Expo plugin.
+- **App:** `widgets`, reached from Você; real-data previews, enable/disable, weekly reading target
+  and lock screen title privacy (hidden by default). No extra tab.
+- **Data:** `/v1/me/stats` adds owner-scoped `weekReadingDates` (sessions only); existing cognitive
+  week unchanged. Snapshots expire; clear on account change, disabling, sign-out/revocation and
+  deletion. Old downloads cannot resurrect cleared data. No new migration.
+- **Assets:** official PNGs and fonts copied byte for byte, light/dark native tokens generated
+  from the existing theme. Poses reading/review/celebrating/empty/sleeping/welcome/neutral.
+- **Local validation:** domain/publisher/native-generation tests, Android prebuild, Android/iOS
+  autolinking, iOS mod/project generation and Android/iOS JS exports. Follow-up ADR-024:
+  free local Android APK compiled for ARM64/ARMv7, signature, three widget receivers and embedded
+  JS verified; full verify green (330 tests). Java/SDK bootstrap and cached builds are automated.
+  macOS/Xcode remain unavailable; Swift compilation and Android/iPhone device acceptance stay
+  open in CONFIGURAR and TESTAR-TELAS. See [build-mobile.md](build-mobile.md).
+- **API deployment:** reading-only stats published as Worker version `1f7b4dcc` after green
+  `npm run deploy:api` (316 tests); Neon through `0013`, no pending migration. No mobile build
+  or store release was performed.
+- **Earlier-phase audit:** initial full verify green. Corrected outdated screen-test guidance
+  that still said settings/inbox were missing, and push copy that promised any installed build
+  would work despite missing owner configuration.
+
+### Slice 3 — Duolingo-style widget redesign (2026-10-01, ADR-026)
+
+- **Four widgets:** Sequência (small + iPhone lock screen), Sequência da semana (week checks),
+  Calendário de leitura (month runs) and Continuar leitura (white book card). They replace
+  Ritmo da semana / Bubo completo; previously installed widgets must be added again.
+- **Look:** full-bleed scene gradients from `widgetScenes`, flame + streak number (lit only
+  with activity today, red "!" while at risk), short caption and the official Bubo peeking
+  from the bottom edge; vector decorations generated by the plugin for Android and iOS.
+- **Moods by hour** decided in `@bubo/domain` (`buildWidgetMoods`, `widgetMoodNow`): day
+  nudge, 18h/21h/22h streak-at-risk escalation only with a real streak, celebration after
+  activity, sleep at night, honest stale/no-data states. Snapshot v2.
+- **API:** `/v1/me/stats` adds `monthActiveDates` (default `[]`). No migration.
+- **App:** `widgets` rebuilt with faithful previews and today's mood timeline.
+- **Pending:** launcher/WidgetKit device acceptance, Swift compilation (no macOS here).
+
 ## Later (see [screens.md](screens.md) for the full list)
 
 - **Task 06 leftovers:** retention model → retention curve and Bubo Score; badge unlock ledger;
   device acceptance of `estatisticas` periods/breakdowns UI (implemented 2026-09-30).
-- **Task 08 leftovers:** device acceptance of the Comunidade screens; club notifications go with
-  Task 09.
-- **Task 09, Você:** settings and cognitive preferences, notifications (Expo Push + a Worker cron
-  for due reviews).
+- **Task 08 leftovers:** device acceptance of the Comunidade screens.
+- **Task 09 leftovers:** owner push setup (EAS project id, Firebase/FCM), official monochrome
+  notification icon, device acceptance (Android 13 permission, channels, deep links, keyboard).
 - **AI (Gemini, server-side):** recall question suggestions and reflection feedback, inside existing
   flows. There is no AI or chat tab.
 - **Before the first store release:**
   - Privacy Policy and Terms (consent at sign-up)
-  - e-mail verification
+  - mandatory e-mail verification (optional confirmation implemented in ADR-025)
   - data export (LGPD)
   - Workers Paid plan
 

@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { ApiError } from '../api/client';
 import { useMe } from '../api/queries';
 import { haptics } from '../haptics';
+import { unregisterPush } from '../notifications';
 import { clearQueryCache } from '../query/persist';
 import { authClient } from './client';
 
@@ -44,6 +45,8 @@ export function useSignOut() {
   const queryClient = useQueryClient();
   return useCallback(async () => {
     haptics.press();
+    // While the session is still valid: this device stops receiving the account's pushes.
+    await unregisterPush();
     await authClient.signOut();
     await clearQueryCache(queryClient);
   }, [queryClient]);

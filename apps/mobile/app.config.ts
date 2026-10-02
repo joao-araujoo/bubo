@@ -14,17 +14,30 @@ const FONTS = [
 ];
 
 /**
- * Release builds must talk to the real API over HTTPS. Failing here stops an EAS build before a
+ * Release builds must talk to the real API over HTTPS. Failing here stops local and EAS builds before a
  * misconfigured binary (pointing at localhost or plain HTTP) can ever reach a store.
  */
 function assertReleaseApiUrl() {
-  const profile = process.env.EAS_BUILD_PROFILE;
+  const profile = process.env.BUBO_BUILD_PROFILE ?? process.env.EAS_BUILD_PROFILE;
   if (profile !== 'production' && profile !== 'preview') return;
   const url = process.env.EXPO_PUBLIC_API_URL ?? '';
-  if (!url.startsWith('https://')) {
+  let valid: boolean;
+  try {
+    const parsed = new URL(url);
+    valid =
+      parsed.protocol === 'https:' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash &&
+      !['localhost', '127.0.0.1', '[::1]', '0.0.0.0'].includes(parsed.hostname);
+  } catch {
+    valid = false;
+  }
+  if (!valid) {
     throw new Error(
-      `EXPO_PUBLIC_API_URL must be an https:// URL for "${profile}" builds (got "${url || 'empty'}"). ` +
-        'Set it in the EAS environment (eas env:create) — see docs/release.md.',
+      `EXPO_PUBLIC_API_URL must be a public HTTPS URL without credentials for "${profile}" builds. ` +
+        'See docs/build-mobile.md or docs/release.md.',
     );
   }
 }
@@ -54,12 +67,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: 'com.joaoaraujo.bubo',
+      // Android push (FCM) needs the owner's Firebase file, given to EAS as a file environment
+      // variable. Without it the app runs and says push is unavailable on that build.
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
       adaptiveIcon: {
         foregroundImage: './assets/icons/adaptive-icon-foreground.png',
         backgroundColor: '#FFFFFF',
       },
     },
     plugins: [
+      './plugins/with-bubo-widgets.config.cjs',
       'expo-router',
       [
         'expo-splash-screen',
@@ -71,6 +88,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       ['expo-font', { fonts: FONTS }],
+      [
+        'expo-notifications',
+        {
+          // Android draws only the alpha shape of the official transparent foreground (no new
+          // artwork, no recolouring); see docs/brand-assets.md.
+          icon: './assets/icons/adaptive-icon-foreground.png',
+          color: '#7C3AED',
+          defaultChannel: 'lembretes',
+        },
+      ],
       [
         'expo-camera',
         {

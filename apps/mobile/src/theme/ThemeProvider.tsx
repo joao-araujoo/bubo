@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { darkColors, lightColors, type ColorTokens } from './colors';
@@ -41,25 +41,34 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
- * Light / dark / system theming. The preference is kept in memory for now; persistence arrives
- * with user settings (it is a device preference, so it will use local storage, not the API).
+ * Light / dark / system theming. The choice is a device preference: the app loads it from local
+ * storage before the first frame and saves it through `onPreferenceChange` (Task 09).
  */
 export function ThemeProvider({
   children,
   // Light is the default; dark (or following the system) is an explicit choice in settings.
   initialPreference = 'light',
+  onPreferenceChange,
 }: {
   children: ReactNode;
   initialPreference?: ThemePreference;
+  onPreferenceChange?: (preference: ThemePreference) => void;
 }) {
   const system = useColorScheme();
-  const [preference, setPreference] = useState<ThemePreference>(initialPreference);
+  const [preference, setPreferenceState] = useState<ThemePreference>(initialPreference);
+  const setPreference = useCallback(
+    (next: ThemePreference) => {
+      setPreferenceState(next);
+      onPreferenceChange?.(next);
+    },
+    [onPreferenceChange],
+  );
   const scheme: ColorScheme =
     preference === 'system' ? (system === 'dark' ? 'dark' : 'light') : preference;
 
   const value = useMemo(
     () => ({ theme: buildTheme(scheme), preference, setPreference }),
-    [scheme, preference],
+    [scheme, preference, setPreference],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

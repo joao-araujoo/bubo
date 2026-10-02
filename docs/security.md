@@ -31,7 +31,8 @@
   - The request answers the same way whether or not an account exists.
   - Tokens last 1 hour and are single-use.
   - A reset revokes all sessions.
-  - Reset links are sent by Resend in production. In development they're logged locally. Anywhere
+  - Reset links are sent by Resend in production. Development without a provider logs only that
+    the email was not sent, never the recipient or authentication link. Anywhere
     else, with no provider configured, the request is refused up front with 503 (the same answer
     for every address). Better Auth sends in a background task and would otherwise answer 200, so
     the refusal happens before it (`apps/api/src/app.ts`, test `email-disabled.test.ts`).
@@ -40,6 +41,10 @@
   - Every row owned by the reader cascades from `users`: sessions, shelf, reading sessions, cards,
     reviews and profile.
   - The reader's manually added books are deleted too.
+- **Email verification (ADR-025):** optional on signup, signed one-hour link; guarded callbacks.
+  Manual resends limited to 3/min/IP. Unconfigured production returns 503 uniformly. Security
+  notification failures cannot prevent password-reset session revocation. Email logs omit auth
+  links and recipients; Resend idempotency headers contain event hashes, never tokens.
 - **Production config:** `/v1/ready` stays 503 unless all of these are set:
   - `DATABASE_URL`
   - `BETTER_AUTH_SECRET`
@@ -85,7 +90,8 @@
 
 ## Before production (known gaps)
 
-- E-mail verification at sign-up. The Resend sender already exists, so it only needs wiring.
+- Verify the Resend domain and configure the sender before enabling public email delivery.
+  Optional signup verification is implemented (ADR-025); requiring it remains an owner decision.
 - Terms of Use and Privacy Policy. The sign-up consent checkbox from Stitch was left out because
   the documents don't exist yet.
 - The Workers Paid plan: scrypt hashing exceeds the Free plan's 10 ms CPU limit.

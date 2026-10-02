@@ -25,7 +25,8 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const auth = useAuthState();
   const due = useDueCards(auth.status === 'ready' ? auth.userId : undefined);
-  const dueCount = due.data?.dueCount ?? 0;
+  // What Revisar offers today (the daily limit applies), never a decorative number.
+  const dueCount = due.data?.cards.length ?? 0;
   return (
     <Tabs
       screenListeners={{ tabPress: () => haptics.selection() }}

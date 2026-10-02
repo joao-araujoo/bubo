@@ -19,6 +19,7 @@ import {
 } from './middleware/session';
 import { catalogRoutes, createCatalogProvider } from './routes/catalog';
 import { communityRoutes } from './routes/community';
+import { notificationRoutes } from './routes/notifications';
 import { readerRoutes } from './routes/me';
 import { recallRoutes } from './routes/recall';
 import { shelfRoutes } from './routes/shelf';
@@ -41,6 +42,8 @@ export type AppDeps = {
   /** Catalog upstream fetch + cache (tests inject a mock fetch; default: global fetch). */
   catalogFetch?: FetchLike;
   catalogCache?: CatalogCache;
+  /** Expo push delivery (tests inject a mock; default: global fetch). */
+  pushFetch?: FetchLike;
 };
 
 /** Builds the Hono app. Dependencies are injectable so tests never hit the network. */
@@ -72,18 +75,20 @@ export function createApp(deps: AppDeps = {}) {
   // Better Auth sends the reset e-mail in a background task and always answers 200, so without a
   // provider the reader would wait for a message that never comes. Refuse up front instead (the
   // same 503 for every address, so it reveals nothing about which accounts exist).
-  app.post(`${API_PREFIX}${API_ROUTES.auth}/request-password-reset`, async (c, next) => {
-    const config = c.get('config');
-    const emailReady =
-      deps.emailSender !== undefined ||
-      (config.ok &&
-        (config.env.APP_ENV === 'development' ||
-          Boolean(config.env.RESEND_API_KEY && config.env.EMAIL_FROM)));
-    if (!emailReady) {
-      throw new AppError('SERVICE_UNAVAILABLE', 'Password reset by e-mail is not available yet.');
-    }
-    await next();
-  });
+  for (const action of ['request-password-reset', 'send-verification-email']) {
+    app.post(`${API_PREFIX}${API_ROUTES.auth}/${action}`, async (c, next) => {
+      const config = c.get('config');
+      const emailReady =
+        deps.emailSender !== undefined ||
+        (config.ok &&
+          (config.env.APP_ENV === 'development' ||
+            Boolean(config.env.RESEND_API_KEY && config.env.EMAIL_FROM)));
+      if (!emailReady) {
+        throw new AppError('SERVICE_UNAVAILABLE', 'E-mail delivery is not available yet.');
+      }
+      await next();
+    });
+  }
   app.use(authPath, authRedirectGuard, database, auth);
   app.on(['GET', 'POST'], authPath, (c) => c.get('auth').handler(c.req.raw));
 
@@ -104,6 +109,8 @@ export function createApp(deps: AppDeps = {}) {
     `${API_ROUTES.blocks}/*`,
     API_ROUTES.reactions,
     '/community/*',
+    API_ROUTES.notifications,
+    `${API_ROUTES.notifications}/*`,
   ]) {
     app.use(`${API_PREFIX}${path}`, database, auth, requireSession);
   }
@@ -111,7 +118,11 @@ export function createApp(deps: AppDeps = {}) {
   app.route(API_PREFIX, shelfRoutes({ now, catalog }));
   app.route(API_PREFIX, catalogRoutes({ catalog, now }));
   app.route(API_PREFIX, recallRoutes({ now }));
-  app.route(API_PREFIX, communityRoutes({ now }));
+  app.route(
+    API_PREFIX,
+    communityRoutes({ now, pushFetch: deps.pushFetch ?? ((input, init) => fetch(input, init)) }),
+  );
+  app.route(API_PREFIX, notificationRoutes({ now }));
 
   app.notFound(handleNotFound);
   app.onError(handleError);

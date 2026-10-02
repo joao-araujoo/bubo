@@ -45,6 +45,7 @@ describe('applyMigrations (PGlite)', () => {
       '0010_club_book_reviews.sql',
       '0011_club_reading_cycles.sql',
       '0012_reader_friendships.sql',
+      '0013_reader_preferences_notifications.sql',
     ]);
   });
 
@@ -254,5 +255,52 @@ describe('reading sessions constraints', () => {
     await report('poll');
     await report('argument');
     await expect(report('club')).rejects.toThrow();
+  });
+
+  it('enforces 0013 constraints: preferences, push tokens, notifications and cascades', async () => {
+    await applyMigrations(client(), loadMigrations());
+    await insertUser('u1');
+    await insertUser('u2');
+    await pg.query(`INSERT INTO "reader_preferences" ("user_id") VALUES ('u1')`);
+    const { rows } = await pg.query<{ review_reminder: boolean; daily_review_limit: number }>(
+      `SELECT "review_reminder", "daily_review_limit" FROM "reader_preferences" WHERE "user_id" = 'u1'`,
+    );
+    // Reminders are opt-in.
+    expect(rows[0]).toEqual({ review_reminder: false, daily_review_limit: 20 });
+    for (const bad of [
+      `UPDATE "reader_preferences" SET "review_intensity" = 'extreme'`,
+      `UPDATE "reader_preferences" SET "daily_review_limit" = 51`,
+      `UPDATE "reader_preferences" SET "daily_focus_minutes" = 25`,
+      `UPDATE "reader_preferences" SET "reminder_hour" = 24`,
+      `UPDATE "reader_preferences" SET "annual_book_goal" = 0`,
+    ]) {
+      await expect(pg.query(bad)).rejects.toThrow();
+    }
+    const token = (value: string, user: string, platform = 'android') =>
+      pg.query(
+        `INSERT INTO "reader_push_tokens" ("token", "user_id", "platform") VALUES ($1, $2, $3)`,
+        [value, user, platform],
+      );
+    await token('ExponentPushToken[abcdefghij]', 'u1');
+    await expect(token('ExponentPushToken[abcdefghij]', 'u2')).rejects.toThrow();
+    await expect(token('ExponentPushToken[klmnopqrst]', 'u1', 'web')).rejects.toThrow();
+    const notify = (id: string, kind: string) =>
+      pg.query(
+        `INSERT INTO "reader_notifications" ("id", "user_id", "kind", "actor_user_id") VALUES ($1, 'u1', $2, 'u2')`,
+        [id, kind],
+      );
+    await notify('n1', 'friend_request');
+    await expect(notify('n2', 'marketing')).rejects.toThrow();
+    // An actor deleting their account takes their notifications with them.
+    await pg.query(`DELETE FROM "users" WHERE "id" = 'u2'`);
+    const left = await pg.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM "reader_notifications"`,
+    );
+    expect(left.rows[0]?.n).toBe(0);
+    await pg.query(`DELETE FROM "users" WHERE "id" = 'u1'`);
+    const gone = await pg.query<{ n: number }>(
+      `SELECT ((SELECT count(*) FROM "reader_preferences") + (SELECT count(*) FROM "reader_push_tokens"))::int AS n`,
+    );
+    expect(gone.rows[0]?.n).toBe(0);
   });
 });

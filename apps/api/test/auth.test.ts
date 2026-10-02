@@ -20,6 +20,10 @@ beforeAll(async () => {
     pingDatabase: database.ping,
     logSink: logs.sink,
     emailSender: () => ({
+      canDeliver: false,
+      sendVerification: async () => undefined,
+      sendPasswordChanged: async () => undefined,
+      sendTest: async () => undefined,
       async sendPasswordReset(message) {
         sentEmails.push(message);
       },

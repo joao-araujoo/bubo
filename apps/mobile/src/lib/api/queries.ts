@@ -1,5 +1,7 @@
 import {
   type AddBookRequest,
+  type MarkNotificationsRead,
+  type ReaderPreferences,
   type GlobalModerationRequest,
   type CreateCycleRequest,
   type FriendAction,
@@ -53,6 +55,8 @@ export const queryKeys = {
   catalogBook: (userId: string, catalogId: string) =>
     ['catalog', userId, 'book', catalogId] as const,
   catalogIsbn: (userId: string, isbn: string) => ['catalog', userId, 'isbn', isbn] as const,
+  preferences: (userId: string) => ['preferences', userId] as const,
+  notifications: (userId: string) => ['notifications', userId] as const,
 };
 
 /** Normalized search text (the cache key and the request share it). */
@@ -641,5 +645,47 @@ export function useSetReaction(userId: string) {
   return useMutation({
     mutationFn: (body: ReactionRequest) => api.setReaction(body),
     onSuccess: invalidate,
+  });
+}
+
+/** Cognitive and notification preferences (server defaults until the reader saves). */
+export function usePreferences(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.preferences(userId ?? 'anonymous'),
+    queryFn: ({ signal }) => api.getPreferences(signal),
+    enabled: Boolean(userId),
+  });
+}
+
+export function useSavePreferences(userId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReaderPreferences) => api.savePreferences(body),
+    onSuccess: async (data) => {
+      client.setQueryData(queryKeys.preferences(userId), data);
+      // The daily limit and the focus goal change what Revisar and Hoje show.
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['recall', userId] }),
+        client.invalidateQueries({ queryKey: ['stats', userId] }),
+      ]);
+    },
+  });
+}
+
+/** Inbox; refreshed every minute while a screen that uses it is open. */
+export function useNotifications(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.notifications(userId ?? 'anonymous'),
+    queryFn: ({ signal }) => api.getNotifications(signal),
+    enabled: Boolean(userId),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarkNotificationsRead(userId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: MarkNotificationsRead) => api.markNotificationsRead(body),
+    onSuccess: (data) => client.setQueryData(queryKeys.notifications(userId), data),
   });
 }

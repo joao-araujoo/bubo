@@ -3,6 +3,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { type QueryClient } from '@tanstack/react-query';
 import { type PersistQueryClientOptions } from '@tanstack/react-query-persist-client';
 import Constants from 'expo-constants';
+import { clearWidgets } from '../../features/widgets/native';
 
 /**
  * Offline-first cache (ADR-016): successful queries (shelf, stats, recall, catalog) are written to
@@ -18,8 +19,10 @@ const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
   // Bump when a persisted response shape gains a required field (v2: shelf detail `reviews`,
   // Task 06; v3: community and memory shapes, Task 08; v4: review tags and friends, Task 08
-  // slice 2), so an OTA update with the same app version never reads an older shape.
-  key: 'bubo.query-cache.v4',
+  // slice 2; v5: daily limit/focus minutes; v6: reading-only widget days, Task 09), so an OTA
+  // update with the same app
+  // version never reads an older shape.
+  key: 'bubo.query-cache.v6',
   throttleTime: 1_000,
 });
 
@@ -37,6 +40,7 @@ export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
 /** Drops the in-memory and the persisted cache (sign-out, account deletion, revoked session). */
 export async function clearQueryCache(queryClient: QueryClient) {
   queryClient.clear();
+  await clearWidgets().catch(() => undefined);
   try {
     await persister.removeClient();
   } catch {

@@ -209,6 +209,7 @@ describe('spaced review (SM-2)', () => {
       reviewedToday: true,
       xpTotal: 5,
       weekActiveDates: ['2026-09-27'],
+      weekReadingDates: [],
     });
 
     // Retrying the same review id is a no-op.

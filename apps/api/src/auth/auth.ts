@@ -8,7 +8,9 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { eq } from 'drizzle-orm';
 
 import { AppError } from '../lib/errors';
+import { type Logger } from '../lib/logger';
 import { type EmailSender } from '../services/email';
+import { AUTH_EMAIL_LINK_TTL_SECONDS } from '../services/email-templates';
 
 export const AUTH_BASE_PATH = `${API_PREFIX}${API_ROUTES.auth}`;
 export const MIN_PASSWORD_LENGTH = 8;
@@ -20,7 +22,7 @@ export function trustedOriginsFor(appEnv: ServerEnv['APP_ENV']): string[] {
   return appEnv === 'development' ? [...origins, 'exp://', 'exp://**'] : origins;
 }
 
-export type AuthDeps = { db: Database; config: ServerEnv; email: EmailSender };
+export type AuthDeps = { db: Database; config: ServerEnv; email: EmailSender; logger: Logger };
 
 /**
  * Better Auth instance for one request (the DB handle is request-scoped on Workers).
@@ -29,7 +31,7 @@ export type AuthDeps = { db: Database; config: ServerEnv; email: EmailSender };
  * - rate limits persisted in Postgres (isolates are short-lived)
  * - telemetry disabled: nothing leaves our infrastructure
  */
-export function createAuth({ db, config, email }: AuthDeps) {
+export function createAuth({ db, config, email, logger }: AuthDeps) {
   if (!config.BETTER_AUTH_SECRET) {
     throw new AppError('SERVICE_UNAVAILABLE', 'Authentication is not configured.');
   }
@@ -58,9 +60,39 @@ export function createAuth({ db, config, email }: AuthDeps) {
       autoSignIn: true,
       requireEmailVerification: false,
       revokeSessionsOnPasswordReset: true,
-      resetPasswordTokenExpiresIn: 60 * 60,
+      resetPasswordTokenExpiresIn: AUTH_EMAIL_LINK_TTL_SECONDS,
       sendResetPassword: async ({ user, url }) => {
         await email.sendPasswordReset({ to: user.email, name: user.name, url });
+      },
+      onPasswordReset: async ({ user }) => {
+        if (!email.canDeliver) return;
+        // Better Auth invokes this before revoking sessions. Delivery must never interrupt revocation.
+        try {
+          await email.sendPasswordChanged({
+            to: user.email,
+            name: user.name,
+            eventId: crypto.randomUUID(),
+          });
+        } catch {
+          logger.warn('security email unavailable after password reset', { userId: user.id });
+        }
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: email.canDeliver,
+      sendOnSignIn: false,
+      expiresIn: AUTH_EMAIL_LINK_TTL_SECONDS,
+      sendVerificationEmail: async ({ user, url }, request) => {
+        const link = new URL(url);
+        // Default native callback; preserve explicit trusted callbacks already validated by the guard.
+        if (link.searchParams.get('callbackURL') === '/')
+          link.searchParams.set('callbackURL', 'bubo:///');
+        try {
+          await email.sendVerification({ to: user.email, name: user.name, url: link.href });
+        } catch (error) {
+          if (!request || !new URL(request.url).pathname.endsWith('/sign-up/email')) throw error;
+          logger.warn('signup verification email unavailable', { userId: user.id });
+        }
       },
     },
     session: {
@@ -87,6 +119,7 @@ export function createAuth({ db, config, email }: AuthDeps) {
         '/sign-in/email': { window: 60, max: 5 },
         '/sign-up/email': { window: 60, max: 5 },
         '/request-password-reset': { window: 60, max: 3 },
+        '/send-verification-email': { window: 60, max: 3 },
       },
     },
     trustedOrigins: trustedOriginsFor(config.APP_ENV),

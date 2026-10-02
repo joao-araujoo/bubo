@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <receiver android:name=".StreakWidget" android:exported="false" android:label="Sequência">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/bubo_streak_widget" />
+    </receiver>
+    <receiver android:name=".RhythmWidget" android:exported="false" android:label="Sequência da semana">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/bubo_rhythm_widget" />
+    </receiver>
+    <receiver android:name=".CalendarWidget" android:exported="false" android:label="Calendário de leitura">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/bubo_calendar_widget" />
+    </receiver>
+    <receiver android:name=".ReadingWidget" android:exported="false" android:label="Continuar leitura">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/bubo_reading_widget" />
+    </receiver>
+  </application>
+</manifest>

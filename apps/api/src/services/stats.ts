@@ -19,6 +19,7 @@ export async function getStats(
 ): Promise<StatsResponse> {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
+  const monthStart = `${today.slice(0, 8)}01`;
   const lookback = addDays(today, -STREAK_LOOKBACK_DAYS);
 
   const [sessionTotals] = await db
@@ -44,6 +45,11 @@ export async function getStats(
         lte(readingSessions.localDate, weekEnd),
       ),
     );
+
+  const [todayMinutes] = await db
+    .select({ seconds: sql<number>`coalesce(sum(${readingSessions.focusedSeconds}), 0)::int` })
+    .from(readingSessions)
+    .where(and(eq(readingSessions.userId, userId), eq(readingSessions.localDate, today)));
 
   const sessionDays = await db
     .selectDistinct({ localDate: readingSessions.localDate })
@@ -84,7 +90,10 @@ export async function getStats(
     ),
     sessionsCount: Number(sessionTotals?.count ?? 0),
     focusedMinutesThisWeek: Math.floor(Number(weekMinutes?.seconds ?? 0) / 60),
+    focusedMinutesToday: Math.floor(Number(todayMinutes?.seconds ?? 0) / 60),
     weekActiveDates: [...activeDates].filter((d) => d >= weekStart && d <= weekEnd).sort(),
+    monthActiveDates: [...activeDates].filter((d) => d >= monthStart && d <= today).sort(),
+    weekReadingDates: [...readDates].filter((d) => d >= weekStart && d <= weekEnd).sort(),
     readToday: readDates.has(today),
     reviewedToday: reviewDates.has(today),
     dueCards: Number(due?.count ?? 0),

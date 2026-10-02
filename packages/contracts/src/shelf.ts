@@ -97,9 +97,14 @@ export const statsResponseSchema = z.object({
   streakDays: z.number().int().nonnegative(),
   sessionsCount: z.number().int().nonnegative(),
   focusedMinutesThisWeek: z.number().int().nonnegative(),
-  /** Local dates (this Monday→Sunday) with at least one session. */
+  /** Focused minutes on `today` (the daily focus goal, Task 09). */
+  focusedMinutesToday: z.number().int().nonnegative(),
   /** Local dates (this Monday→Sunday) with a reading session or a review. */
   weekActiveDates: z.array(localDateSchema),
+  /** Local dates this month (up to today) with a session or a review: the widget calendar. Defaults to [] for older APIs. */
+  monthActiveDates: z.array(localDateSchema).default([]),
+  /** Reading-only days for the system widget; reviews never count as reading. */
+  weekReadingDates: z.array(localDateSchema),
   /** Whether there was a reading session on `today`. */
   readToday: z.boolean(),
   /** Whether there was at least one review on `today`. */

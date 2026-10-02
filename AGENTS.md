@@ -47,6 +47,11 @@ npm run verify         # MUST pass before you finish any task
 npm run dev:mobile | dev:api | lint | format | typecheck | test | doctor
 npm run assets:build | assets:check | audit:repo | package:zip
 npm run db:migrate:check   # read-only; `db:migrate` applies (Neon from apps/api/.dev.vars)
+npm run build:android     # free standalone APK with native widgets; includes verify
+npm run install:android   # install existing APK on an authorized USB device
+npm run build:android:setup | build:android:check
+npm run email:preview     # local examples; no credentials or sending
+npm run email:check       # read-only diagnostics unless --send-to is explicitly provided
 ```
 
 After adding a screen, run `npx expo start` once in `apps/mobile` (a few seconds is enough) so
@@ -98,7 +103,7 @@ On Windows use PowerShell or cmd. All scripts are cross-platform Node.
 
 ## Current status and next step
 
-Tasks 01–05, 07 and 08 are complete in code (Task 05 still needs owner/device acceptance, see
+Tasks 01–05 and 07–09 are complete in code (Task 05 still needs owner/device acceptance, see
 [docs/roadmap.md](docs/roadmap.md)):
 
 - foundation
@@ -108,17 +113,34 @@ Tasks 01–05, 07 and 08 are complete in code (Task 05 still needs owner/device 
 - Discover + catalog + ISBN
 - Comunidade: clubs + anti-spoiler debates + moderation (Task 07)
 - Comunidade part 2: invites, polls, reviews, friends, cycles, global moderation (Task 08)
+- Você: preferences with real effect, notification inbox, push + review reminder cron (Task 09)
 
 **Task 06 (memory and stats)** is done except a documented retention model (curve, Bubo Score).
 **Task 07 (Comunidade: clubs, anti-spoiler debates, reports, blocks; ADR-019)** is complete and
 deployed. **Task 08 (Comunidade part 2)** is complete and deployed: slice 1 (ADR-020: private clubs +
 invites, members, polls, reactions, club feed; `0009`) and slice 2 (ADR-021: book reviews with
 tags, friends + opt-in friends feed, club reading cycles, global moderation via
-`MODERATOR_USER_IDS`; `0010`–`0012`). Device acceptance is pending. **Next: Task 09 (Você:
-settings, notifications/push, then club notifications).**
+`MODERATOR_USER_IDS`; `0010`–`0012`). Device acceptance is pending. **Task 09 (ADR-022; `0013`)** is complete and
+deployed: preferences, inbox, Expo push (hourly cron), Você rebuilt. Push on devices needs the
+owner (EAS project id, Firebase). **Next:** Task 06 retention model (curve, Bubo Score) or AI
+flows (Gemini), as the owner prefers.
+
+**Task 09 widgets (2026-10-01; ADR-023):** Android App Widgets and iOS WidgetKit code implemented,
+with `widgets` previews/settings in Você. Source lives in `apps/mobile/modules/bubo-widgets`,
+`native-widgets` and the local config plugin. Generated PNGs/fonts/tokens always come from
+canonical assets/theme. Android APK compilation/signing verified (ADR-024); Swift compilation
+and Android/iPhone device acceptance are pending;
+see [docs/widgets.md](docs/widgets.md). **Redesign (ADR-026):** four Duolingo-style widgets
+(Sequência, Sequência da semana, Calendário de leitura, Continuar leitura) with scenes from
+`widgetScenes`, hourly moods from `@bubo/domain` and `monthActiveDates` in `/v1/me/stats`. Do not confuse prebuild/autolinking/JS export with native
+device validation. Live Activities remain backlog 34; Android keyguard is not registered.
 
 - Owner-only setup lives in [CONFIGURAR.md](CONFIGURAR.md); the screen test script in
   [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md). Keep both current when screens or config change.
+- Transactional emails (ADR-025): optional signup verification/welcome, reset, reset security
+  notice. Preserve auto sign-in and session revocation during provider failures. Resend test
+  reached owner Gmail INBOX; bubo.nyoneo.com.br DNS/public activation deferred by owner.
+  Instructions: [docs/emails.md](docs/emails.md), [docs/emails-dns.md](docs/emails-dns.md).
 - The shared Neon database has empty legacy tables (`clubs`, `club_polls`, `posts`, …). Never
   reuse those names; never drop them without the owner.
 - Remote state (Neon migrations, Worker deploys, R2) lives in

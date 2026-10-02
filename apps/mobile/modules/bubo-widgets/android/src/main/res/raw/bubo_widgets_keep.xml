@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scene, pose and calendar drawables are looked up by name in BuboWidgetProvider. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+  tools:keep="@drawable/bubo_*,@color/bubo_*,@id/bubo_*" />

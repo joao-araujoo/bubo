@@ -7,7 +7,9 @@ export * from './errors';
 export * from './health';
 export * from './me';
 export * from './memory';
+export * from './notifications';
 export * from './openapi';
+export * from './preferences';
 export * from './recall';
 export * from './shelf';
 export {
@@ -17,3 +19,4 @@ export {
   deleteResponseSchema,
   type ApiRouteDefinition,
 } from './routes';
+export * from './widgets';

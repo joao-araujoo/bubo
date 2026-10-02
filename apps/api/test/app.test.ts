@@ -186,6 +186,11 @@ describe('GET /v1/openapi.json', () => {
       '/v1/clubs/{id}/cycles',
       '/v1/clubs/{id}/cycles/{cycleId}/close',
       '/v1/me/moderation',
+      '/v1/me/preferences',
+      '/v1/me/push-token',
+      '/v1/me/push-token/{token}',
+      '/v1/notifications',
+      '/v1/notifications/read',
     ]);
   });
 });

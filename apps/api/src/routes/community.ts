@@ -19,6 +19,7 @@ import {
 import { type Context, Hono } from 'hono';
 
 import { type AppEnv } from '../env';
+import { type FetchLike } from '../services/catalog';
 import { createRateLimiter } from '../lib/rate-limit';
 import { parseJsonBody } from '../lib/validation';
 import { listMembers } from '../services/club-members';
@@ -45,6 +46,13 @@ import {
   unblockUser,
 } from '../services/community';
 import { getFeed } from '../services/community-feed';
+import {
+  notifyCycleStarted,
+  notifyFriendAccepted,
+  notifyFriendRequest,
+  notifyTopicReply,
+} from '../services/notifications';
+import { type PushMessage, deliverPush } from '../services/push';
 import { listCycles, startCycle, closeCycle } from '../services/club-cycles';
 import { changeFriend, friendsFeed, listFriends, saveSocialPreferences } from '../services/friends';
 import {
@@ -63,8 +71,23 @@ const readerId = (c: Context<AppEnv>) => c.get('session').user.id;
  * reports and blocks. Session-protected; membership, spoiler locks and moderation are enforced in
  * the services, never in the client.
  */
-export function communityRoutes(deps: { now: () => Date }) {
+export function communityRoutes(deps: { now: () => Date; pushFetch: FetchLike }) {
   const routes = new Hono<AppEnv>();
+
+  /**
+   * Records the inbox item and pushes after the action succeeded. A failure here is logged and
+   * never undoes or fails the action itself.
+   */
+  async function notify(c: Context<AppEnv>, build: () => Promise<PushMessage[]>) {
+    try {
+      const messages = await build();
+      await deliverPush(c.get('db'), messages, { fetch: deps.pushFetch, logger: c.get('logger') });
+    } catch (error) {
+      c.get('logger').warn('notification failed', {
+        error: error instanceof Error ? error.name : 'unknown',
+      });
+    }
+  }
   // Writes only (clubs, topics, replies, polls, votes, reports): a flood guard per reader.
   const writes = createRateLimiter({
     limit: 30,
@@ -171,6 +194,15 @@ export function communityRoutes(deps: { now: () => Date }) {
       c.req.param('postId'),
       input,
     );
+    if (created) {
+      await notify(c, () =>
+        notifyTopicReply(
+          c.get('db'),
+          { replierId: readerId(c), clubId: c.req.param('id'), postId: c.req.param('postId') },
+          deps.now(),
+        ),
+      );
+    }
     return c.json(reply, created ? 201 : 200);
   });
 
@@ -312,9 +344,32 @@ export function communityRoutes(deps: { now: () => Date }) {
   routes.put(API_ROUTES.friend, async (c) => {
     writes.hit(readerId(c));
     const input = await parseJsonBody(c, friendActionSchema);
-    return c.json(
-      await changeFriend(c.get('db'), readerId(c), c.req.param('userId'), input.action, deps.now()),
+    const otherId = c.req.param('userId');
+    const { friends, event } = await changeFriend(
+      c.get('db'),
+      readerId(c),
+      otherId,
+      input.action,
+      deps.now(),
     );
+    if (event === 'requested') {
+      await notify(c, () =>
+        notifyFriendRequest(
+          c.get('db'),
+          { senderId: readerId(c), recipientId: otherId },
+          deps.now(),
+        ),
+      );
+    } else if (event === 'accepted') {
+      await notify(c, () =>
+        notifyFriendAccepted(
+          c.get('db'),
+          { senderId: otherId, recipientId: readerId(c) },
+          deps.now(),
+        ),
+      );
+    }
+    return c.json(friends);
   });
   routes.put(API_ROUTES.socialPreferences, async (c) => {
     writes.hit(readerId(c));
@@ -333,7 +388,24 @@ export function communityRoutes(deps: { now: () => Date }) {
   routes.post(API_ROUTES.clubCycles, async (c) => {
     writes.hit(readerId(c));
     const input = await parseJsonBody(c, createCycleRequestSchema);
-    return c.json(await startCycle(c.get('db'), readerId(c), c.req.param('id'), input, deps.now()));
+    const clubId = c.req.param('id');
+    const { cycles, created } = await startCycle(
+      c.get('db'),
+      readerId(c),
+      clubId,
+      input,
+      deps.now(),
+    );
+    if (created) {
+      await notify(c, () =>
+        notifyCycleStarted(
+          c.get('db'),
+          { ownerId: readerId(c), clubId, cycleId: input.id, goalPages: input.goalPages },
+          deps.now(),
+        ),
+      );
+    }
+    return c.json(cycles);
   });
   routes.post(API_ROUTES.clubCycleClose, async (c) =>
     c.json(

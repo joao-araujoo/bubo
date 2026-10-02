@@ -3,18 +3,20 @@ import { Pressable, View } from 'react-native';
 
 import { Avatar, BuboLogo, Chip } from '../../design-system';
 import { haptics } from '../../lib/haptics';
+import { NotificationBell } from '../notifications/NotificationBell';
 import { useTheme } from '../../theme';
 
 type Props = {
   /** The signed-in reader's name (initials in the avatar). */
   name: string;
+  userId: string;
   /** `null` until the reader has real activity (never invented). */
   streakDays: number | null;
   xp: number | null;
 };
 
 /** Home header: official logo, streak + XP counters and the profile shortcut. */
-export function HomeHeader({ name, streakDays, xp }: Props) {
+export function HomeHeader({ name, userId, streakDays, xp }: Props) {
   const theme = useTheme();
   const router = useRouter();
   return (
@@ -40,6 +42,7 @@ export function HomeHeader({ name, streakDays, xp }: Props) {
         label={xp === null ? '–' : String(xp)}
         accessibilityLabel={xp === null ? 'XP: ainda sem dados' : `${xp} pontos de experiência`}
       />
+      <NotificationBell userId={userId} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Abrir seu perfil"

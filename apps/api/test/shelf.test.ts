@@ -302,7 +302,10 @@ describe('stats', () => {
       streakDays: 0,
       sessionsCount: 0,
       focusedMinutesThisWeek: 0,
+      focusedMinutesToday: 0,
       weekActiveDates: [],
+      monthActiveDates: [],
+      weekReadingDates: [],
       readToday: false,
       reviewedToday: false,
       dueCards: 0,
@@ -332,6 +335,7 @@ describe('stats', () => {
       streakDays: 1,
       readToday: false,
       weekActiveDates: ['2026-09-25'],
+      weekReadingDates: ['2026-09-25'],
     });
 
     await h.call('/v1/sessions', {
@@ -349,6 +353,13 @@ describe('stats', () => {
       xpTotal: 45,
       focusedMinutesThisWeek: 45,
       weekActiveDates: ['2026-09-25', '2026-09-26'],
+      monthActiveDates: ['2026-09-25', '2026-09-26'],
+      weekReadingDates: ['2026-09-25', '2026-09-26'],
     });
+    // The widget calendar restarts with the month; the streak carries over.
+    const nextMonth = statsResponseSchema.parse(
+      await (await h.call('/v1/me/stats?today=2026-10-01', { cookie })).json(),
+    );
+    expect(nextMonth.monthActiveDates).toEqual([]);
   });
 });

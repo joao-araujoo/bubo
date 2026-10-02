@@ -113,17 +113,17 @@ do [roadmap](roadmap.md). Cada checkbox representa uma entrega com os critérios
 
 ## 6. Presença no sistema do celular
 
-- [ ] **29 — Widget: Continuar leitura.** Capa, título, página e progresso do livro
+- [ ] **29 — Widget: Continuar leitura (código implementado; aceite nativo pendente, ADR-023).** Capa, título, página e progresso do livro
       atual; toque abre livro ou inicia sessão. Deep link autenticado e estado vazio honesto;
       atualizar após sessões e saída da conta.
-- [ ] **30 — Widget: Ritmo da semana.** Dias com leitura e meta (3/4), Bubo e estados
+- [ ] **30 — Widget: Ritmo da semana (código implementado; aceite nativo pendente).** Dias com leitura e meta (3/4), Bubo e estados
       visuais compatíveis com as limitações da plataforma. Depende de 04 e 05.
-- [ ] **31 — Widget: Completo.** Versão média/grande com livro atual, progresso, meta,
+- [ ] **31 — Widget: Completo (código implementado; aceite nativo pendente).** Versão média/grande com livro atual, progresso, meta,
       dias ativos, próxima revisão e continuar; painel legível, com prioridades claras.
-- [ ] **32 — Widgets com estados do mascote.** Ler, comemorar meta, descansar sem
+- [ ] **32 — Widgets com estados do mascote (poses oficiais implementadas; aceite nativo pendente).** Ler, comemorar meta, descansar sem
       pendências, segurar cards com revisões e dormir à noite. Mapear somente assets oficiais;
       documentar pose equivalente ou needs-confirmation. Nunca redesenhar/recolorir Bubo.
-- [ ] **33 — Widget na tela bloqueada.** Versões compactas com página, ritmo, revisões
+- [ ] **33 — Widget na tela bloqueada (iOS implementado; Android sem registro keyguard; aceite pendente).** Versões compactas com página, ritmo, revisões
       e voltar ao livro. Configurar privacidade do título/capa em tela bloqueada; validar
       suporte por plataforma em build nativo e aparelho.
 - [ ] **34 — Live Activity durante a sessão.** Tempo, título/capa e estado na tela

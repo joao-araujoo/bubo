@@ -28,7 +28,7 @@ bucket_name = "bubo"
 # by environments, so they are repeated here.
 # Required secrets (config validation keeps /v1/ready at 503 until all are set):
 #   DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL (https://…), RESEND_API_KEY, EMAIL_FROM
-# Optional: GEMINI_API_KEY, GOOGLE_BOOKS_API_KEY
+# Optional: GEMINI_API_KEY, GOOGLE_BOOKS_API_KEY, MODERATOR_USER_IDS
 # ---------------------------------------------------------------------------------------------
 [env.production]
 name = "bubo-api"
@@ -36,6 +36,10 @@ name = "bubo-api"
 [env.production.vars]
 APP_ENV = "production"
 GEMINI_MODEL = "gemini-2.5-flash"
+
+# Hourly cron: daily review reminders at each reader's chosen local hour (ADR-022).
+[env.production.triggers]
+crons = ["0 * * * *"]
 
 [env.production.observability]
 enabled = true

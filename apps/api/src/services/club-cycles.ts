@@ -42,6 +42,7 @@ export async function startCycle(
   input: CreateCycleRequest,
   now: Date,
 ) {
+  let created = false;
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM reading_clubs WHERE id = ${clubId} FOR UPDATE`);
     const { club, isOwner } = await requireMember(tx, clubId, userId);
@@ -89,8 +90,9 @@ export async function startCycle(
       await tx
         .insert(clubCycleMembers)
         .values(members.map((member) => ({ cycleId: input.id, userId: member.userId })));
+    created = true;
   });
-  return listCycles(db, userId, clubId, now);
+  return { cycles: await listCycles(db, userId, clubId, now), created };
 }
 
 export async function closeCycle(

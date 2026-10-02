@@ -17,9 +17,8 @@ const IGNORED_DIRS = new Set([
   '.expo',
   '.wrangler',
   'dist',
+  'build',
   'coverage',
-  'android',
-  'ios',
   '.tmp-inspect',
   '.local',
   'Bubo - Assets',
@@ -27,7 +26,7 @@ const IGNORED_DIRS = new Set([
   'assets-source',
   '.git',
 ]);
-const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.jsx']);
+const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.jsx', '.kt', '.swift']);
 const TEXT_EXT = new Set([
   ...CODE_EXT,
   '.json',
@@ -37,12 +36,17 @@ const TEXT_EXT = new Set([
   '.yml',
   '.yaml',
   '.example',
+  '.xml',
+  '.podspec',
+  '.gradle',
 ]);
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (IGNORED_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
+    const relative = path.relative(root, full).split(path.sep).join('/');
+    if (relative === 'apps/mobile/android' || relative === 'apps/mobile/ios') continue;
     if (entry.isDirectory()) walk(full, out);
     else out.push(full);
   }

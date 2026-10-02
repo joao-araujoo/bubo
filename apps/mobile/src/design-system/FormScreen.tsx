@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { type ComponentProps, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FadeIn } from '../lib/motion';
@@ -43,12 +43,15 @@ export function HeaderButton({
   onPress,
   shape = 'round',
   iconColor = 'text',
+  badge,
 }: {
   icon: ComponentProps<typeof Icon>['name'];
   label: string;
   onPress: () => void;
   shape?: 'round' | 'square';
   iconColor?: keyof ColorTokens;
+  /** Real count drawn on the corner (e.g. unread notifications); hidden when 0. */
+  badge?: number;
 }) {
   const theme = useTheme();
   const square = shape === 'square';
@@ -56,7 +59,7 @@ export function HeaderButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={badge ? `${label}, ${badge} ${badge === 1 ? 'nova' : 'novas'}` : label}
       onPress={onPress}
       hitSlop={square ? 6 : 4}
     >
@@ -76,6 +79,32 @@ export function HeaderButton({
           }}
         >
           <Icon name={icon} size={square ? 20 : 22} color={iconColor} />
+          {badge ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                minWidth: 20,
+                height: 20,
+                paddingHorizontal: 4,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: theme.colors.surface,
+                backgroundColor: theme.colors.primary,
+              }}
+            >
+              <Text
+                variant="label"
+                color="onPrimary"
+                style={{ fontSize: 10, lineHeight: 13, includeFontPadding: false }}
+              >
+                {badge > 99 ? '99+' : String(badge)}
+              </Text>
+            </View>
+          ) : null}
         </Raised>
       )}
     </Pressable>
@@ -143,7 +172,9 @@ export function FormScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // Android draws edge-to-edge (SDK 57), so the window no longer shrinks for the keyboard:
+      // padding keeps fields and the sticky footer (composers, publish buttons) above it.
+      behavior="padding"
       style={{ flex: 1, backgroundColor: theme.colors.bg }}
     >
       <View

@@ -10,11 +10,12 @@ import {
   recallCardSchema,
 } from '@bubo/contracts';
 import { type Database, type Executor, schema } from '@bubo/database';
-import { addDays } from '@bubo/domain';
+import { addDays, adjustInterval, remainingReviewsToday } from '@bubo/domain';
 import { type RecallGrade, scheduleNextReview, xpForRecallSession } from '@bubo/scoring';
 import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
 
 import { AppError } from '../lib/errors';
+import { getPreferences } from './preferences';
 import { findEntry } from './shelf';
 import { getStats } from './stats';
 
@@ -117,6 +118,14 @@ export async function listDueCards(
   userId: string,
   today: string,
 ): Promise<DueCardsResponse> {
+  // The daily limit counts cards already graded today (Task 09); `dueCount` stays the full truth.
+  const { dailyReviewLimit } = await getPreferences(db, userId);
+  const [graded] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(reviewLogs)
+    .where(and(eq(reviewLogs.userId, userId), eq(reviewLogs.localDate, today)));
+  const reviewedToday = Number(graded?.n ?? 0);
+  const offered = Math.min(DUE_PAGE_SIZE, remainingReviewsToday(dailyReviewLimit, reviewedToday));
   const due = await db
     .select({ card: recallCards, bookTitle: books.title })
     .from(recallCards)
@@ -124,7 +133,7 @@ export async function listDueCards(
     .innerJoin(books, eq(books.id, shelfEntries.bookId))
     .where(and(eq(recallCards.userId, userId), lte(recallCards.dueDate, today)))
     .orderBy(asc(recallCards.dueDate), asc(recallCards.createdAt))
-    .limit(DUE_PAGE_SIZE);
+    .limit(offered);
 
   const [counts] = await db
     .select({
@@ -145,6 +154,8 @@ export async function listDueCards(
     dueCount: Number(counts?.due ?? 0),
     totalCards: Number(counts?.total ?? 0),
     nextDueDate: next?.date ?? null,
+    dailyLimit: dailyReviewLimit,
+    reviewedToday,
   });
 }
 
@@ -252,7 +263,8 @@ export async function reviewCard(
     }
 
     const grade = input.grade as RecallGrade;
-    const next = scheduleNextReview(
+    const { reviewIntensity } = await getPreferences(tx, userId);
+    const sm2 = scheduleNextReview(
       {
         repetitions: card.repetitions,
         intervalDays: card.intervalDays,
@@ -260,6 +272,11 @@ export async function reviewCard(
       },
       grade,
     );
+    // The reader's rigor scales successful intervals; a lapse always comes back tomorrow.
+    const next =
+      grade >= 3
+        ? { ...sm2, intervalDays: adjustInterval(sm2.intervalDays, reviewIntensity) }
+        : sm2;
     const xpEarned = xpForRecallSession({
       attempts: 1,
       correct: grade >= 3 ? 1 : 0,

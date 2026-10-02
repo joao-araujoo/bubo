@@ -60,5 +60,8 @@ export const dueCardsResponseSchema = z.object({
   totalCards: z.number().int().nonnegative(),
   /** Earliest future due date when nothing is due today. */
   nextDueDate: localDateSchema.nullable(),
+  /** Reader's daily limit (Task 09) and cards already graded today: `cards` holds at most the rest. */
+  dailyLimit: z.number().int().positive(),
+  reviewedToday: z.number().int().nonnegative(),
 });
 export type DueCardsResponse = z.infer<typeof dueCardsResponseSchema>;

@@ -4,7 +4,7 @@ Lista de **todas as telas que existem hoje**, como chegar em cada uma e o que co
 terminar as configurações de [../CONFIGURAR.md](../CONFIGURAR.md). Status de cada tela frente ao
 Stitch: [screens.md](screens.md).
 
-Última atualização: 2026-09-30 (Task 08 concluída — resenhas, amigos, ciclos e moderação). Total: 44 telas, mais 2 de desenvolvimento.
+Última atualização: 2026-10-01 (Task 09 concluída — preferências, notificações e push). Total: 47 telas, mais 2 de desenvolvimento.
 
 ---
 
@@ -20,7 +20,12 @@ Stitch: [screens.md](screens.md).
 Atenção: se o `apps/api/.dev.vars` tiver `DATABASE_URL`, o `dev:api` usa o **mesmo banco da
 produção** (ver CONFIGURAR.md 3.2). Sem essa linha, tudo roda local (PGlite).
 
-**Opção B — contra a produção:** exige um build EAS (CONFIGURAR.md 3.3). O Expo Go **não** consegue
+No Expo Go (Android) as notificações push não existem: o app abre normalmente e Configurações
+mostra push como "indisponível". Push requer uma build nativa e configuração Firebase/EAS
+(CONFIGURAR 3.13); não é necessário para testar widgets.
+
+**Opção B — contra a produção, Android com widgets:** `npm run build:android` e instale
+`build/android/bubo-test.apk` (CONFIGURAR.md 3.3). O Expo Go **não** consegue
 entrar na conta da API de produção (ela só aceita o app oficial `bubo://`).
 
 **Para testar a Comunidade** você precisa de **duas contas** (dois celulares, ou sair e entrar com
@@ -52,6 +57,13 @@ outra conta): uma cria o clube e escreve, a outra entra e vê o bloqueio anti-sp
 
 ## 2. Onboarding (só na primeira vez, após o cadastro)
 
+Antes, confira os emails de conta quando o domínio/Resend estiverem configurados (ADR-025):
+cadastro recebe um único email de boas-vindas/confirmação; o link confirma e volta ao app sem
+bloquear o uso inicial. Recuperação recebe link de 1 hora/uso único; senha redefinida recebe
+aviso de segurança. Confira texto/imagens/botão no Gmail e outro cliente. Links `bubo:///`
+podem exigir abrir o app manualmente. Sem Resend, ações de email em produção continuam 503.
+Guia de ativação: [emails-dns.md](emails-dns.md).
+
 | #   | Tela                 | O que conferir                                                  |
 | --- | -------------------- | --------------------------------------------------------------- |
 | 8   | Hábito (2/6)         | Barra de progresso "2 de 6"; só avança com uma opção escolhida. |
@@ -62,13 +74,13 @@ outra conta): uma cria o clube e escreve, a outra entra e vê o bloqueio anti-sp
 
 ## 3. Abas principais
 
-| #   | Tela           | O que conferir                                                                                                                   |
-| --- | -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 13  | **Hoje**       | Sequência e XP reais no topo; "Lendo agora"; "Recuperação ativa" com cards pendentes; semana cognitiva; missão do dia.           |
-| 14  | **Estante**    | Livros agrupados por status; vazio mostra o Bubo; botão para adicionar.                                                          |
-| 15  | **Revisar**    | Contagem de cards para hoje e selo na aba; sem cards → explica como criar.                                                       |
-| 16  | **Comunidade** | Ver seção 6.                                                                                                                     |
-| 17  | **Você**       | Nome, e-mail, lidos/XP/sequência reais; Aparência; Minha memória; Mural de conquistas; Leitores bloqueados; Sair; Excluir conta. |
+| #   | Tela           | O que conferir                                                                                                                                |
+| --- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 13  | **Hoje**       | Sequência e XP reais no topo, sino com avisos não lidos; "Lendo agora"; "Recuperação ativa"; semana cognitiva; missão com a sua meta de foco. |
+| 14  | **Estante**    | Livros agrupados por status; vazio mostra o Bubo; botão para adicionar.                                                                       |
+| 15  | **Revisar**    | Cards de hoje (respeita o limite diário) e selo na aba; limite atingido → "Meta de revisões cumprida"; sem cards → explica como criar.        |
+| 16  | **Comunidade** | Ver seção 6.                                                                                                                                  |
+| 17  | **Você**       | Ver tela 47 (perfil novo). Aparência agora fica em Preferências.                                                                              |
 
 ## 4. Livros e leitura
 
@@ -191,6 +203,75 @@ Continuação de 2026-09-30 — Você → Minha memória:
 
 ---
 
+## 6b. Você, preferências e notificações (Task 09)
+
+| #   | Tela                    | Como chegar                                                  | O que conferir                                                                                                                                                                                                                                                                        |
+| --- | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 45  | Preferências cognitivas | Você → engrenagem no topo, ou Você → Preferências cognitivas | Rigor (Suave / Equilibrado / Intensivo), revisões por dia (5–50), meta diária de foco, meta anual, tema (salvo ao reabrir o app), vibração, notificações (estado do aparelho, lembrete + horário, clubes, amigos), escudo anti-spoiler sempre ligado. "Salvar" só ativa com mudanças. |
+| 46  | Notificações            | Sino no topo do Hoje ou do Você                              | Todas / Memória / Comunidade; card "Hora de revisar" só com lembranças vencidas; avisos por dia; aceitar/recusar amizade ali mesmo; "Lidas" zera o contador do sino.                                                                                                                  |
+| 47  | Você (novo)             | Aba Você                                                     | Avatar com estrela, nível e XP para o próximo nível, livros lidos / Lembrei 30 dias / sequência, conquistas recentes, meta anual, seu jeito de ler, atalhos.                                                                                                                          |
+
+### Roteiro de preferências
+
+1. Em Preferências, escolha **Intensivo**, **5** revisões por dia e **30 min** → Salvar.
+2. Hoje: a missão vira "Leia 30 minutos com foco hoje", com barra de progresso.
+3. Revisar: aparecem no máximo 5 cartões; ao terminar os 5, aparece "Meta de revisões cumprida".
+4. Troque o tema para **Escuro**, feche o app de vez e abra de novo: continua escuro.
+
+### Roteiro de notificações (duas contas, A e B, no mesmo clube)
+
+1. **B** pede amizade a **A** → o sino de **A** mostra 1 → Notificações → "Aceitar".
+2. **B** recebe "Amizade aceita". **A** abre um debate; **B** responde → **A** vê "B respondeu à
+   sua discussão" (sem o texto da resposta) → "Ver discussão" abre o debate.
+3. Com uma build instalada (CONFIGURAR 3.13) e o lembrete ligado para a próxima hora cheia, com
+   cartões vencidos: chega "Hora de lembrar"; tocar abre Revisar. No Android, em Configurações →
+   Apps → Bubo → Notificações, aparecem os canais "Lembretes de revisão" e "Comunidade".
+4. **Android:** em telas com campo de texto no rodapé (responder debate, publicar resenha), o
+   teclado não pode cobrir o campo nem o botão.
+
+---
+
+## 6c. Widgets Android e iOS (Task 09, ADR-023 / ADR-026)
+
+Abra **Você → Bubo na sua tela**. Sem módulo nativo, confira as prévias; os widgets do sistema
+precisam de uma nova build instalada (CONFIGURAR 3.14).
+
+Para o APK Android gratuito: `npm run build:android`, depois copie `build/android/bubo-test.apk`
+para o celular ou rode `npm run install:android` com USB autorizado. Feche o terminal/Metro e
+confira que o app continua abrindo e os widgets aparecem no seletor do launcher.
+
+1. **Android:** adicione os quatro modelos (Sequência, Sequência da semana, Calendário de
+   leitura, Continuar leitura) pelo botão no app ou pelo seletor Widgets → Bubo. Compare com
+   as prévias do app: cena colorida de ponta a ponta, chama + número, frase e Bubo espiando de
+   baixo sem distorção. Redimensione: os médios estreitos viram o pequeno. **iOS:** confira
+   pequeno/médio e as três variantes de Sequência na tela bloqueada.
+   Widgets do modelo anterior (Ritmo da semana / Bubo completo) devem sumir após a atualização.
+2. Sem livro em leitura: estado vazio, sem capa/título/percentual inventados. Com um livro:
+   widget mostra a página real; toque abre livro/sessão autenticados. Confirme que a sessão
+   não começa a registrar atividade apenas por instalar/tocar no widget.
+3. Conclua uma sessão: a chama acende (laranja), a cena fica dourada com o Bubo comemorando,
+   o dia ganha check na semana e entra na faixa do calendário (fundo menta). Página/progresso
+   atualizam. Um dia só de revisão também acende a chama (“Revisão feita hoje!”), mas não
+   conta para a meta semanal de leitura; ao bater a meta, aparece “Meta da semana!”.
+4. Revise até o limite diário: a contagem de revisões oferecidas cai a zero, mesmo que existam
+   outros cards pendentes. O widget não deve insistir em revisões que o app já limitou.
+5. No iPhone, o título da tela bloqueada começa oculto; capa, reflexão e resposta de memória
+   não aparecem. Altere a opção no app e confira; as regras de privacidade do sistema prevalecem.
+6. Desligue “Atualizar meus widgets”: os dados somem. Ligue: dados da conta atual voltam.
+   Saia da conta, entre com outra e exclua uma conta de teste: widgets anteriores não podem
+   ressurgir, inclusive se uma capa ainda estava carregando.
+7. Sem ler hoje e com sequência: às 18h “Salve sua sequência!” (com “!” vermelho na chama),
+   às 21h “Está ficando tarde!”, às 22h “Última chance!”. Sem sequência, não há alerta.
+   Depois de ler, à noite (22h–05h59) o Bubo dorme. Após virar o dia / dados ficarem antigos,
+   o widget mostra “Abra o Bubo” sem número e não mantém números de “hoje”. Sem conexão, reabrir não renova dados antigos.
+   O sistema pode atrasar refresh; sincronize abrindo o app para conferir a atualização imediata.
+8. Confira tema claro/escuro do sistema, fonte grande, TalkBack/VoiceOver, ações e labels.
+   Android específico de tela bloqueada e Live Activity não fazem parte deste recorte.
+
+**APK Android compilado e verificado em 2026-10-01** (assinatura, três receptores de widgets
+e bundle embarcado). **Aceite em aparelho ainda pendente:** não houve celular conectado.
+Swift/iOS ainda não foi compilado; o comportamento do launcher/WidgetKit exige este roteiro.
+
 ## 7. Só em desenvolvimento
 
 | Tela                     | Como chegar                  | Observação                                                |
@@ -200,9 +281,9 @@ Continuação de 2026-09-30 — Você → Minha memória:
 
 ## 8. O que ainda não existe (não é defeito)
 
-- Comunidade: notificações dos clubes e caixa de convites (Task 09, junto com as notificações
-  push). Sugestões de amigos em "Convidar membros". Rascunho de resenha e feed público de
-  resenhas.
+- Comunidade: convites para leitores específicos, sugestões de amigos, rascunho de resenha e
+  feed público de resenhas. Os avisos de respostas/ciclos e a caixa de notificações já existem.
 - Curva de retenção e Bubo Score.
-- Configurações, notificações push, login com Google/Apple, verificação de e-mail, exportação de
-  dados, recursos de IA.
+- Login com Google/Apple, verificação de e-mail, exportação de dados e recursos de IA.
+- Push no aparelho ainda depende de EAS/Firebase/Apple; widgets dependem de uma nova build nativa.
+- Live Activity de sessão e widget Android específico de tela bloqueada.

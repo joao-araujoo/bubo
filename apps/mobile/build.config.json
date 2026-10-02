@@ -1,0 +1,5 @@
+{
+  "apiUrl": "https://bubo-api.bubo-api.workers.dev",
+  "architectures": ["arm64-v8a", "armeabi-v7a"],
+  "workers": 2
+}

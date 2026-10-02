@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { createCycleRequestSchema, clubCyclesResponseSchema } from './cycles';
+import { markNotificationsReadSchema, notificationsResponseSchema } from './notifications';
+import {
+  pushTokenRequestSchema,
+  pushTokenResponseSchema,
+  readerPreferencesSchema,
+} from './preferences';
 import {
   friendActionSchema,
   friendsResponseSchema,
@@ -120,6 +126,11 @@ export const API_ROUTES = {
   friendsFeed: '/community/friends-feed',
   socialPreferences: '/me/social-preferences',
   moderationQueue: '/me/moderation',
+  preferences: '/me/preferences',
+  pushToken: '/me/push-token',
+  pushTokenItem: '/me/push-token/:token',
+  notifications: '/notifications',
+  notificationsRead: '/notifications/read',
   /** Better Auth account deletion lives at /v1/auth/delete-user (documented, not in the registry). */
 } as const;
 
@@ -699,5 +710,57 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     auth: true,
     requestBody: globalModerationRequestSchema,
     responses: { 200: { description: 'Moderated.', schema: moderationResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.preferences,
+    summary: 'Cognitive and notification preferences (defaults until saved). Task 09.',
+    tags: ['me'],
+    auth: true,
+    responses: { 200: { description: 'Preferences.', schema: readerPreferencesSchema } },
+  },
+  {
+    method: 'put',
+    path: API_ROUTES.preferences,
+    summary: 'Replace every preference (review rigor, daily limits, goals, reminders, pushes).',
+    tags: ['me'],
+    auth: true,
+    requestBody: readerPreferencesSchema,
+    responses: { 200: { description: 'Saved preferences.', schema: readerPreferencesSchema } },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.pushToken,
+    summary: 'Register the Expo push token of this device (moves between accounts on it).',
+    tags: ['me'],
+    auth: true,
+    requestBody: pushTokenRequestSchema,
+    responses: { 200: { description: 'Registered.', schema: pushTokenResponseSchema } },
+  },
+  {
+    method: 'delete',
+    path: API_ROUTES.pushTokenItem,
+    summary: 'Forget a push token of the reader (sign-out, notifications off).',
+    tags: ['me'],
+    auth: true,
+    responses: { 200: { description: 'Removed (idempotent).', schema: pushTokenResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.notifications,
+    summary:
+      'Inbox, newest 50: due reviews, replies to my topics, friend requests/acceptances, new club cycles.',
+    tags: ['me'],
+    auth: true,
+    responses: { 200: { description: 'Inbox.', schema: notificationsResponseSchema } },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.notificationsRead,
+    summary: 'Mark some notifications (ids) or all of them as read.',
+    tags: ['me'],
+    auth: true,
+    requestBody: markNotificationsReadSchema,
+    responses: { 200: { description: 'Inbox.', schema: notificationsResponseSchema } },
   },
 ];

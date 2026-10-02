@@ -5,7 +5,7 @@ depende de mais nada: o que está aqui é o que falta para o Bubo funcionar "per
 produção e nas lojas. Estado técnico detalhado: [docs/release.md](docs/release.md) → "Current
 remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
-Última atualização: 2026-09-30 (Task 08 concluída — resenhas, amigos, ciclos e moderação geral).
+Última atualização: 2026-10-01 (Task 09 concluída — preferências, notificações e push).
 
 ---
 
@@ -14,7 +14,7 @@ remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.m
 | Item                           | Estado                                                                                                                                                                                                                                                                            |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API de produção                | `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`). `/v1/health` e `/v1/ready` respondem 200.                                                                                                                                                                            |
-| Banco Neon                     | Migrations `0001` a `0012` aplicadas, nenhuma pendente.                                                                                                                                                                                                                           |
+| Banco Neon                     | Migrations `0001` a `0013` aplicadas, nenhuma pendente.                                                                                                                                                                                                                           |
 | Segredos no Cloudflare         | `DATABASE_URL`, `BETTER_AUTH_SECRET` (gerado aleatoriamente), `BETTER_AUTH_URL`.                                                                                                                                                                                                  |
 | Armazenamento R2               | Bucket `bubo` existe e está ligado ao Worker como `MEDIA` (sem acesso público ainda).                                                                                                                                                                                             |
 | Testes automáticos em produção | Cadastro, catálogo, ISBN, sessões, cards, conquistas, clubes, debates anti-spoiler, clube privado com convite, enquetes, argumentos, reações, membros, feed, resenhas, amigos, ciclos, denúncia, bloqueio e exclusão de conta: todos passaram. As contas de teste foram apagadas. |
@@ -23,20 +23,21 @@ remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.m
 
 ## 2. Resumo do que falta (por prioridade)
 
-| #   | O que configurar                                  | Sem isso, o que acontece                                                                 | Prioridade              |
-| --- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------- |
-| 1   | Plano **Workers Paid** (Cloudflare)               | Com mais usuários, cadastro/login podem falhar (limite de 10 ms de CPU do plano grátis). | Antes de usuários reais |
-| 2   | **Banco de produção separado** (branch no Neon)   | Seu ambiente local e a produção escrevem no mesmo banco.                                 | Antes de usuários reais |
-| 3   | **Build do app com EAS** (conta Expo)             | Não dá para testar o app contra a produção (o Expo Go só funciona com a API local).      | Para testar em produção |
-| 4   | **E-mail (Resend)**                               | "Esqueci minha senha" responde "serviço indisponível".                                   | Alta                    |
-| 5   | **Canal de suporte e moderação** (e-mail público) | As lojas recusam apps com comunidade sem contato para denúncias.                         | Antes das lojas         |
-| 6   | **Política de Privacidade e Termos de Uso**       | As lojas recusam o app; o cadastro não pede consentimento.                               | Antes das lojas         |
-| 7   | **Contas nas lojas** (Apple e Google)             | Não dá para publicar.                                                                    | Antes das lojas         |
-| 8   | **Chave do Google Books**                         | A busca usa só Open Library e BrasilAPI (o Google recusa por cota sem chave).            | Média                   |
-| 9   | **Capas no R2** (`MEDIA_PUBLIC_URL`)              | As capas vêm direto dos sites de origem, com a capa tipográfica como reserva.            | Média                   |
-| 10  | **Domínio próprio** (opcional)                    | A API fica em `*.workers.dev`.                                                           | Baixa                   |
-| 11  | **Rotacionar credenciais antigas**                | Senhas/chaves que já apareceram em arquivos ou conversas continuam válidas.              | Alta                    |
-| 12  | **Tabelas antigas no Neon** (decisão)             | Nada quebra; o banco só fica com ~40 tabelas vazias que o Bubo não usa.                  | Baixa                   |
+| #   | O que configurar                                  | Sem isso, o que acontece                                                                  | Prioridade              |
+| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------- |
+| 1   | Plano **Workers Paid** (Cloudflare)               | Com mais usuários, cadastro/login podem falhar (limite de 10 ms de CPU do plano grátis).  | Antes de usuários reais |
+| 2   | **Banco de produção separado** (branch no Neon)   | Seu ambiente local e a produção escrevem no mesmo banco.                                  | Antes de usuários reais |
+| 3   | **Build nativa do app**                           | Use `npm run build:android` para um APK gratuito com widgets; Expo Go não inclui widgets. | Para testar no celular  |
+| 4   | **E-mail (Resend)**                               | "Esqueci minha senha" responde "serviço indisponível".                                    | Alta                    |
+| 5   | **Canal de suporte e moderação** (e-mail público) | As lojas recusam apps com comunidade sem contato para denúncias.                          | Antes das lojas         |
+| 6   | **Política de Privacidade e Termos de Uso**       | As lojas recusam o app; o cadastro não pede consentimento.                                | Antes das lojas         |
+| 7   | **Contas nas lojas** (Apple e Google)             | Não dá para publicar.                                                                     | Antes das lojas         |
+| 8   | **Chave do Google Books**                         | A busca usa só Open Library e BrasilAPI (o Google recusa por cota sem chave).             | Média                   |
+| 9   | **Capas no R2** (`MEDIA_PUBLIC_URL`)              | As capas vêm direto dos sites de origem, com a capa tipográfica como reserva.             | Média                   |
+| 10  | **Domínio próprio** (opcional)                    | A API fica em `*.workers.dev`.                                                            | Baixa                   |
+| 11  | **Rotacionar credenciais antigas**                | Senhas/chaves que já apareceram em arquivos ou conversas continuam válidas.               | Alta                    |
+| 12  | **Tabelas antigas no Neon** (decisão)             | Nada quebra; o banco só fica com ~40 tabelas vazias que o Bubo não usa.                   | Baixa                   |
+| 13  | **Notificações push** (EAS + Firebase)            | Os avisos ficam só dentro do app; o celular não recebe lembretes nem avisos.              | Antes das lojas         |
 
 Não precisa configurar agora: `GEMINI_API_KEY` (nenhuma tela usa IA ainda) e
 `CATALOG_CONTACT_EMAIL` (opcional, só identifica o Bubo para a Open Library).
@@ -75,24 +76,30 @@ banco da produção. Contas criadas nos seus testes locais vão para a produçã
 5. Opcional: deixe o `.dev.vars` apontando para uma branch `dev`, ou apague a linha `DATABASE_URL`
    para desenvolver 100% local (PGlite, sem nuvem).
 
-### 3.3 Build do app com EAS (para testar contra a produção)
+### 3.3 Build Android gratuito (com widgets)
 
 O servidor de produção só aceita o app com o esquema oficial `bubo://`. O **Expo Go** usa `exp://`
-e só funciona com a API local. Para testar contra a produção, gere um build:
+e só funciona com a API local. Para testar contra a produção, gere um APK local:
 
-1. Crie uma conta em [expo.dev](https://expo.dev) e rode:
+1. Na raiz do projeto, rode:
    ```powershell
-   npm i -g eas-cli
-   eas login
-   cd apps/mobile
-   eas init
-   eas env:create --environment preview --name EXPO_PUBLIC_API_URL --value https://bubo-api.bubo-api.workers.dev --visibility plaintext
-   eas env:create --environment production --name EXPO_PUBLIC_API_URL --value https://bubo-api.bubo-api.workers.dev --visibility plaintext
-   eas build --profile preview --platform android
+   npm run build:android
    ```
-2. Instale o APK gerado no celular Android. Para iPhone é preciso conta Apple Developer (3.7).
+2. Copie `build/android/bubo-test.apk` para o Android e abra-o, ou conecte/autorize o USB e rode
+   `npm run install:android`. O app funciona sem o computador e inclui os widgets.
+3. Leia [docs/build-mobile.md](docs/build-mobile.md) para diagnóstico, configuração e limites.
+   Não exige EAS, assinatura paga nem publicação. iPhone físico com estes widgets exige
+   Mac/Xcode e App Groups disponíveis na equipe Apple Developer (3.7).
 
-### 3.4 E-mail para "Esqueci minha senha" (Resend)
+### 3.4 Emails de conta (Resend)
+
+**2026-10-01:** teste real entregue pelo Resend e encontrado no Gmail do dono, com a arte oficial.
+Boas-vindas/confirmação, recuperação de senha e aviso de senha alterada implementados (ADR-025).
+O remetente de teste `onboarding@resend.dev` não serve para enviar aos usuários em geral.
+`bubo.nyoneo.com.br` está preparado no Resend; o dono adiou os quatro registros de DNS e,
+até verificar o subdomínio e configurar os secrets, o email da API continua indisponível.
+Guia simples com valores exatos: [docs/emails-dns.md](docs/emails-dns.md).
+Modelos, casos estudados e comandos de prévia/diagnóstico: [docs/emails.md](docs/emails.md).
 
 1. Crie conta em [resend.com](https://resend.com) → **Domains** → adicione seu domínio e crie os
    registros DNS (SPF/DKIM) que ele mostrar. Espere ficar "Verified".
@@ -144,8 +151,10 @@ e que exista um contato público. Falta:
 
 ### 3.7 Contas nas lojas
 
-- **Apple Developer Program** (US$ 99/ano) — necessário para iPhone, inclusive para testes via
-  TestFlight.
+Esta seção é para distribuição futura; não é requisito para gerar/instalar o APK Android gratuito.
+
+- **Apple Developer Program** (US$ 99/ano) — para App Store e testes via TestFlight.
+  Teste local no iPhone via Mac/Xcode depende do provisionamento da conta; veja [docs/build-mobile.md](docs/build-mobile.md).
 - **Google Play Console** (US$ 25, uma vez).
 - Depois: `eas build --profile production --platform all` e `eas submit --profile production`
   (detalhes em [docs/release.md](docs/release.md) §4).
@@ -204,7 +213,58 @@ Opções:
 - **Recomendado:** criar a branch de produção limpa (3.2) a partir de um banco vazio.
 - Ou me pedir para gerar um script de limpeza, que você revisa e roda.
 
+### 3.13 Notificações push (lembretes e avisos da comunidade)
+
+O servidor já envia os avisos e o app já sabe recebê-los. Falta ligar o push nas contas Expo e
+Google. Sem isso, os avisos continuam aparecendo na tela **Notificações** do app.
+
+1. **Projeto EAS** (uma vez): na pasta `apps/mobile`, rode `npx eas init`. Como a configuração
+   do app é `app.config.ts`, ele mostra o `projectId` e pede para colocá-lo em
+   `extra.eas.projectId`: me mande o id (não é segredo) que eu coloco.
+2. **Android (Firebase / FCM)**:
+   1. Em <https://console.firebase.google.com>, crie um projeto e adicione um app Android com o
+      pacote `com.joaoaraujo.bubo`. Baixe o `google-services.json` (não vai para o Git).
+   2. Envie o arquivo para o EAS como variável de arquivo:
+      `npx eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`
+   3. No Firebase → Configurações do projeto → Contas de serviço, gere uma chave privada e envie
+      para o EAS: `npx eas credentials` → Android → "Google Service Account Key for FCM V1".
+3. **iOS**: na primeira build com `npx eas build -p ios`, aceite que o EAS crie a chave de push
+   da Apple (precisa da conta Apple Developer, item 7).
+4. Faça uma nova build (3.3). No app: Você → engrenagem → "Ativar notificações". No Android 13+
+   o sistema pergunta se pode notificar.
+
+Ícone da notificação no Android: enquanto não existir um ícone monocromático oficial do Bubo, o
+Android desenha a silhueta do símbolo oficial. Se o designer tiver o arquivo "Ícone minimal" em
+branco com fundo transparente, me envie que eu troco.
 ---
+
+### 3.14 Widgets Android e iPhone (nova build nativa)
+
+O código dos widgets está implementado. **Expo Go não instala widgets**, e uma atualização
+só de JavaScript não inclui os arquivos nativos. Não precisam de Firebase nem push.
+
+1. Gere e instale uma nova build com `npm run build:android` (3.3). Java/SDK são preparados
+   automaticamente no Windows x64. iOS local requer
+   macOS/Xcode: `npm run ios --workspace @bubo/mobile`.
+2. **iOS/Apple Developer:** confirme o App Group `group.com.joaoaraujo.bubo.widgets` tanto no
+   app `com.joaoaraujo.bubo` quanto na extensão `com.joaoaraujo.bubo.widgets`.
+   O plugin gera os entitlements e o target `BuboWidgetsExtension`, inclusive metadados para
+   o EAS preparar as credenciais. Não substitua os PNGs do mascote nem a paleta gerada.
+3. No app: **Você → Bubo na sua tela**. Confira as prévias dos quatro widgets (Sequência,
+   Sequência da semana, Calendário de leitura, Continuar leitura); escolha a meta semanal e a
+   privacidade do título. No Android, “Adicionar à tela inicial” abre a confirmação do launcher
+   quando suportado. Alternativa: tela inicial → Widgets → Bubo.
+4. No iPhone, adicione Bubo pelo seletor da tela inicial; a Sequência também está em
+   Personalizar tela bloqueada → Adicionar Widgets. O título vem oculto; capa nunca aparece ali.
+5. Faça o roteiro da seção **6c** de TESTAR-TELAS: sessões/revisões, sair/trocar conta,
+   redimensionar, dados vencidos, fontes grandes e acessibilidade.
+
+Neste ambiente foram verificados o código, testes, geração dos projetos e bundle Android.
+**APK Android compilado e assinatura/três receptores de widgets verificados em 2026-10-01.**
+Swift/iOS ainda não foi compilado; instalação e aceite dos widgets em aparelhos continuam
+pendentes. Guia gratuito e evidências: [docs/build-mobile.md](docs/build-mobile.md).
+Não há widget Android específico de tela bloqueada nem Live Activity nesta entrega.
+Detalhes: [docs/widgets.md](docs/widgets.md).
 
 ## 4. Como conferir se está tudo certo
 
@@ -220,8 +280,8 @@ Depois, siga o roteiro de telas em [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
 Para você não procurar o que ainda não foi feito:
 
-- Comunidade: notificações dos clubes e caixa de convites (vão junto com as notificações push da
-  Task 09). Rascunho de resenha e feed público de resenhas (decisão de produto).
+- Comunidade: rascunho de resenha e feed público de resenhas (decisão de produto).
 - Curva de retenção e Bubo Score (precisam de um modelo de memória documentado).
-- Login com Google/Apple, verificação de e-mail, exportação de dados (LGPD).
-- Configurações e notificações push (Task 09). Recursos de IA (Gemini) dentro dos fluxos.
+- Login com Google/Apple, exigir verificação de email antes das lojas, exportação de dados (LGPD).
+- Alerta de "curva crítica", paisagem sonora, tema sépia e exportação (Anki/Notion).
+- Recursos de IA (Gemini) dentro dos fluxos.

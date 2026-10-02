@@ -58,21 +58,27 @@ dark surfaces.
 
 ## Components
 
-| component       | notes                                                                                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `Text`          | the only text primitive. `variant` + colour token. Font scaling capped at 1.6×                                             |
-| `Button`        | `primary` / `secondary` / `success`, `md` 48 / `lg` 56, icon, trailing, loading, disabled, haptics                         |
-| `Card`          | `default` / `muted`. `style` = inner layout, `containerStyle` = outer layout (flex)                                        |
-| `Raised`        | the tactile depth primitive used by `Button`, `Card`, `SelectableCard`                                                     |
-| `Chip`          | tones `primary`, `gold`, `orange`, `success`, `neutral`. `eyebrow` for caption labels. `align="center"` in centred layouts |
-| `SectionHeader` | icon + caption title + trailing meta                                                                                       |
-| `ProgressBar`   | accessible progressbar (`accessibilityValue`)                                                                              |
-| `WeekStrip`     | Monday→Sunday cognitive week from `@bubo/domain`                                                                           |
-| `EmptyState`    | official mascot (by semantic state) + title + description + action                                                         |
-| `Screen`        | safe areas, canvas, gutters, optional sticky header, `OfflineBanner`                                                       |
-| `BuboMascot`    | `pose` or semantic `state`. Decorative by default                                                                          |
-| `BuboLogo`      | official horizontal logo or symbol                                                                                         |
-| `Icon`          | Material Icons (`@expo/vector-icons`), hidden from screen readers                                                          |
+| component                                                                                                                      | notes                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Text`                                                                                                                         | the only text primitive. `variant` + colour token. Font scaling capped at 1.6×                                                                                 |
+| `Button`                                                                                                                       | `primary` / `secondary` / `success`, `md` 48 / `lg` 56, icon, trailing, loading, disabled, haptics                                                             |
+| `Card`                                                                                                                         | `default` / `muted`. `style` = inner layout, `containerStyle` = outer layout (flex)                                                                            |
+| `Raised`                                                                                                                       | the tactile depth primitive used by `Button`, `Card`, `SelectableCard`                                                                                         |
+| `Chip`                                                                                                                         | tones `primary`, `gold`, `orange`, `success`, `neutral`. `eyebrow` for caption labels. `align="center"` in centred layouts                                     |
+| `SectionHeader`                                                                                                                | icon + caption title + trailing meta                                                                                                                           |
+| `ProgressBar`                                                                                                                  | accessible progressbar (`accessibilityValue`)                                                                                                                  |
+| `WeekStrip`                                                                                                                    | Monday→Sunday cognitive week from `@bubo/domain`                                                                                                               |
+| `EmptyState`                                                                                                                   | official mascot (by semantic state) + title + description + action                                                                                             |
+| `Screen`                                                                                                                       | safe areas, canvas, gutters, optional sticky header, `OfflineBanner`                                                                                           |
+| `BuboMascot`                                                                                                                   | `pose` or semantic `state`. Decorative by default                                                                                                              |
+| `BuboLogo`                                                                                                                     | official horizontal logo or symbol                                                                                                                             |
+| `Icon`                                                                                                                         | Material Icons (`@expo/vector-icons`), hidden from screen readers                                                                                              |
+| `FormScreen`                                                                                                                   | pushed screens: back, eyebrow + title, `headerRight`, scroll body, sticky `footer`, `floating`. Keyboard `padding` on both platforms (Android is edge-to-edge) |
+| `HeaderButton`                                                                                                                 | raised round/square header action; optional real `badge` count (e.g. unread notifications)                                                                     |
+| `OptionTiles`                                                                                                                  | Stitch tactile option row (rigor, focus goal, palette): equal tiles, selected = solid purple + check, optional swatch (Task 09)                                |
+| `ActionRow`                                                                                                                    | raised list action with icon, title, subtitle and chevron (Você, sheets)                                                                                       |
+| `BuboTip`                                                                                                                      | official mascot + speech bubble with a real message                                                                                                            |
+| `GradientCard`, `IconTile`, `Pill`, `SectionTitle`, `SegmentedTabs`, `StatTile`, `Stepper`, `TabChip`, `Toggle`, `BottomSheet` | Stitch primitives added in Task 08 (see each file header)                                                                                                      |
 
 ## Motion & haptics
 
@@ -82,8 +88,9 @@ dark surfaces.
 
 ## Theme
 
-`ThemeProvider` supports `light` (default), `system` and `dark`. You can switch it in the Você tab.
-The preference is kept in memory until user settings persistence exists.
+`ThemeProvider` supports `light` (default), `system` and `dark`. The reader picks it in
+Preferências cognitivas → "Aparência & toque"; it is saved on the device with the haptics switch
+(`lib/device-preferences.tsx`) and loaded before the first frame (Task 09, ADR-022).
 
 ### Form motion and sizing
 
@@ -95,3 +102,12 @@ transforms for tactile presses, selection and progress, and opacity for field fo
 TextField uses a 56pt minimum outer height, normalized native padding, centered single-line
 text and a 48pt password toggle. Multiline fields align at the top; errors remain outside the
 input and are announced. Buttons grow vertically for long labels and larger text.
+
+## Native widgets (Task 09 extension)
+
+Widgets use the canonical light/dark colour tokens, Plus Jakarta Sans and official mascot
+PNGs through prebuild generation, not a separate palette. Android uses rounded RemoteViews
+cards, a bordered purple action (48 dp) and seven reading-day tiles; WidgetKit adapts small,
+medium, large and compact lock screen families to system margins. Widget themes follow the
+system. Você → `widgets` uses existing Card, BuboTip, BookCover, BuboMascot, WeekStrip, Toggle,
+Stepper and Button components. See [widgets.md](widgets.md) and ADR-023 for native/device limits.

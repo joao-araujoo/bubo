@@ -10,7 +10,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Button, EmptyState, Screen } from '../design-system';
 import { BootScreen } from '../features/shell/BootScreen';
+import { useWidgetSync } from '../features/widgets/use-widget-sync';
+import {
+  DEFAULT_DEVICE_PREFERENCES,
+  type DevicePreferences,
+  DevicePreferencesProvider,
+  loadDevicePreferences,
+  useDevicePreferences,
+} from '../lib/device-preferences';
+import { haptics } from '../lib/haptics';
 import { useReducedMotion } from '../lib/motion';
+import { useNotificationNavigation } from '../lib/notifications';
 import { authClient } from '../lib/auth/client';
 import { useAuthState } from '../lib/auth/session';
 import { createQueryClient, wireQueryToReactNative } from '../lib/query/client';
@@ -43,6 +53,8 @@ function RootNavigator() {
   const reduced = useReducedMotion();
   const auth = useAuthState();
   const queryClient = useQueryClient();
+  useNotificationNavigation(auth.status === 'ready');
+  useWidgetSync(auth);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(theme.colors.bg).catch(() => undefined);
@@ -106,6 +118,9 @@ function RootNavigator() {
           <Stack.Screen name="convidar/[clubId]" />
           <Stack.Screen name="convite/[code]" />
           <Stack.Screen name="amigos" />
+          <Stack.Screen name="configuracoes" />
+          <Stack.Screen name="widgets" />
+          <Stack.Screen name="notificacoes" />
           <Stack.Screen name="moderacao" />
           <Stack.Screen name="catalogo/[id]" />
           <Stack.Screen
@@ -133,19 +148,48 @@ function RootNavigator() {
   );
 }
 
+/** Theme saved on this device (Task 09); the provider reads it once before the first frame. */
+function ThemedApp() {
+  const { preferences, update } = useDevicePreferences();
+  return (
+    <ThemeProvider
+      initialPreference={preferences.theme}
+      onPreferenceChange={(theme) => update({ theme })}
+    >
+      <RootNavigator />
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
   const [queryClient] = useState(createQueryClient);
   const [fontsLoaded, fontError] = useFonts(fontSources);
+  const [device, setDevice] = useState<DevicePreferences | null>(null);
 
-  // Keep the native splash until fonts are ready (falls back to system fonts on error).
-  if (!fontsLoaded && !fontError) return null;
+  useEffect(() => {
+    let active = true;
+    loadDevicePreferences().then(
+      (loaded) => {
+        if (!active) return;
+        haptics.setEnabled(loaded.haptics);
+        setDevice(loaded);
+      },
+      () => active && setDevice(DEFAULT_DEVICE_PREFERENCES),
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Keep the native splash until fonts and device preferences are ready (no theme flash).
+  if ((!fontsLoaded && !fontError) || !device) return null;
 
   return (
     <SafeAreaProvider>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        <ThemeProvider>
-          <RootNavigator />
-        </ThemeProvider>
+        <DevicePreferencesProvider initial={device}>
+          <ThemedApp />
+        </DevicePreferencesProvider>
       </PersistQueryClientProvider>
     </SafeAreaProvider>
   );

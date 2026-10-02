@@ -42,6 +42,8 @@ export async function changeFriend(
   now: Date,
 ) {
   if (userId === otherId) throw new AppError('VALIDATION_FAILED', 'Choose another reader.');
+  // What actually changed, so the route notifies only once (retries are silent).
+  let event: 'requested' | 'accepted' | null = null;
   await db.transaction(async (tx) => {
     // Same ordered row locks as blockUser: block/request races cannot recreate a friendship.
     await tx.execute(
@@ -60,8 +62,10 @@ export async function changeFriend(
     if (action === 'accept') {
       if (!existing || existing.recipientId !== userId)
         throw new AppError('NOT_FOUND', 'Incoming request not found.');
-      if (!existing.acceptedAt)
+      if (!existing.acceptedAt) {
         await tx.update(friendships).set({ acceptedAt: now }).where(eq(friendships.id, id));
+        event = 'accepted';
+      }
       return;
     }
     if (existing) return;
@@ -89,8 +93,9 @@ export async function changeFriend(
     await tx
       .insert(friendships)
       .values({ id, senderId: userId, recipientId: otherId, createdAt: now });
+    event = 'requested';
   });
-  return listFriends(db, userId);
+  return { friends: await listFriends(db, userId), event };
 }
 
 export async function saveSocialPreferences(

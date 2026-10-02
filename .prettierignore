@@ -2,6 +2,7 @@ node_modules/
 package-lock.json
 .expo/
 dist/
+build/
 coverage/
 .wrangler/
 apps/api/.local/

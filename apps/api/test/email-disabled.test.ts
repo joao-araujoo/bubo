@@ -50,3 +50,13 @@ it('answers a password reset with 503 and never logs the reset link', async () =
   expect(errorResponseSchema.parse(await response.json()).error.code).toBe('SERVICE_UNAVAILABLE');
   expect(h.logs.lines.join('\n')).not.toContain('reset-password/');
 });
+
+it('answers verification requests with 503 for every address when delivery is unconfigured', async () => {
+  for (const email of ['existing@example.test', 'unknown@example.test']) {
+    const response = await h.call('/v1/auth/send-verification-email', {
+      method: 'POST',
+      json: { email, callbackURL: 'bubo:///' },
+    });
+    expect(response.status).toBe(503);
+  }
+});

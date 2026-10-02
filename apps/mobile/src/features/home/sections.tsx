@@ -9,6 +9,7 @@ import {
   Card,
   Chip,
   EmptyState,
+  ProgressBar,
   SectionHeader,
   Text,
   WeekStrip,
@@ -133,13 +134,20 @@ export function CognitiveWeekSection({
 export function DailyMissionSection({
   readToday,
   readingEntryId,
+  focusedMinutesToday,
+  goalMinutes,
 }: {
   readToday: boolean | null;
   /** The book in progress, if any (the mission's call to action). */
   readingEntryId: string | null;
+  /** Real focused minutes today and the reader's daily goal (Preferências, Task 09). */
+  focusedMinutesToday: number | null;
+  goalMinutes: number | null;
 }) {
   const router = useRouter();
-  const done = readToday === true;
+  const theme = useTheme();
+  const hasGoal = goalMinutes !== null && focusedMinutesToday !== null;
+  const done = hasGoal ? focusedMinutesToday >= goalMinutes : readToday === true;
   return (
     <Card>
       <SectionHeader
@@ -153,9 +161,31 @@ export function DailyMissionSection({
       />
       <Text variant="bodyStrong">
         {done
-          ? 'Você já leu com foco hoje. Até amanhã!'
-          : 'Faça uma sessão de leitura focada hoje.'}
+          ? hasGoal
+            ? `Meta de ${goalMinutes} min cumprida. Até amanhã!`
+            : 'Você já leu com foco hoje. Até amanhã!'
+          : hasGoal
+            ? `Leia ${goalMinutes} minutos com foco hoje.`
+            : 'Faça uma sessão de leitura focada hoje.'}
       </Text>
+      {hasGoal ? (
+        <View style={{ gap: theme.spacing.xs }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text variant="label" color="textMuted">
+              Foco hoje
+            </Text>
+            <Text variant="label" color={done ? 'successText' : 'accentText'}>
+              {`${Math.min(focusedMinutesToday, goalMinutes)} / ${goalMinutes} min`}
+            </Text>
+          </View>
+          <ProgressBar
+            percent={Math.min(100, (focusedMinutesToday / goalMinutes) * 100)}
+            tone={done ? 'success' : 'primary'}
+            size="sm"
+            accessibilityLabel={`${focusedMinutesToday} de ${goalMinutes} minutos de foco hoje`}
+          />
+        </View>
+      ) : null}
       <Text variant="bodySm" color="textMuted">
         {done
           ? 'Voltar amanhã mantém sua sequência acesa.'

@@ -1,4 +1,10 @@
 import {
+  type MarkNotificationsRead,
+  type PushTokenRequest,
+  type ReaderPreferences,
+  notificationsResponseSchema,
+  pushTokenResponseSchema,
+  readerPreferencesSchema,
   moderationQueueSchema,
   clubCyclesResponseSchema,
   type CreateCycleRequest,
@@ -397,6 +403,23 @@ export function createApiClient({
       request(apiPath(API_ROUTES.catalogIsbn, { isbn }), catalogBookResponseSchema, { signal }),
     reviewCard: (id: string, body: ReviewRequest) =>
       request(apiPath(API_ROUTES.recallReview, { id }), reviewResultSchema, {
+        method: 'POST',
+        body,
+      }),
+    getPreferences: (signal?: AbortSignal) =>
+      request(API_ROUTES.preferences, readerPreferencesSchema, { signal }),
+    savePreferences: (body: ReaderPreferences) =>
+      request(API_ROUTES.preferences, readerPreferencesSchema, { method: 'PUT', body }),
+    registerPushToken: (body: PushTokenRequest) =>
+      request(API_ROUTES.pushToken, pushTokenResponseSchema, { method: 'POST', body }),
+    removePushToken: (token: string) =>
+      request(apiPath(API_ROUTES.pushTokenItem, { token }), pushTokenResponseSchema, {
+        method: 'DELETE',
+      }),
+    getNotifications: (signal?: AbortSignal) =>
+      request(API_ROUTES.notifications, notificationsResponseSchema, { signal }),
+    markNotificationsRead: (body: MarkNotificationsRead) =>
+      request(API_ROUTES.notificationsRead, notificationsResponseSchema, {
         method: 'POST',
         body,
       }),

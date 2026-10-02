@@ -25,9 +25,19 @@ export async function createHarness(
     databaseProvider: database.provider,
     pingDatabase: database.ping,
     logSink: logs.sink,
-    emailSender: () => ({ sendPasswordReset: async () => undefined }),
+    emailSender: () => ({
+      canDeliver: false,
+      sendPasswordReset: async () => undefined,
+      sendVerification: async () => undefined,
+      sendPasswordChanged: async () => undefined,
+      sendTest: async () => undefined,
+    }),
     // Tests never reach real catalog sources; catalog tests inject a fake upstream.
     catalogFetch: async () => {
+      throw new Error('network disabled in tests');
+    },
+    // Pushes never leave tests; notification tests inject a fake Expo endpoint.
+    pushFetch: async () => {
       throw new Error('network disabled in tests');
     },
     ...deps,

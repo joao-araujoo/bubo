@@ -5,11 +5,12 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 
 ## Current remote state (keep this updated after every remote change)
 
-Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Portuguese:
+Last updated 2026-10-01 (ADR-026 widget calendar: `monthActiveDates` in /v1/me/stats). Owner-facing checklist in Portuguese:
 [../CONFIGURAR.md](../CONFIGURAR.md).
 
 - **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
-  `95b22fbd-93a9-41ea-889b-042a4d7292fa`, 2026-09-30). The account's `workers.dev` subdomain `bubo-api` was
+  `ad7ebef7-169a-4b9f-a48d-9607fd2cb83e`, 2026-10-01; health/ready smoke OK, Neon unchanged) with an hourly cron trigger (`0 * * * *`,
+  review reminders). The account's `workers.dev` subdomain `bubo-api` was
   registered automatically by the first deploy; renaming it changes every Worker URL on the account.
 - **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),
   `BETTER_AUTH_SECRET` (random, stored only in Cloudflare; rotating it signs everyone out),
@@ -17,15 +18,16 @@ Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Port
   answers 503), `GOOGLE_BOOKS_API_KEY` (Google 429; Open Library/BrasilAPI answer),
   `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`, `MODERATOR_USER_IDS` (the
   moderation queue answers 403 to everyone until the owner adds their user id).
-- **Neon:** migrations `0001`–`0012` applied, 0 pending (`0010`–`0012` on 2026-09-30). Production and the owner's local
+- **Neon:** migrations `0001`–`0013` applied, 0 pending (`0013` on 2026-10-01). Production and the owner's local
   `dev:api` share this database — split into a `production` branch before real users.
 - **Legacy tables in Neon:** about 40 empty tables that no Bubo migration created (`clubs`,
   `club_members`, `club_polls`, `content_reports`, `posts`, `blocks`, `works`, `editions`, …). They
-  are untouched. New Bubo tables must not reuse those names (hence `reading_club_*` in 0008–0012).
+  are untouched. New Bubo tables must not reuse those names (hence `reading_club_*` in 0008–0012 and `reader_*` in 0013).
 - **R2:** bucket `bubo` bound as `MEDIA`; public delivery not configured.
 - **Plan:** Workers Paid not confirmed (password hashing can exceed Free CPU limits under load).
 - **Expo Go vs production:** production trusts only `bubo://`; Expo Go (`exp://`) works only with a
-  development API. Testing against production needs an EAS build.
+  development API. Testing against production needs a native build; the free local Android
+  route is `npm run build:android` (see [build-mobile.md](build-mobile.md)).
 - **Smoke tests (2026-09-27):** core flow (health, ready, sign-up, memory, catalog, ISBN, add,
   session → card, shelf detail, OpenAPI, achievements, reset → 503, account deletion) and the
   Comunidade flow with two accounts both passed; every test account was deleted.
@@ -37,8 +39,33 @@ Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Port
   participation and close, moderation 403 and `isModerator` false, 401 without session — 28/28,
   both accounts deleted. Catalog search is intermittent (Google 429 without a key, slow Open
   Library), and this machine clock was ~15 s behind the Worker.
+- **Smoke test (2026-10-01, Task 09):** health, ready, preference defaults/save/422, push token
+  register/reject/remove, due cards with `dailyLimit`, `focusedMinutesToday`, club + friend
+  request in the inbox, acceptance, answered request leaves the inbox, reply notification without
+  text, mark all read, 401 without session — 22/22, both accounts deleted.
+- **Push:** the Worker calls the Expo push service; no EAS project id or Firebase credentials are
+  configured yet, so no device receives pushes (the inbox works).
+- **Widgets API (2026-10-01):** `/v1/me/stats` adds reading-only `weekReadingDates`. No new
+  migration; check found zero pending and migration command made no changes. `npm run deploy:api`
+  passed verify (316 tests) and published `1f7b4dcc-3eb1-465b-96e9-e42f5902cbd7`, retaining the existing hourly cron.
+  No mobile distribution or store submission was performed in that API slice.
+  Follow-up local ADR-024: Android APK compiled for ARM64/ARMv7 with verified signature,
+  three widget receivers and embedded JS; no remote change. Swift/device acceptance is pending.
+  See [widgets.md](widgets.md) and [build-mobile.md](build-mobile.md).
+- **Widgets API smoke (2026-10-01):** production health/ready 200, stats without a session 401,
+  OpenAPI 200 containing `weekReadingDates`. Authenticated reading-data checks were run locally
+  against PGlite; no production test account or shelf was created in this slice.
 - **Migration check:** use `npm run db:migrate:check` (read-only). Until 2026-09-28 the root
   `db:migrate -- --check` applied migrations because npm swallowed `--check`; fixed.
+- **Resend follow-up (2026-10-01; ADR-025):** root .env key authenticated; a real owner test
+  reached Gmail INBOX with official inline artwork (`delivered` in Resend). Created sending
+  subdomain `bubo.nyoneo.com.br` (id `9cfb0fca-15f7-43db-975e-79fb05dbff0a`), tracking off,
+  receiving disabled. Owner deferred DNS; status not_started, Worker email secrets still absent.
+  Public email delivery remains unavailable until verification/configuration. See [emails-dns.md](emails-dns.md).
+- **Emails API deploy (2026-10-01):** verify passed (340 tests); migration check found zero pending,
+  no database changes. Published the current version above, preserving the hourly cron and existing
+  secrets. Production health/ready 200, unauthenticated stats 401, verification email action 503
+  while unconfigured. No paid plan or email campaign was enabled; no DNS records were changed.
 
 ## 0. Before anything
 
@@ -60,7 +87,7 @@ Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Port
    # PowerShell: $env:DATABASE_URL="postgres://…"; npm run db:migrate
    DATABASE_URL="postgres://…" npm run db:migrate
    ```
-   Expected output lists only applied pending files (currently through `0012_reader_friendships.sql`),
+   Expected output lists only applied pending files (currently through `0013_reader_preferences_notifications.sql`),
    or `migrations up to date`.
 3. Keep a Neon branch per environment. Never point development at production.
 
@@ -72,7 +99,9 @@ Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Port
 
 ## 3. API (Cloudflare Workers)
 
-1. **Workers Paid plan.** Password hashing needs more than the Free plan's 10 ms CPU.
+1. Keep the current plan for the owner's free test. Password hashing may exceed Workers Free
+   CPU limits under load; validate authenticated device flows before a public release. Any paid
+   upgrade requires a separate owner decision and is outside this setup.
 2. Create the R2 bucket `bubo`: `npx wrangler r2 bucket create bubo`.
 3. Set the secrets. Each command prompts for the value, so nothing lands in shell history:
    ```sh
@@ -98,9 +127,14 @@ Last updated 2026-09-30 (Task 08 slice 2 deploy). Owner-facing checklist in Port
 
 **Safety net:** the top-level `wrangler.toml` Worker is `bubo-api-dev`, so a deploy without
 `--env production` can't overwrite production. Production refuses to boot "ready" without
-`https://` auth links, e-mail, a database and a secret.
+`https://` auth links, a database and a secret. Email remains an optional configuration pair.
 
 ## 4. Mobile (EAS)
+
+For a free Android device test with widgets, start with [build-mobile.md](build-mobile.md).
+It creates a standalone test APK locally without an EAS account or remote configuration.
+The following steps are the optional cloud/store distribution route, not prerequisites for
+local Android testing.
 
 1. Install the CLI and log in: `npm i -g eas-cli`, then `eas login`. Link the project with
    `cd apps/mobile && eas init`, which writes the project id.

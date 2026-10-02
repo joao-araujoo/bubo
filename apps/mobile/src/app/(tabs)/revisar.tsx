@@ -43,8 +43,30 @@ export default function ReviewTab() {
         />
       </Card>
     );
-  } else if (due.data.dueCount > 0) {
-    const count = due.data.dueCount;
+  } else if (due.data.cards.length === 0 && due.data.dueCount > 0) {
+    // The reader's daily limit (Preferências) is reached; the rest waits for tomorrow, in order.
+    const waiting = due.data.dueCount;
+    content = (
+      <Card>
+        <EmptyState
+          mascot="sessionComplete"
+          title="Meta de revisões cumprida"
+          description={`Você revisou ${due.data.reviewedToday} ${due.data.reviewedToday === 1 ? 'lembrança' : 'lembranças'} hoje, o seu limite diário. ${waiting === 1 ? '1 lembrança volta' : `${waiting} lembranças voltam`} amanhã, na ordem certa.`}
+          action={
+            <Button
+              label="Ajustar limite diário"
+              icon="tune"
+              variant="secondary"
+              fullWidth
+              onPress={() => router.push('/configuracoes')}
+            />
+          }
+        />
+      </Card>
+    );
+  } else if (due.data.cards.length > 0) {
+    const count = due.data.cards.length;
+    const beyond = due.data.dueCount - count;
     content = (
       <View style={{ gap: theme.spacing.lg }}>
         <Card>
@@ -62,6 +84,11 @@ export default function ReviewTab() {
           <Chip label={`Hoje · ${count}`} tone="primary" icon="event" />
           <Chip label={`~${estimatedMinutes(count)} min`} tone="neutral" icon="schedule" />
         </View>
+        {beyond > 0 ? (
+          <Text variant="bodySm" color="textMuted">
+            {`Seu limite diário é ${due.data.dailyLimit}. ${beyond === 1 ? 'Mais 1 lembrança volta' : `Mais ${beyond} lembranças voltam`} amanhã.`}
+          </Text>
+        ) : null}
         {due.data.cards.map((card) => (
           <Card key={card.id}>
             <Text variant="caption" color="textMuted">

@@ -56,3 +56,15 @@ npm-debug.log*
 stitch_bubo_read_deeply/
 
 Bubo - Assets/
+# Firebase config for Android push (owner-provided; EAS uses a file env var)
+google-services.json
+GoogleService-Info.plist
+
+# Native widget resources are generated from canonical assets/theme at prebuild.
+apps/mobile/modules/bubo-widgets/android/src/main/res/drawable-nodpi/
+apps/mobile/modules/bubo-widgets/android/src/main/res/font/
+apps/mobile/modules/bubo-widgets/android/src/main/res/drawable/
+apps/mobile/modules/bubo-widgets/android/src/main/res/xml/
+apps/mobile/modules/bubo-widgets/android/src/main/res/values/bubo_colors.xml
+apps/mobile/modules/bubo-widgets/android/src/main/res/values/bubo_scenes.xml
+apps/mobile/modules/bubo-widgets/android/src/main/res/values-night/

@@ -10,7 +10,7 @@ import {
   DailyMissionSection,
   HowBuboWorksSection,
 } from '../../features/home/sections';
-import { useDueCards, useShelf, useStats } from '../../lib/api/queries';
+import { useDueCards, usePreferences, useShelf, useStats } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { FadeIn } from '../../lib/motion';
 
@@ -21,6 +21,7 @@ export default function TodayScreen() {
   const stats = useStats(userId);
   const shelf = useShelf(userId);
   const due = useDueCards(userId);
+  const preferences = usePreferences(userId);
   const weekDates = stats.data?.weekActiveDates;
   const activeDates = useMemo(() => new Set<string>(weekDates ?? []), [weekDates]);
   if (auth.status !== 'ready') return null;
@@ -31,7 +32,7 @@ export default function TodayScreen() {
     <ReadingNowSection key="reading" userId={auth.userId} />,
     <ActiveRecallSection
       key="recall"
-      dueCount={due.data?.dueCount ?? null}
+      dueCount={due.data?.cards.length ?? null}
       totalCards={due.data?.totalCards ?? null}
     />,
     <CognitiveWeekSection
@@ -43,6 +44,8 @@ export default function TodayScreen() {
       key="mission"
       readToday={stats.data?.readToday ?? null}
       readingEntryId={reading?.id ?? null}
+      focusedMinutesToday={stats.data?.focusedMinutesToday ?? null}
+      goalMinutes={preferences.data?.dailyFocusMinutes ?? null}
     />,
     <HowBuboWorksSection key="how" />,
   ];
@@ -51,6 +54,7 @@ export default function TodayScreen() {
       header={
         <HomeHeader
           name={auth.me.user.name}
+          userId={auth.userId}
           streakDays={stats.data?.streakDays ?? null}
           xp={stats.data?.xpTotal ?? null}
         />

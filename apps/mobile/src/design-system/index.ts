@@ -16,6 +16,7 @@ export { IconTile, type IconTileTone } from './IconTile';
 export { InlineMessage } from './InlineMessage';
 export { LinkButton } from './LinkButton';
 export { OfflineBanner } from './OfflineBanner';
+export { OptionTiles, type TileOption } from './OptionTiles';
 export { Pill, type PillTone } from './Pill';
 export { ProgressBar, type ProgressTone } from './ProgressBar';
 export { Raised } from './Raised';

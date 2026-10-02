@@ -58,7 +58,7 @@ export function withAuth(emailFactory?: EmailSenderFactory) {
     const email = emailFactory
       ? emailFactory(c, config)
       : createEmailSender({ config, logger: c.get('logger') });
-    c.set('auth', createAuth({ db: c.get('db'), config, email }));
+    c.set('auth', createAuth({ db: c.get('db'), config, email, logger: c.get('logger') }));
     await next();
   });
 }

@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/.expo/**',
       '**/dist/**',
+      '**/build/**',
       '**/coverage/**',
       '**/.wrangler/**',
       '**/.local/**',
