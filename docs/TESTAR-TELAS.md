@@ -84,15 +84,33 @@ Guia de ativação: [emails-dns.md](emails-dns.md).
 
 ## 4. Livros e leitura
 
-| #   | Tela                      | Como chegar                                             | O que conferir                                                                                                           |
-| --- | ------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 18  | Descobrir livros          | Estante → botão de bússola no topo                      | Temas por interesse; busca por título, autor ou ISBN; "Uma das bibliotecas não respondeu" quando o Google falha.         |
-| 19  | Detalhe do catálogo       | Tocar num livro da busca                                | Edição, idioma, páginas; "Adicionar"; "Abrir na estante" se já estiver lá.                                               |
-| 20  | Leitor de ISBN            | Botão de ISBN no campo de busca ou "Escanear ISBN"      | Pede permissão da câmera; lê o código de barras; ISBN manual como alternativa.                                           |
-| 21  | Adicionar livro           | Estante → "+ Livro" (busca, ISBN ou "Adicionar manual") | Título obrigatório; páginas 1–20000.                                                                                     |
-| 22  | Livro (Jornada literária) | Tocar num livro da Estante                              | Status, progresso, **Caminho de memória** (sessões, revisões e a próxima revisão), histórico de sessões, cards, remover. |
-| 23  | Sessão de leitura focada  | Livro → Iniciar/Continuar leitura                       | Cronômetro; sair pede confirmação; ao fim: página alcançada + reflexão opcional.                                         |
-| 24  | Resultado da sessão       | Fim da sessão                                           | Minutos, páginas, XP e sequência reais; a reflexão vira card para amanhã.                                                |
+| #   | Tela                      | Como chegar                                             | O que conferir                                                                                                                         |
+| --- | ------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 18  | Descobrir livros          | Estante → botão de bússola no topo                      | Temas por interesse; busca por título, autor ou ISBN; "Uma das bibliotecas não respondeu" quando o Google falha.                       |
+| 19  | Detalhe do catálogo       | Tocar num livro da busca                                | Edição, idioma, páginas; "Adicionar"; "Abrir na estante" se já estiver lá.                                                             |
+| 20  | Leitor de ISBN            | Botão de ISBN no campo de busca ou "Escanear ISBN"      | Pede permissão da câmera; lê o código de barras; ISBN manual como alternativa.                                                         |
+| 21  | Adicionar livro           | Estante → "+ Livro" (busca, ISBN ou "Adicionar manual") | Título obrigatório; páginas 1–20000.                                                                                                   |
+| 22  | Livro (Jornada literária) | Tocar num livro da Estante                              | Status, progresso, **Caminho de memória** (sessões, revisões e a próxima revisão), histórico de sessões, cards, remover.               |
+| 23  | Sessão de leitura focada  | Livro → Iniciar/Continuar leitura                       | Cronômetro e recuperação após fechar o app; ao fim: página + ideia, detalhe e ligação/dúvida obrigatórios; conferir antes de concluir. |
+| 24  | Resultado da sessão       | Fim da sessão                                           | Só aparece após aceite da API; minutos, páginas, XP e sequência reais; os três campos viram card para amanhã.                          |
+
+### Recordação obrigatória (ADR-027)
+
+1. Leia por pelo menos um minuto e toque **Ir para a recordação**. Feche o livro e preencha ideia,
+   detalhe e ligação ou dúvida. Campo vazio, texto repetido e respostas genéricas devem pedir
+   elaboração; página, XP e sequência não mudam.
+2. Uma tentativa específica e curta deve passar; teste também bullets, ausência de acentos,
+   dúvida sincera e poema. O resultado diz **checklist de escrita**, sem prometer compreensão.
+3. Edite um campo depois de conferir: concluir volta a ficar indisponível. Durante a conferência,
+   campos, consentimento e descarte ficam bloqueados, inclusive com armazenamento lento.
+4. A opção de IA começa desligada. Só ligue com texto de teste sem dados pessoais. Sem chave,
+   quota ou conexão com o provedor, a pergunta extra pode faltar e o checklist local permanece.
+5. Feche o app antes de conferir e após um envio sem resposta. Recuperar mantém campos, página
+   e UUID. Repetir um envio recebido não duplica sessão, XP ou card. Confira notas antigas inteiras.
+6. Desconecte a rede: nenhuma conclusão fictícia; rascunho preservado. Ao reconectar, confirme o
+   mesmo envio. Se a limpeza local falhar depois do aceite, a tela informa **sessão salva**.
+7. Confira amanhã em Revisar: as três âncoras estão no card e continuam privadas. Em fonte grande,
+   TalkBack/VoiceOver e teclado aberto, todos os campos e botões devem ser alcançáveis.
 
 ## 5. Memória e progresso
 
@@ -284,6 +302,8 @@ Swift/iOS ainda não foi compilado; o comportamento do launcher/WidgetKit exige 
 - Comunidade: convites para leitores específicos, sugestões de amigos, rascunho de resenha e
   feed público de resenhas. Os avisos de respostas/ciclos e a caixa de notificações já existem.
 - Curva de retenção e Bubo Score.
-- Login com Google/Apple, verificação de e-mail, exportação de dados e recursos de IA.
+- Login com Google/Apple, obrigatoriedade de verificação de e-mail e exportação de dados.
+- Avaliação de fidelidade ao texto do livro e curva calibrada: veja core-validation.md. A pergunta
+  opcional do Gemini já faz parte da conferência de sessão.
 - Push no aparelho ainda depende de EAS/Firebase/Apple; widgets dependem de uma nova build nativa.
 - Live Activity de sessão e widget Android específico de tela bloqueada.

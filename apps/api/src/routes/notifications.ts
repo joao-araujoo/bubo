@@ -7,6 +7,7 @@ import {
 import { type Context, Hono } from 'hono';
 
 import { type AppEnv } from '../env';
+import { AppError } from '../lib/errors';
 import { createRateLimiter } from '../lib/rate-limit';
 import { parseJsonBody } from '../lib/validation';
 import { listNotifications, markNotificationsRead } from '../services/notifications';
@@ -38,7 +39,10 @@ export function notificationRoutes(deps: { now: () => Date }) {
   routes.post(API_ROUTES.pushToken, async (c) => {
     writes.hit(readerId(c));
     const input = await parseJsonBody(c, pushTokenRequestSchema);
-    await registerPushToken(c.get('db'), readerId(c), input);
+    if (input.expectedUserId && input.expectedUserId !== readerId(c)) {
+      throw new AppError('CONFLICT', 'The active account changed. Register notifications again.');
+    }
+    await registerPushToken(c.get('db'), readerId(c), c.get('session').session.id, input);
     // The token itself is never logged.
     c.get('logger').info('push token registered', {
       userId: readerId(c),

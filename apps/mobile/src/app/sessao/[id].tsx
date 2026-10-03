@@ -1,11 +1,11 @@
-import { type SessionResult, type ShelfEntry } from '@bubo/contracts';
 import {
-  MAX_REFLECTION_LENGTH,
-  MIN_SESSION_SECONDS,
-  focusElapsedMs,
-  pauseFocusClock,
-  toLocalIsoDate,
-} from '@bubo/domain';
+  SESSION_RECALL_FIELD_MAX_LENGTH,
+  type AssessSessionResponse,
+  type SessionRecall,
+  type SessionResult,
+  type ShelfEntry,
+} from '@bubo/contracts';
+import { MIN_SESSION_SECONDS, focusElapsedMs, pauseFocusClock, toLocalIsoDate } from '@bubo/domain';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -22,6 +22,7 @@ import {
   InlineMessage,
   Text,
   TextField,
+  Toggle,
 } from '../../design-system';
 import { formatDuration, useFocusTimer } from '../../features/session/useFocusTimer';
 import {
@@ -31,7 +32,7 @@ import {
   type SessionDraft,
 } from '../../features/session/draft-storage';
 import { ApiError } from '../../lib/api/client';
-import { useRecordSession, useShelfEntry } from '../../lib/api/queries';
+import { useAssessSession, useRecordSession, useShelfEntry } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
@@ -105,7 +106,7 @@ function TimerStep({
             />
           )}
           <Button
-            label="Encerrar sessão"
+            label="Ir para a recordação"
             icon="flag"
             variant="success"
             fullWidth
@@ -208,21 +209,73 @@ function FinishStep({
   draft: SessionDraft;
   persist: (draft: SessionDraft) => Promise<void>;
   onDiscard: () => void;
-  onSaved: (result: SessionResult) => void;
+  onSaved: (result: SessionResult, cleanupWarning?: string) => void;
 }) {
   const theme = useTheme();
   const save = useRecordSession(userId);
+  const check = useAssessSession();
   useConfirmLeave(!save.isSuccess);
   const total = entry.book.totalPages;
   const [page, setPage] = useState(draft.page);
-  const [reflection, setReflection] = useState(draft.reflection);
+  const [recall, setRecall] = useState<SessionRecall>(
+    draft.submission?.recall ??
+      draft.recall ?? {
+        idea: draft.reflection.slice(0, SESSION_RECALL_FIELD_MAX_LENGTH),
+        detail: '',
+        connection: '',
+      },
+  );
+  const [assessment, setAssessment] = useState<AssessSessionResponse | null>(null);
+  const [coach, setCoach] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const submitting = useRef(false);
   const [sending, setSending] = useState(false);
+  const checking = useRef(false);
+  const [evaluating, setEvaluating] = useState(false);
+  const editingLocked = Boolean(draft.submission) || sending || evaluating;
+  const canSave = Boolean(draft.submission) || assessment?.assessment.passed === true;
+
+  function updateRecall(key: keyof SessionRecall, value: string) {
+    if (checking.current || submitting.current || draft.submission) return;
+    const next = { ...recall, [key]: value.slice(0, SESSION_RECALL_FIELD_MAX_LENGTH) };
+    setRecall(next);
+    setAssessment(null);
+    setLocalError(null);
+    check.reset();
+    save.reset();
+    void persist({ ...draft, page, recall: next }).catch(() =>
+      setLocalError('Não foi possível guardar o rascunho neste aparelho.'),
+    );
+  }
+
+  async function assess() {
+    if (checking.current || submitting.current) return;
+    checking.current = true;
+    setEvaluating(true);
+    setAssessment(null);
+    setLocalError(null);
+    try {
+      await persist({ ...draft, page, recall });
+      const response = await check.mutateAsync({ shelfEntryId: entry.id, recall, coach });
+      setAssessment(response);
+      if (response.assessment.passed) haptics.success();
+      else haptics.warning();
+    } catch (error) {
+      haptics.error();
+      setLocalError(
+        error instanceof ApiError && (error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT')
+          ? 'Sem conexão. Sua recordação fica guardada; confira novamente quando voltar.'
+          : 'Não foi possível conferir agora. Seu rascunho continua aqui.',
+      );
+    } finally {
+      checking.current = false;
+      setEvaluating(false);
+    }
+  }
 
   async function submit() {
-    if (submitting.current) return;
+    if (submitting.current || checking.current || !canSave) return;
     const endPage = Number(page.trim());
     if (
       !draft.submission &&
@@ -249,20 +302,32 @@ function FinishStep({
         endedAt: new Date(draft.endedAt ?? 0).toISOString(),
         focusedSeconds: Math.floor(draft.accumulatedMs / 1000),
         endPage,
-        reflection: reflection.trim() === '' ? null : reflection.trim(),
+        reflection: null,
+        recall,
         localDate: toLocalIsoDate(new Date(draft.endedAt ?? 0)),
       };
-      await persist({ ...draft, page, reflection, submission });
+      await persist({ ...draft, page, recall, submission });
       const result = await save.mutateAsync(submission);
-      await clearSessionDraft(userId);
+      let cleanupWarning: string | undefined;
+      try {
+        await clearSessionDraft(userId);
+      } catch {
+        cleanupWarning =
+          'A sessão foi salva, mas não foi possível apagar o rascunho deste aparelho. Se ele reaparecer, confirme o mesmo envio: não contará duas vezes.';
+      }
       haptics.success();
-      onSaved(result);
+      onSaved(result, cleanupWarning);
     } catch (error) {
       haptics.error();
       if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
-        await persist({ ...draft, page, reflection, submission: null }).catch(() => undefined);
+        setAssessment(null);
+        await persist({ ...draft, page, recall, submission: null }).catch(() => undefined);
+        setLocalError(
+          'Confira a página e os três campos de recordação antes de tentar concluir novamente.',
+        );
+      } else {
+        setLocalError('Não foi possível concluir. O registro foi mantido para tentar novamente.');
       }
-      setLocalError('Não foi possível concluir. O registro foi mantido para tentar novamente.');
     } finally {
       submitting.current = false;
       setSending(false);
@@ -280,23 +345,44 @@ function FinishStep({
       back={false}
       footer={
         <>
-          <Button label="Salvar sessão" icon="check" fullWidth loading={sending} onPress={submit} />
+          {!draft.submission ? (
+            <Button
+              label={assessment ? 'Conferir novamente' : 'Conferir minha recordação'}
+              icon="fact-check"
+              variant="secondary"
+              fullWidth
+              loading={evaluating}
+              disabled={sending}
+              onPress={() => void assess()}
+            />
+          ) : null}
+          <Button
+            label={draft.submission ? 'Confirmar envio guardado' : 'Concluir e salvar sessão'}
+            icon="check"
+            fullWidth
+            loading={sending}
+            disabled={!canSave || evaluating}
+            accessibilityHint={canSave ? undefined : 'Complete e confira a recordação primeiro'}
+            onPress={() => void submit()}
+          />
           <Button
             label="Descartar registro local"
             variant="secondary"
-            disabled={sending}
-            onPress={onDiscard}
+            disabled={sending || evaluating}
+            onPress={() => {
+              if (!checking.current && !submitting.current) onDiscard();
+            }}
           />
         </>
       }
     >
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="heading" accessibilityRole="header">
-          Boa leitura!
+          Feche o livro. Abra a memória.
         </Text>
         <Text variant="body" color="textMuted">
-          Você leu com foco por {formatDuration(draft.accumulatedMs / 1000)}. Registre até onde
-          chegou.
+          Você leu com foco por {formatDuration(draft.accumulatedMs / 1000)}. Antes de concluir,
+          recupere uma ideia, um detalhe e uma ligação ou dúvida, sem consultar o livro.
         </Text>
       </View>
       {save.isError ? <InlineMessage tone="error" message={errorMessage} /> : null}
@@ -307,15 +393,27 @@ function FinishStep({
           message="Este envio está guardado. Tentar novamente usa os mesmos dados para evitar duplicações."
         />
       ) : null}
+      {draft.reflection ? (
+        <Card style={{ gap: theme.spacing.xs }}>
+          <Text variant="titleSm">Sua anotação anterior</Text>
+          <Text variant="bodySm">{draft.reflection}</Text>
+          <Text variant="bodySm" color="textMuted">
+            O rascunho foi preservado por inteiro. Use os três campos abaixo para organizar sua
+            recordação neste novo formato.
+          </Text>
+        </Card>
+      ) : null}
       <TextField
         label="Até que página você chegou?"
         icon="bookmark-border"
         keyboardType="number-pad"
         value={page}
-        editable={!draft.submission && !sending}
+        editable={!editingLocked}
         onChangeText={(value) => {
-          setPage(value);
-          void persist({ ...draft, page: value.slice(0, 10), reflection }).catch(() =>
+          if (checking.current || submitting.current || draft.submission) return;
+          setPage(value.slice(0, 10));
+          setPageError(null);
+          void persist({ ...draft, page: value.slice(0, 10), recall }).catch(() =>
             setLocalError('Não foi possível guardar o rascunho neste aparelho.'),
           );
         }}
@@ -325,27 +423,100 @@ function FinishStep({
         }
       />
       <TextField
-        label="O que ficou com você? (opcional)"
+        label="1. Qual ideia, cena ou imagem ficou?"
         icon="edit-note"
-        placeholder="Uma ideia, uma frase, uma pergunta…"
-        value={reflection}
-        editable={!draft.submission && !sending}
-        onChangeText={(value) => {
-          const text = value.slice(0, MAX_REFLECTION_LENGTH);
-          setReflection(text);
-          void persist({ ...draft, page, reflection: text }).catch(() =>
-            setLocalError('Não foi possível guardar o rascunho neste aparelho.'),
-          );
-        }}
+        placeholder="Conte com suas palavras o que você lembra."
+        value={recall.idea}
+        editable={!editingLocked}
+        onChangeText={(value) => updateRecall('idea', value)}
+        maxLength={SESSION_RECALL_FIELD_MAX_LENGTH}
         multiline
         textAlignVertical="top"
-        hint="Explicar com suas palavras ajuda a lembrar depois."
+        hint="Pode ser breve. Não precisa escrever bonito."
       />
+      <TextField
+        label="2. Que detalhe ajuda a lembrar disso?"
+        icon="search"
+        placeholder="Uma ação, um exemplo, um argumento ou uma imagem."
+        value={recall.detail}
+        editable={!editingLocked}
+        onChangeText={(value) => updateRecall('detail', value)}
+        maxLength={SESSION_RECALL_FIELD_MAX_LENGTH}
+        multiline
+        textAlignVertical="top"
+        hint="Escolha algo concreto diferente da primeira resposta."
+      />
+      <TextField
+        label="3. Que ligação ou dúvida surgiu?"
+        icon="psychology"
+        placeholder="O que isso explica, lembra ou faz você perguntar?"
+        value={recall.connection}
+        editable={!editingLocked}
+        onChangeText={(value) => updateRecall('connection', value)}
+        maxLength={SESSION_RECALL_FIELD_MAX_LENGTH}
+        multiline
+        textAlignVertical="top"
+        hint="Uma dúvida sincera também vale."
+      />
+      {!draft.submission ? (
+        <Card>
+          <Toggle
+            title="Quero uma pergunta extra com IA"
+            description="Opcional: envia somente estas respostas ao Gemini. Conforme o serviço configurado, o provedor pode usar o texto para melhorar seus modelos. Evite informações pessoais ou sensíveis."
+            value={coach}
+            onValueChange={
+              sending || evaluating
+                ? undefined
+                : (value) => {
+                    if (!checking.current && !submitting.current) setCoach(value);
+                  }
+            }
+          />
+        </Card>
+      ) : null}
+      {assessment ? (
+        <Card style={{ gap: theme.spacing.sm }}>
+          <Text variant="titleSm" accessibilityRole="header">
+            {assessment.assessment.passed ? 'Recordação pronta para guardar' : 'Vamos completar?'}
+          </Text>
+          <Text accessibilityLiveRegion="polite">{assessment.assessment.feedback}</Text>
+          {assessment.assessment.checks.map((item) => (
+            <InlineMessage
+              key={item.key}
+              tone={item.passed ? 'success' : 'info'}
+              message={item.message}
+            />
+          ))}
+          <Text variant="bodySm" color="textMuted">
+            Checklist de escrita: {assessment.assessment.score}/100. Confere o preenchimento do
+            exercício; não mede sua inteligência, retenção ou a correção do livro.
+          </Text>
+          {assessment.coach.question ? (
+            <InlineMessage tone="info" message={`Para pensar: ${assessment.coach.question}`} />
+          ) : assessment.coach.status === 'unavailable' ? (
+            <InlineMessage
+              tone="info"
+              message="A pergunta extra não está disponível agora. Sua recordação pode ser concluída normalmente."
+            />
+          ) : null}
+        </Card>
+      ) : (
+        <InlineMessage
+          tone="info"
+          message="Sua sessão será salva depois que os três campos passarem pela conferência. As respostas ficam guardadas para você tentar recuperá-las na revisão."
+        />
+      )}
     </FormScreen>
   );
 }
 
-function ResultStep({ result }: { result: SessionResult }) {
+function ResultStep({
+  result,
+  cleanupWarning,
+}: {
+  result: SessionResult;
+  cleanupWarning?: string;
+}) {
   const theme = useTheme();
   const router = useRouter();
   const minutes = Math.floor(result.session.focusedSeconds / 60);
@@ -371,6 +542,7 @@ function ResultStep({ result }: { result: SessionResult }) {
         />
       }
     >
+      {cleanupWarning ? <InlineMessage tone="info" message={cleanupWarning} /> : null}
       <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
         <BuboMascot state={finishedBook ? 'achievementUnlocked' : 'sessionComplete'} size={180} />
         <Chip
@@ -409,11 +581,20 @@ function ResultStep({ result }: { result: SessionResult }) {
           </Card>
         ))}
       </View>
+      {result.session.assessment ? (
+        <Card style={{ gap: theme.spacing.xs }}>
+          <Text variant="titleSm">Você transformou leitura em recordação.</Text>
+          <Text variant="bodySm" color="textMuted">
+            Sua ideia, seu detalhe e sua ligação viraram uma revisão para amanhã. Recuperá-los
+            depois, sem espiar, ajuda a acompanhar o que ficou.
+          </Text>
+        </Card>
+      ) : null}
     </FormScreen>
   );
 }
 
-/** Focused reading session: timer → pages + reflection → result ("Essa leitura ficou"). */
+/** Focused reading session: timer → mandatory recall → server acceptance → result. */
 export default function ReadingSessionScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -456,7 +637,9 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SessionResult | null>(null);
+  const [cleanupWarning, setCleanupWarning] = useState<string | undefined>();
   const pendingWrites = useRef(0);
+  const initialPage = useRef(String(entry.currentPage));
 
   function fresh(): SessionDraft {
     return {
@@ -492,7 +675,7 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
             accumulatedMs: 0,
             runningSince: null,
             endedAt: null,
-            page: String(entry.currentPage),
+            page: initialPage.current,
             reflection: '',
             submission: null,
           },
@@ -509,7 +692,7 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
     return () => {
       active = false;
     };
-  }, [userId, entry.id, entry.currentPage]);
+  }, [userId, entry.id]);
 
   async function persist(next: SessionDraft) {
     pendingWrites.current += 1;
@@ -552,7 +735,7 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
     );
   }
 
-  if (result) return <ResultStep result={result} />;
+  if (result) return <ResultStep result={result} cleanupWarning={cleanupWarning} />;
   if (!loaded)
     return (
       <FormScreen title="Sua leitura">
@@ -573,7 +756,7 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
         <Text>
           Seu registro ficou guardado neste aparelho.{' '}
           {draft.endedAt
-            ? 'Falta salvar a página e a reflexão.'
+            ? 'Falta conferir sua recordação e salvar a sessão.'
             : 'Você pode continuar ou encerrar.'}
         </Text>
         <Text variant="titleSm">{formatDuration(focusElapsedMs(draft, Date.now()) / 1000)}</Text>
@@ -623,7 +806,10 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
         draft={draft}
         persist={persist}
         onDiscard={discard}
-        onSaved={setResult}
+        onSaved={(saved, warning) => {
+          setCleanupWarning(warning);
+          setResult(saved);
+        }}
       />
     );
   return (

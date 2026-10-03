@@ -7,7 +7,7 @@ import {
   isValidTimeZone,
 } from '@bubo/domain';
 import { type ReactNode, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, ScrollView, View } from 'react-native';
 
 import {
   BuboTip,
@@ -96,7 +96,7 @@ const PUSH_COPY: Record<
   PushState | 'off',
   { tone: 'success' | 'neutral' | 'warning'; text: string }
 > = {
-  registered: { tone: 'success', text: 'Este aparelho recebe notificações.' },
+  registered: { tone: 'success', text: 'Este aparelho está registrado para notificações.' },
   off: { tone: 'neutral', text: 'Notificações ainda não ativadas neste aparelho.' },
   denied: {
     tone: 'warning',
@@ -129,11 +129,18 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let active = true;
-    void currentPushState().then((state) => active && setPush(state));
+    const refresh = () => {
+      void currentPushState(userId).then((state) => active && setPush(state));
+    };
+    refresh();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
     return () => {
       active = false;
+      subscription.remove();
     };
-  }, []);
+  }, [userId]);
   // The form starts from what is saved; later refetches never overwrite unsaved changes.
   if (saved.data && draft === null) setDraft(saved.data);
 
@@ -165,12 +172,11 @@ export default function SettingsScreen() {
     setNotice(null);
     setDraft({ ...draft, ...patch });
   };
-  const wantsPush = draft.reviewReminder || draft.notifyCommunity || draft.notifyFriends;
 
   async function enablePush() {
     if (asking) return;
     setAsking(true);
-    const state = await registerForPush();
+    const state = await registerForPush(userId ?? '');
     setPush(state);
     setAsking(false);
     if (state === 'registered') haptics.success();
@@ -183,7 +189,6 @@ export default function SettingsScreen() {
         haptics.success();
         setDraft(next);
         setNotice('Preferências salvas. O Bubo já segue o seu novo ritmo.');
-        if (wantsPush && push === 'off') void enablePush();
       },
       onError: () => haptics.error(),
     });
@@ -396,7 +401,7 @@ export default function SettingsScreen() {
         <Toggle
           icon="alarm"
           title="Lembrete de revisão"
-          description="Um aviso por dia, só quando há lembranças vencidas."
+          description="Um piu divertido por dia, no seu horário, só com revisões disponíveis. Sem cobranças."
           value={draft.reviewReminder}
           onValueChange={(on) => {
             set({ reviewReminder: on });

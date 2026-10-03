@@ -89,6 +89,7 @@ describe('database schema', () => {
       'contentReports',
       'friendships',
       'notifications',
+      'pushReceipts',
       'pushTokens',
       'rateLimits',
       'readerPreferences',

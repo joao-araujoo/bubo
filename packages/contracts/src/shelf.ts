@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { catalogIdSchema } from './catalog';
 import { newBookSchema, readingStatusSchema, shelfEntrySchema } from './me';
 import { recallCardSchema } from './recall';
+import { sessionAssessmentSchema, sessionRecallSchema } from './session-assessment';
 
 const localDateSchema = z.string().refine(isIsoDate, 'Must be a calendar date (YYYY-MM-DD).');
 const pageSchema = z.number().int().min(0).max(MAX_BOOK_PAGES);
@@ -58,6 +59,9 @@ export const readingSessionSchema = z.object({
   endPage: z.number().int(),
   pagesRead: z.number().int().nonnegative(),
   reflection: z.string().nullable(),
+  /** Historical sessions predate the mandatory exercise and keep both fields null. */
+  recall: sessionRecallSchema.nullable().default(null),
+  assessment: sessionAssessmentSchema.nullable().default(null),
   localDate: localDateSchema,
   xpEarned: z.number().int().nonnegative(),
 });
@@ -74,6 +78,8 @@ export const createSessionRequestSchema = z
     focusedSeconds: z.number().int().min(MIN_SESSION_SECONDS).max(MAX_SESSION_SECONDS),
     endPage: pageSchema,
     reflection: z.string().trim().max(MAX_REFLECTION_LENGTH).nullable().optional(),
+    /** Required by the server for new sessions; optional here to preserve accepted UUID retries. */
+    recall: sessionRecallSchema.optional(),
     /** Reader's local calendar day when the session ended. */
     localDate: localDateSchema,
   })

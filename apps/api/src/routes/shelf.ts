@@ -1,6 +1,7 @@
 import {
   API_ROUTES,
   addBookRequestSchema,
+  assessSessionRequestSchema,
   createSessionRequestSchema,
   updateShelfEntryRequestSchema,
 } from '@bubo/contracts';
@@ -10,6 +11,8 @@ import { type AppEnv } from '../env';
 import { parseJsonBody } from '../lib/validation';
 import { entryReviewTotals, listEntryCards, listEntryReviews } from '../services/recall';
 import { listEntrySessions, recordSession } from '../services/sessions';
+import { assessSessionExercise } from '../services/session-assessment';
+import { GeminiService } from '../services/gemini';
 import { type CatalogProvider, resolveCatalogBook } from './catalog';
 import {
   addCatalogBook,
@@ -22,7 +25,11 @@ import {
 } from '../services/shelf';
 
 /** Shelf + reading sessions (session-protected; every query is scoped to the signed-in reader). */
-export function shelfRoutes(deps: { now: () => Date; catalog: CatalogProvider }) {
+export function shelfRoutes(deps: {
+  now: () => Date;
+  catalog: CatalogProvider;
+  geminiFetch: typeof fetch;
+}) {
   const routes = new Hono<AppEnv>();
 
   routes.get(API_ROUTES.shelf, async (c) => {
@@ -77,6 +84,31 @@ export function shelfRoutes(deps: { now: () => Date; catalog: CatalogProvider })
       });
     }
     return c.json(result, created ? 201 : 200);
+  });
+
+  routes.post(API_ROUTES.sessionAssessment, async (c) => {
+    const { user } = c.get('session');
+    const input = await parseJsonBody(c, assessSessionRequestSchema);
+    const db = c.get('db');
+    await findEntry(db, user.id, input.shelfEntryId);
+    const config = c.get('config');
+    const gemini = new GeminiService({
+      apiKey: config.ok ? config.env.GEMINI_API_KEY : undefined,
+      model: config.ok ? config.env.GEMINI_MODEL : 'gemini-2.5-flash',
+      fetch: deps.geminiFetch,
+      timeoutMs: 8000,
+    });
+    c.header('Cache-Control', 'private, no-store');
+    return c.json(
+      await assessSessionExercise({
+        db,
+        userId: user.id,
+        recall: input.recall,
+        coach: input.coach,
+        gemini,
+        now: deps.now(),
+      }),
+    );
   });
 
   return routes;

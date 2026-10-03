@@ -46,6 +46,8 @@ describe('applyMigrations (PGlite)', () => {
       '0011_club_reading_cycles.sql',
       '0012_reader_friendships.sql',
       '0013_reader_preferences_notifications.sql',
+      '0014_session_recall_assessment.sql',
+      '0015_reader_push_receipts.sql',
     ]);
   });
 
@@ -136,6 +138,63 @@ describe('applyMigrations (PGlite)', () => {
 });
 
 describe('reading sessions constraints', () => {
+  it('enforces accepted recall pairs and rejects JSON null metadata rather than SQL UNKNOWN', async () => {
+    await applyMigrations(client(), loadMigrations());
+    await insertUser();
+    await pg.query(`INSERT INTO "books" ("id", "title") VALUES ('b1', 'Duna')`);
+    await pg.query(
+      `INSERT INTO "shelf_entries" ("id", "user_id", "book_id") VALUES ('s1', 'u1', 'b1')`,
+    );
+    await pg.query(`INSERT INTO "reading_sessions" ("id", "user_id", "shelf_entry_id", "started_at", "ended_at", "focused_seconds", "start_page", "end_page", "local_date")
+      VALUES ('r1', 'u1', 's1', now() - interval '1 hour', now(), 600, 0, 10, '2026-10-03')`);
+    const exercise = {
+      idea: 'Ana sentiu medo',
+      detail: 'Carta caiu aberta',
+      connection: 'Saudade vira coragem',
+    };
+    const assessment = {
+      version: 'bubo-recall-v1',
+      passed: true,
+      score: 100,
+      kind: 'writing_checklist',
+      factualVerification: 'unavailable',
+      checks: [],
+      feedback: 'Checklist preenchido.',
+    };
+    const update = (recall: unknown, result: unknown) =>
+      pg.query(
+        `UPDATE "reading_sessions" SET "recall_exercise"=$1::jsonb, "recall_assessment"=$2::jsonb WHERE "id"='r1'`,
+        [
+          recall === undefined ? null : JSON.stringify(recall),
+          result === undefined ? null : JSON.stringify(result),
+        ],
+      );
+    await update(undefined, undefined); // Legacy SQL null pairs remain valid.
+    await update(exercise, assessment);
+    for (const key of [
+      'version',
+      'passed',
+      'score',
+      'kind',
+      'factualVerification',
+      'checks',
+      'feedback',
+    ]) {
+      await expect(update(exercise, { ...assessment, [key]: null }), key).rejects.toThrow();
+      const missing = { ...assessment } as Record<string, unknown>;
+      delete missing[key];
+      await expect(update(exercise, missing), `missing ${key}`).rejects.toThrow();
+    }
+    for (const key of ['idea', 'detail', 'connection']) {
+      await expect(update({ ...exercise, [key]: null }, assessment), key).rejects.toThrow();
+    }
+    await expect(update(exercise, undefined)).rejects.toThrow();
+    await expect(update(undefined, assessment)).rejects.toThrow();
+    await expect(update(null, null)).rejects.toThrow(); // JSON null is different from a legacy SQL null.
+    await expect(update(exercise, { ...assessment, passed: false })).rejects.toThrow();
+    await expect(update(exercise, { ...assessment, score: 75 })).rejects.toThrow();
+  });
+
   it('rejects implausible sessions and cascades with the shelf entry', async () => {
     await applyMigrations(client(), loadMigrations());
     await insertUser();

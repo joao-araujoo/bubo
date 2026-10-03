@@ -107,6 +107,10 @@ export function createAuth({ db, config, email, logger }: AuthDeps) {
         beforeDelete: async (user) => {
           // Books the reader typed in manually are personal data too.
           await db.delete(schema.books).where(eq(schema.books.createdByUserId, user.id));
+          // The optional recall coach quota also belongs to this account (no retained user id).
+          await db
+            .delete(schema.rateLimits)
+            .where(eq(schema.rateLimits.key, `recall-coach:${user.id}`));
         },
       },
     },

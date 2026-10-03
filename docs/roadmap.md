@@ -1,5 +1,25 @@
 # Roadmap
 
+## Núcleo e push — 2026-10-03
+
+- API publicada com migrações `0014`/`0015`, `verify` verde (409 testes), smoke de produção
+  30/30 e conta temporária apagada. APK Android assinado com quatro widgets e permissão de
+  notificações verificados. Evidências e limites em [release.md](release.md).
+- Sessões novas exigem recordação em três partes: ideia, detalhe e ligação ou dúvida. Conferência
+  explícita na tela e recálculo obrigatório na API antes de progresso, XP e card. Rascunho durável,
+  retries antigos preservados e avaliação versionada armazenada (`0014`; ADR-027).
+- O checklist mede preenchimento do exercício, não correção do livro nem retenção. Gemini opcional
+  sugere uma pergunta com consentimento; indisponibilidade não impede a avaliação local. Fontes,
+  casos com capítulos reais e plano de calibração humana em [core-validation.md](core-validation.md).
+- Push recebe recibos persistentes, vínculo ao login, correções de consentimento e lembretes
+  transacionais, navegação por conta e mensagens divertidas curadas (`0015`). Diagnóstico local:
+  `npm run push:check`. Veja [notifications.md](notifications.md).
+- Task 06 ainda precisa calibrar retenção longitudinal e fidelidade factual com fontes. Task 09
+  ainda precisa de Expo/FCM/APNs configurados e homologação em Android/iPhone. Compilação não
+  comprova recebimento no aparelho.
+- A nova API de sessão requer a nova build mobile; builds antigas com reflexão opcional não podem
+  criar novas sessões. UUIDs já aceitos continuam confirmáveis. Distribuir os dois em conjunto.
+
 ## Continuação — 2026-09-30
 
 - Emails (2026-10-01; ADR-025): boas-vindas/confirmação opcional, recuperação e aviso de senha

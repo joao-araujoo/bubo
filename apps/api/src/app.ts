@@ -44,6 +44,8 @@ export type AppDeps = {
   catalogCache?: CatalogCache;
   /** Expo push delivery (tests inject a mock; default: global fetch). */
   pushFetch?: FetchLike;
+  /** Optional recall coach (tests inject a mock; mobile never reaches Gemini). */
+  geminiFetch?: typeof fetch;
 };
 
 /** Builds the Hono app. Dependencies are injectable so tests never hit the network. */
@@ -115,7 +117,14 @@ export function createApp(deps: AppDeps = {}) {
     app.use(`${API_PREFIX}${path}`, database, auth, requireSession);
   }
   app.route(API_PREFIX, readerRoutes({ catalog }));
-  app.route(API_PREFIX, shelfRoutes({ now, catalog }));
+  app.route(
+    API_PREFIX,
+    shelfRoutes({
+      now,
+      catalog,
+      geminiFetch: deps.geminiFetch ?? ((input, init) => fetch(input, init)),
+    }),
+  );
   app.route(API_PREFIX, catalogRoutes({ catalog, now }));
   app.route(API_PREFIX, recallRoutes({ now }));
   app.route(

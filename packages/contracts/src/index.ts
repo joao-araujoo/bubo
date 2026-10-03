@@ -11,6 +11,7 @@ export * from './notifications';
 export * from './openapi';
 export * from './preferences';
 export * from './recall';
+export * from './session-assessment';
 export * from './shelf';
 export {
   API_ROUTES,

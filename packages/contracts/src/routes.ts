@@ -50,6 +50,7 @@ import {
 } from './community';
 import { catalogBookResponseSchema, catalogSearchResponseSchema } from './catalog';
 import { errorResponseSchema } from './errors';
+import { assessSessionRequestSchema, assessSessionResponseSchema } from './session-assessment';
 import { memoryStatsResponseSchema } from './memory';
 import { healthResponseSchema, readyResponseSchema } from './health';
 import {
@@ -91,6 +92,7 @@ export const API_ROUTES = {
   shelf: '/shelf',
   shelfEntry: '/shelf/:id',
   sessions: '/sessions',
+  sessionAssessment: '/sessions/assessment',
   recallDue: '/recall/due',
   recallCards: '/recall/cards',
   recallCard: '/recall/cards/:id',
@@ -269,7 +271,29 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     tags: ['sessions'],
     auth: true,
     requestBody: createSessionRequestSchema,
-    responses: { 201: { description: 'Session recorded.', schema: sessionResultSchema } },
+    responses: {
+      201: {
+        description: 'Session recorded after the recall checklist passes.',
+        schema: sessionResultSchema,
+      },
+      200: { description: 'Already accepted session UUID.', schema: sessionResultSchema },
+      422: {
+        description: 'Timing, progress or recall exercise is incomplete.',
+        schema: errorResponseSchema,
+      },
+    },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.sessionAssessment,
+    summary:
+      'Assess a closed-book writing checklist. Optional Gemini question with explicit consent; no book accuracy verification.',
+    tags: ['sessions'],
+    auth: true,
+    requestBody: assessSessionRequestSchema,
+    responses: {
+      200: { description: 'Checklist and optional coach.', schema: assessSessionResponseSchema },
+    },
   },
   {
     method: 'get',

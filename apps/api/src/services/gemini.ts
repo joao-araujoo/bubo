@@ -35,6 +35,8 @@ export type GeminiGenerateOptions = {
   maxOutputTokens?: number;
   /** Ask Gemini for JSON output (pair with a Zod parse of the text). */
   json?: boolean;
+  /** Gemini 2.5 Flash can disable internal thinking for a short bounded coaching question. */
+  thinkingBudget?: number;
 };
 
 export type GeminiResult = {
@@ -68,6 +70,10 @@ export class GeminiService {
     return Boolean(this.apiKey);
   }
 
+  get modelName(): string {
+    return this.model;
+  }
+
   async generateText(prompt: string, options: GeminiGenerateOptions = {}): Promise<GeminiResult> {
     if (!this.apiKey) {
       throw new AppError('SERVICE_UNAVAILABLE', 'AI features are not configured.');
@@ -87,6 +93,9 @@ export class GeminiService {
           ? { maxOutputTokens: options.maxOutputTokens }
           : {}),
         ...(options.json ? { responseMimeType: 'application/json' } : {}),
+        ...(options.thinkingBudget !== undefined
+          ? { thinkingConfig: { thinkingBudget: options.thinkingBudget } }
+          : {}),
       },
     };
 

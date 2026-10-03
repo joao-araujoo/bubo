@@ -1,6 +1,7 @@
 import { clubCyclesResponseSchema, clubDetailSchema, meResponseSchema } from '@bubo/contracts';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createHarness } from './harness';
+import { VALID_SESSION_RECALL } from './session-fixtures';
 
 let h: Awaited<ReturnType<typeof createHarness>>;
 let now = new Date('2026-09-30T10:00:00Z');
@@ -92,6 +93,7 @@ it('scopes cycles, freezes participants, derives only in-window book sessions an
     focusedSeconds: 1200,
     endPage: 12,
     reflection: null,
+    recall: VALID_SESSION_RECALL,
     localDate: '2026-09-30',
   };
   expect(

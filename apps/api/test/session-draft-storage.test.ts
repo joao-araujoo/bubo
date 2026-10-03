@@ -64,6 +64,41 @@ it('preserves an exact pending submission across restart', async () => {
   await writeSessionDraft('a', { ...draft, submission });
   expect((await readSessionDraft('a'))?.submission).toEqual(submission);
 });
+it('keeps the three recall fields and an exact pending submission through restart', async () => {
+  const recall = {
+    idea: 'A personagem escolhe partir apesar do medo.',
+    detail: 'Ela guarda a carta e deixa a casa cedo.',
+    connection: 'Isso lembra como coragem depende de agir com dúvida.',
+  };
+  const submission = {
+    id: draft.id,
+    shelfEntryId: draft.shelfEntryId,
+    startedAt: '2026-09-30T10:00:00.000Z',
+    endedAt: '2026-09-30T10:01:00.000Z',
+    focusedSeconds: 60,
+    endPage: 10,
+    reflection: null,
+    recall,
+    localDate: '2026-09-30',
+  };
+  await writeSessionDraft('a', { ...draft, recall, submission });
+  expect((await readSessionDraft('a'))?.recall).toEqual(recall);
+  expect((await readSessionDraft('a'))?.submission).toEqual(submission);
+  expect(await readSessionDraft('b')).toBeNull();
+});
+it('reads legacy drafts without inventing an approved recall exercise', async () => {
+  storage.rows.set('bubo.session-draft.v1.a', JSON.stringify(draft));
+  expect(await readSessionDraft('a')).toEqual(draft);
+  expect((await readSessionDraft('a'))?.recall).toBeUndefined();
+});
+it('keeps the same session UUID when local cleanup fails and allows retrying cleanup', async () => {
+  await writeSessionDraft('a', draft);
+  storage.removeItem.mockRejectedValueOnce(new Error('disk unavailable'));
+  await expect(clearSessionDraft('a')).rejects.toThrow('disk unavailable');
+  expect((await readSessionDraft('a'))?.id).toBe(draft.id);
+  await clearSessionDraft('a');
+  expect(await readSessionDraft('a')).toBeNull();
+});
 it('surfaces failed writes and malformed drafts instead of claiming they were saved', async () => {
   storage.setItem.mockRejectedValueOnce(new Error('disk unavailable'));
   await expect(writeSessionDraft('a', draft)).rejects.toThrow('disk unavailable');

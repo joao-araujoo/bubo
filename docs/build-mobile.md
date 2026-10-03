@@ -10,7 +10,7 @@ npm run build:android
 
 O comando valida o projeto com `npm run verify`, prepara Java e o SDK no Windows 64 bits,
 confere a API, gera o projeto nativo com os assets oficiais e compila um APK independente.
-Verifica a assinatura, os três receptores de widgets e o JavaScript dentro do APK antes de
+Verifica a assinatura, os quatro receptores de widgets, a permissão de notificações e o JavaScript dentro do APK antes de
 entregar **`build/android/bubo-test.apk`**. `build-info.json` registra data, API, arquiteturas
 e SHA-256. Nenhuma conta Expo, cartão, assinatura, EAS, loja ou serviço de CI é necessário.
 
@@ -42,7 +42,7 @@ reset de senha e outras integrações têm os limites registrados em [CONFIGURAR
 ## Conferir os widgets
 
 Abra **Você → Bubo na sua tela**, ligue a atualização e adicione um modelo. Ou toque e segure
-uma área vazia da tela inicial → **Widgets → Bubo**. Teste os três, redimensione e conclua uma
+uma área vazia da tela inicial → **Widgets → Bubo**. Teste os quatro, redimensione e conclua uma
 sessão para ver página/dias atualizados. Toque no widget para abrir o app; saia da conta para
 conferir que os dados somem. Roteiro completo: [TESTAR-TELAS.md, seção 6c](TESTAR-TELAS.md#6c-widgets-android-e-ios-task-09-adr-023).
 
@@ -113,7 +113,9 @@ Não use `prebuild --clean` para acelerar: isso descarta projetos/cache nativos 
 Compilação, assinatura e presença dos widgets no APK são verificáveis no computador.
 Funcionamento visual no launcher e nos aparelhos continua sendo um aceite separado.
 
-**Verificado em 2026-10-01:** `npm run verify` passou (330 testes); APK Android compilado
-nas duas arquiteturas, assinatura validada, três receptores de widgets e bundle embarcado
-confirmados. `/v1/health` e `/v1/ready` responderam 200. Nenhum celular estava conectado;
+**Verificado em 2026-10-03:** `npm run verify` passou (407 testes); APK Android compilado
+nas duas arquiteturas, assinatura validada, quatro receptores de widgets, `POST_NOTIFICATIONS`
+e bundle embarcado confirmados. A primeira execução falhou em `packageRelease`; repetir
+`assembleRelease` com os mesmos caches concluiu a compilação, sem limpeza ou alteração de
+fonte. A causa inicial não foi reproduzida. `/v1/health` e `/v1/ready` responderam 200. Nenhum celular estava conectado;
 instalação, login e aparência/atualização dos widgets no launcher aguardam seu teste.

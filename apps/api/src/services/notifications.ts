@@ -7,6 +7,7 @@ import { type Executor, schema } from '@bubo/database';
 import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 
 import { type PushMessage } from './push';
+import { reviewReminderCopy } from './notification-copy';
 
 const { clubMembers, clubPosts, clubs, notifications, users } = schema;
 
@@ -280,7 +281,7 @@ export async function notifyCycleStarted(
 /** Daily review reminder (see reminders.ts): one inbox item per local day. */
 export async function notifyReviewsDue(
   db: Executor,
-  input: { userId: string; dueCount: number },
+  input: { userId: string; dueCount: number; localDate: string },
   now: Date,
 ): Promise<PushMessage[]> {
   await insert(db, { userId: input.userId, kind: 'review_due', count: input.dueCount }, now);
@@ -288,11 +289,7 @@ export async function notifyReviewsDue(
     {
       userId: input.userId,
       category: 'reviews',
-      title: 'Hora de lembrar',
-      body:
-        input.dueCount === 1
-          ? '1 lembrança espera por você. Leva só um minuto.'
-          : `${input.dueCount} lembranças esperam por você hoje.`,
+      ...reviewReminderCopy(input),
       url: '/revisar',
     },
   ];

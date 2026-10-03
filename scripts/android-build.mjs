@@ -280,6 +280,8 @@ async function buildNative(nativeRoot) {
     if (!manifest.includes(`expo.modules.bubowidgets.${receiver}`))
       throw new Error(`APK sem ${receiver}.`);
   }
+  if (!manifest.includes('android.permission.POST_NOTIFICATIONS'))
+    throw new Error('APK sem permissão POST_NOTIFICATIONS.');
   const contents = await run(path.join(buildTools, `aapt${suffix}`), ['list', source], {
     env,
     capture: true,
@@ -298,7 +300,7 @@ async function buildNative(nativeRoot) {
         architectures: config.architectures,
         signing: 'test-only',
         sha256,
-        widgets: ['reading', 'rhythm', 'complete'],
+        widgets: ['streak', 'rhythm', 'calendar', 'reading'],
       },
       null,
       2,

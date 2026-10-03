@@ -1,12 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQueryClient } from '@tanstack/react-query';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type * as NotificationsModule from 'expo-notifications';
 import { type Href, useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 
-import { lightColors } from '../theme';
+import { lightColors } from '../theme/colors';
 import { api } from './api/client';
+import { notificationMatchesUser, notificationPath } from './notification-policy';
 
 /**
  * Push notifications (Task 09, ADR-022). The API decides what to send (it knows due cards, replies
@@ -15,6 +17,18 @@ import { api } from './api/client';
  */
 
 const TOKEN_KEY = 'bubo.push-token.v1';
+const OWNER_KEY = 'bubo.push-owner.v1';
+const REMOVAL_KEY = 'bubo.push-removal.v1';
+let registration: { userId: string; promise: Promise<PushState> } | null = null;
+let registrationEpoch = 0;
+let notificationAccount: string | null = null;
+
+/** Called at account transitions, including forced sign-out; cancels in-flight work. */
+export function setNotificationAccount(userId: string | null) {
+  if (notificationAccount === userId) return;
+  notificationAccount = userId;
+  registrationEpoch += 1;
+}
 
 /** Android channels — ids must match the API (`PUSH_CHANNEL`). The reader can mute each one. */
 const ANDROID_CHANNELS = [
@@ -29,16 +43,6 @@ const ANDROID_CHANNELS = [
     description: 'Respostas às suas discussões, pedidos de amizade e novos ciclos dos clubes.',
   },
 ] as const;
-
-/** Paths a notification may open; anything else is ignored. */
-const ALLOWED_PREFIXES = [
-  '/revisar',
-  '/notificacoes',
-  '/amigos',
-  '/debates/',
-  '/resenhas/',
-  '/ciclos/',
-];
 
 export type PushState =
   | 'registered'
@@ -61,12 +65,17 @@ function loadNotifications(): Promise<Notifications | null> {
   loading ??= import('expo-notifications')
     .then((Notifications) => {
       Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        }),
+        handleNotification: async (notification) => {
+          const display =
+            notificationAccount !== null &&
+            notificationMatchesUser(notification.request.content.data, notificationAccount);
+          return {
+            shouldShowBanner: display,
+            shouldShowList: display,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          };
+        },
       });
       return Notifications;
     })
@@ -77,6 +86,16 @@ function loadNotifications(): Promise<Notifications | null> {
 function projectId(): string | undefined {
   const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
   return extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+}
+
+function hasPermission(
+  Notifications: Notifications,
+  permission: NotificationsModule.NotificationPermissionsStatus,
+) {
+  return (
+    permission.granted ||
+    permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  );
 }
 
 async function ensureAndroidChannels(Notifications: Notifications) {
@@ -100,8 +119,7 @@ export async function notificationsAllowed(): Promise<boolean> {
   try {
     const Notifications = await loadNotifications();
     if (!Notifications) return false;
-    const { granted } = await Notifications.getPermissionsAsync();
-    return granted;
+    return hasPermission(Notifications, await Notifications.getPermissionsAsync());
   } catch {
     return false;
   }
@@ -111,36 +129,72 @@ export async function notificationsAllowed(): Promise<boolean> {
  * Asks for permission when needed (Android 13+ shows the system prompt only after a channel
  * exists), gets the Expo push token and sends it to the API.
  */
-export async function registerForPush(): Promise<PushState> {
+async function performRegistration(userId: string, askPermission: boolean): Promise<PushState> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return 'unavailable';
+  const epoch = registrationEpoch;
   try {
+    // Check the build before any system permission prompt. Expo Go and unconfigured builds
+    // must not ask for a capability they cannot actually register.
+    if (isExpoGo || !projectId()) return 'unavailable';
     const Notifications = await loadNotifications();
     if (!Notifications) return 'unavailable';
     await ensureAndroidChannels(Notifications);
     const current = await Notifications.getPermissionsAsync();
     const granted =
-      current.granted ||
-      (current.canAskAgain && (await Notifications.requestPermissionsAsync()).granted);
+      hasPermission(Notifications, current) ||
+      (askPermission &&
+        current.canAskAgain &&
+        hasPermission(
+          Notifications,
+          await Notifications.requestPermissionsAsync({
+            ios: { allowAlert: true, allowSound: true, allowBadge: false },
+          }),
+        ));
     if (!granted) return 'denied';
     const id = projectId();
-    if (isExpoGo || !id) return 'unavailable';
+    if (!id) return 'unavailable';
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: id });
-    await api.registerPushToken({ token, platform: Platform.OS });
+    if (epoch !== registrationEpoch) return 'unavailable';
+    await api.registerPushToken({ token, platform: Platform.OS, expectedUserId: userId });
+    if (epoch !== registrationEpoch) return 'unavailable';
     await AsyncStorage.setItem(TOKEN_KEY, token);
+    await AsyncStorage.setItem(OWNER_KEY, userId);
+    // A registration transfers this token to the active account; no old removal may undo it.
+    if ((await AsyncStorage.getItem(REMOVAL_KEY)) === token)
+      await AsyncStorage.removeItem(REMOVAL_KEY);
     return 'registered';
   } catch {
     return 'unavailable';
   }
 }
 
+/** Only an explicit reader action may call with askPermission=true. */
+export function registerForPush(userId: string, askPermission = true): Promise<PushState> {
+  if (!userId) return Promise.resolve('unavailable');
+  if (notificationAccount && notificationAccount !== userId) return Promise.resolve('unavailable');
+  if (registration) {
+    if (registration.userId === userId) return registration.promise;
+    return registration.promise.then(() => registerForPush(userId, askPermission));
+  }
+  const promise = performRegistration(userId, askPermission).finally(() => {
+    if (registration?.promise === promise) registration = null;
+  });
+  registration = { userId, promise };
+  return promise;
+}
+
 /** What the settings screen shows, without prompting: 'off' = never asked or not registered. */
-export async function currentPushState(): Promise<PushState | 'off'> {
+export async function currentPushState(userId?: string): Promise<PushState | 'off'> {
   try {
+    if (isExpoGo || !projectId()) return 'unavailable';
     const Notifications = await loadNotifications();
     if (!Notifications) return 'unavailable';
-    const { granted, canAskAgain } = await Notifications.getPermissionsAsync();
-    if (!granted) return canAskAgain ? 'off' : 'denied';
+    const permission = await Notifications.getPermissionsAsync();
+    if (!hasPermission(Notifications, permission)) return permission.canAskAgain ? 'off' : 'denied';
     if (isExpoGo || !projectId()) return 'unavailable';
+    if (await AsyncStorage.getItem(REMOVAL_KEY)) return 'off';
+    const owner = await AsyncStorage.getItem(OWNER_KEY);
+    if (userId && owner && owner !== userId) return 'off';
     return (await AsyncStorage.getItem(TOKEN_KEY)) ? 'registered' : 'off';
   } catch {
     return 'unavailable';
@@ -149,58 +203,100 @@ export async function currentPushState(): Promise<PushState | 'off'> {
 
 /** Sign-out: this device stops receiving pushes for the account (best effort). */
 export async function unregisterPush() {
+  registrationEpoch += 1;
+  setNotificationAccount(null);
+  await registration?.promise;
+  try {
+    const Notifications = await loadNotifications();
+    if (Notifications) {
+      await Notifications.dismissAllNotificationsAsync();
+      Notifications.clearLastNotificationResponse();
+    }
+  } catch {
+    /* Delivered alerts are also removed when the device allows it. */
+  }
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (!token) return;
-    await AsyncStorage.removeItem(TOKEN_KEY);
+    // Durable retry: offline sign-out cannot revoke a server token, so never forget it locally.
+    await AsyncStorage.setItem(REMOVAL_KEY, token);
     await api.removePushToken(token);
+    await AsyncStorage.multiRemove([TOKEN_KEY, OWNER_KEY, REMOVAL_KEY]);
   } catch {
-    // Offline: the API drops tokens Expo reports as unregistered, and a token moves to the next
-    // account that signs in on this device.
+    // The removal is retried if this account returns. Server session revocation also deletes
+    // its tokens. An alert already accepted by APNs/FCM cannot be retracted remotely.
   }
 }
 
 /** Re-sends a known token at start-up (it can change after reinstalling or restoring). */
-export async function refreshPushRegistration() {
+export async function refreshPushRegistration(userId: string) {
   try {
     if (!(await AsyncStorage.getItem(TOKEN_KEY))) return;
-    if (await notificationsAllowed()) await registerForPush();
+    const owner = await AsyncStorage.getItem(OWNER_KEY);
+    if (owner && owner !== userId) return;
+    const pending = await AsyncStorage.getItem(REMOVAL_KEY);
+    if (pending) {
+      await api.removePushToken(pending);
+      await AsyncStorage.multiRemove([TOKEN_KEY, OWNER_KEY, REMOVAL_KEY]);
+      return;
+    }
+    if (await notificationsAllowed()) await registerForPush(userId, false);
+    else await unregisterPush();
   } catch {
     // Nothing to do: the next start tries again.
   }
 }
 
-function pathOf(response: NotificationsModule.NotificationResponse | null): Href | null {
-  const url = response?.notification.request.content.data?.url;
-  if (typeof url !== 'string') return null;
-  return ALLOWED_PREFIXES.some((prefix) => url === prefix || url.startsWith(prefix))
-    ? (url as Href)
-    : null;
-}
-
 /** Opens the screen a tapped notification points to, also when it launched the app. */
-export function useNotificationNavigation(enabled: boolean) {
+export function useNotificationNavigation(userId: string | null) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const handled = useRef(new Set<string>());
+  useLayoutEffect(() => {
+    setNotificationAccount(userId);
+  }, [userId]);
   useEffect(() => {
-    if (!enabled) return;
+    if (!userId) return;
     let active = true;
-    let subscription: { remove: () => void } | undefined;
+    const subscriptions: { remove: () => void }[] = [];
     void loadNotifications().then((Notifications) => {
       if (!Notifications || !active) return;
-      const initial = pathOf(Notifications.getLastNotificationResponse());
-      if (initial) {
-        router.push(initial);
+      const refresh = () => {
+        if (active) void refreshPushRegistration(userId);
+      };
+      const open = (response: NotificationsModule.NotificationResponse | null) => {
+        if (!active || !response) return;
         Notifications.clearLastNotificationResponse();
-      }
-      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        const path = pathOf(response);
-        if (path) router.push(path);
-      });
-      void refreshPushRegistration();
+        if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+        const { data } = response.notification.request.content;
+        if (!notificationMatchesUser(data, userId)) return;
+        const path = notificationPath(data?.url);
+        const id = response.notification.request.identifier;
+        if (!path || handled.current.has(id)) return;
+        if (handled.current.size > 50) handled.current.clear();
+        handled.current.add(id);
+        router.push(path as Href);
+      };
+      subscriptions.push(Notifications.addNotificationResponseReceivedListener(open));
+      subscriptions.push(
+        Notifications.addNotificationReceivedListener((notification) => {
+          if (notificationMatchesUser(notification.request.content.data, userId)) {
+            void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+          }
+        }),
+      );
+      subscriptions.push(Notifications.addPushTokenListener(refresh));
+      subscriptions.push(
+        AppState.addEventListener('change', (state) => {
+          if (state === 'active') refresh();
+        }),
+      );
+      open(Notifications.getLastNotificationResponse());
+      refresh();
     });
     return () => {
       active = false;
-      subscription?.remove();
+      subscriptions.forEach((subscription) => subscription.remove());
     };
-  }, [enabled, router]);
+  }, [userId, router, queryClient]);
 }

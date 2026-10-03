@@ -1,4 +1,4 @@
-import { createSessionRequestSchema } from '@bubo/contracts';
+import { createSessionRequestSchema, sessionRecallSchema } from '@bubo/contracts';
 import { MAX_REFLECTION_LENGTH, MAX_SESSION_SECONDS } from '@bubo/domain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
@@ -17,6 +17,8 @@ const draftSchema = z.object({
   endedAt: stamp.nullable(),
   page: z.string().max(10),
   reflection: z.string().max(MAX_REFLECTION_LENGTH),
+  // Optional to preserve drafts created before the mandatory recall exercise.
+  recall: sessionRecallSchema.optional(),
   submission: createSessionRequestSchema.nullable(),
 });
 export type SessionDraft = z.infer<typeof draftSchema>;

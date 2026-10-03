@@ -52,7 +52,7 @@ natively with the design system and never copy HTML (ADR-008). See
 | `bubo_a_es_do_livro_bottom_sheets_mobile`                        | `livro/[id]` actions                             | 🟡     | actions exist inline; bottom-sheet presentation is a polish item                                                                                                                                 |
 | `bubo_hist_rico_de_ciclos_de_leitura_mobile_1/_2`                | `ciclos/[clubId]`                                | ✅     | club history (ADR-021): Bubo historiador, real totals, year chips, current cycle (days left, group %), timeline, owner start/close. "Score médio"/"+pts" → "na meta" counts                      |
 | **Reading session**                                              |                                                  |        |                                                                                                                                                                                                  |
-| `bubo_sess_o_de_leitura_focada_1/_2`                             | `sessao/[id]`                                    | ✅     | restoring a timer after the OS kills the app is deferred                                                                                                                                         |
+| `bubo_sess_o_de_leitura_focada_1/_2`                             | `sessao/[id]`                                    | ✅     | durable timer/draft, mandatory idea/detail/connection, versioned server checklist; device acceptance pending (ADR-027)                                                                           |
 | `bubo_resultado_da_sess_o_essa_leitura_ficou`                    | `sessao/[id]` (result step)                      | ✅     |                                                                                                                                                                                                  |
 | `bubo_nova_reflex_o_toasts_mobile`                               | toasts in session/review                         | ⬜     | small: a toast component in the design system                                                                                                                                                    |
 | **Revisar**                                                      |                                                  |        |                                                                                                                                                                                                  |
@@ -241,3 +241,19 @@ dark theme on Você, Preferências and Notificações.
 
 Use the official poses and canonical theme/fonts; no new tab, fabricated activity or AI dependency.
 See [widgets.md](widgets.md) and [TESTAR-TELAS.md](TESTAR-TELAS.md).
+
+## Mandatory recall and push lifecycle (2026-10-03)
+
+`sessao/[id]` now follows timer → closed-book recall → explicit check → server-confirmed result.
+Idea, detail and connection/question autosave on the device. Edits invalidate a preview; a check
+locks editing and consent before disk/network work. Old notes remain readable. Exact pending
+requests keep their UUID; a failed local cleanup shows that the API save succeeded.
+
+The checklist score is labelled as exercise completion, never understanding or retention.
+The optional Gemini question requires consent and does not affect acceptance. No new route/tab
+or replacement artwork. Tests and research limits: [core-validation.md](core-validation.md).
+
+Settings request push permission only after a deliberate activation. Returning from system
+settings and rotating tokens refresh registration. Notification taps require the current account
+and an exact allowed route. Provider setup and Android/iPhone acceptance remain pending; see
+[notifications.md](notifications.md).

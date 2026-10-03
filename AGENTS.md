@@ -52,6 +52,7 @@ npm run install:android   # install existing APK on an authorized USB device
 npm run build:android:setup | build:android:check
 npm run email:preview     # local examples; no credentials or sending
 npm run email:check       # read-only diagnostics unless --send-to is explicitly provided
+npm run push:check        # read-only local Expo/Firebase/native diagnostics; never sends
 ```
 
 After adding a screen, run `npx expo start` once in `apps/mobile` (a few seconds is enough) so
@@ -124,6 +125,16 @@ tags, friends + opt-in friends feed, club reading cycles, global moderation via
 deployed: preferences, inbox, Expo push (hourly cron), Você rebuilt. Push on devices needs the
 owner (EAS project id, Firebase). **Next:** Task 06 retention model (curve, Bubo Score) or AI
 flows (Gemini), as the owner prefers.
+
+**Core and push (2026-10-03; ADR-027/028):** new sessions require a three-part recall exercise
+(idea, detail, connection/question) that passes the server's versioned writing checklist before
+progress, XP or cards are saved (`0014`). It does not verify book facts or measure retention.
+Gemini only suggests an optional consented question; failure never blocks the local checklist.
+Push has persistent provider receipts, session-bound registrations, atomic daily reminders and
+account-checked native navigation (`0015`). Expo/FCM/APNs configuration and device acceptance are
+still required. See [docs/core-validation.md](docs/core-validation.md) and
+[docs/notifications.md](docs/notifications.md). Coordinate the new API and APK: older builds lack
+required recall fields, while already accepted UUIDs remain retryable.
 
 **Task 09 widgets (2026-10-01; ADR-023):** Android App Widgets and iOS WidgetKit code implemented,
 with `widgets` previews/settings in Você. Source lives in `apps/mobile/modules/bubo-widgets`,

@@ -7,6 +7,7 @@ import {
 } from '@bubo/contracts';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createHarness } from './harness';
+import { VALID_SESSION_RECALL } from './session-fixtures';
 
 let h: Awaited<ReturnType<typeof createHarness>>;
 let now = new Date('2026-09-30T10:00:00Z');
@@ -99,6 +100,10 @@ it('requires mutual consent and opt-in; blocks revoke friendship and stop future
         focusedSeconds: 600,
         endPage,
         reflection: 'REFLEXAO_PRIVADA_NUNCA_NO_FEED',
+        recall: {
+          ...VALID_SESSION_RECALL,
+          idea: 'REFLEXAO_PRIVADA_NUNCA_NO_FEED: A personagem aprende a lidar com a saudade.',
+        },
         localDate: '2026-09-30',
       },
     });

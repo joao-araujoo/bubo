@@ -2,6 +2,7 @@ import { achievementsResponseSchema, shelfEntrySchema } from '@bubo/contracts';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import { createHarness } from './harness';
+import { VALID_SESSION_RECALL } from './session-fixtures';
 
 let h: Awaited<ReturnType<typeof createHarness>>;
 let now = new Date('2026-09-24T15:00:00.000Z');
@@ -54,6 +55,7 @@ it('unlocks from recorded sessions, finished books and streaks, scoped to the re
       focusedSeconds: 40 * 60,
       endPage: (index + 1) * 20,
       reflection: index === 0 ? 'Uma ideia que ficou.' : null,
+      recall: VALID_SESSION_RECALL,
       localDate: day,
     };
     expect((await h.call('/v1/sessions', { method: 'POST', cookie, json })).status).toBe(201);
@@ -77,7 +79,7 @@ it('unlocks from recorded sessions, finished books and streaks, scoped to the re
   expect(byId.get('ten_hours')?.progress).toBe(120);
   expect(byId.get('thousand_pages')?.progress).toBe(60);
   expect(byId.get('first_book')?.unlocked).toBe(true);
-  expect(byId.get('five_reflections')?.progress).toBe(1);
+  expect(byId.get('five_reflections')?.progress).toBe(3);
   expect(byId.get('streak_3')?.unlocked).toBe(true);
   expect(result.streakDays).toBe(3);
   expect(result.longestStreakDays).toBe(3);

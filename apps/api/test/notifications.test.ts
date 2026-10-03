@@ -11,8 +11,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PGLITE_DATABASE_URL } from '../dev/pglite';
 import { runScheduled } from '../src/scheduled';
-import { EXPO_PUSH_URL } from '../src/services/push';
+import { EXPO_PUSH_URL, EXPO_RECEIPTS_URL } from '../src/services/push';
 import { createHarness } from './harness';
+import { VALID_SESSION_RECALL } from './session-fixtures';
 
 type Sent = { to: string; title: string; body: string; channelId: string; data: { url: string } };
 
@@ -22,6 +23,7 @@ let sent: Sent[] = [];
 const unregistered = new Set<string>();
 
 const pushFetch = async (input: string, init?: RequestInit) => {
+  if (input === EXPO_RECEIPTS_URL) return Response.json({ data: {} });
   expect(input).toBe(EXPO_PUSH_URL);
   const batch = JSON.parse(String(init?.body)) as Sent[];
   sent.push(...batch);
@@ -407,6 +409,7 @@ describe('review preferences', () => {
         focusedSeconds: 25 * 60,
         endPage: 20,
         reflection: null,
+        recall: VALID_SESSION_RECALL,
         localDate: '2026-09-30',
       },
     });

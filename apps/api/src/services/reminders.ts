@@ -5,7 +5,7 @@ import { and, eq, lte, sql } from 'drizzle-orm';
 import { notifyReviewsDue } from './notifications';
 import { type PushMessage } from './push';
 
-const { readerPreferences, recallCards } = schema;
+const { readerPreferences, recallCards, reviewLogs } = schema;
 
 /** Upper bound per run so one cron invocation stays well inside the Worker limits. */
 const MAX_READERS_PER_RUN = 500;
@@ -21,10 +21,18 @@ export async function runReviewReminders(db: Database, now: Date): Promise<PushM
       reminderHour: readerPreferences.reminderHour,
       timeZone: readerPreferences.timeZone,
       lastReminderDate: readerPreferences.lastReminderDate,
+      dailyReviewLimit: readerPreferences.dailyReviewLimit,
     })
     .from(readerPreferences)
-    .where(eq(readerPreferences.reviewReminder, true))
-    .limit(5000);
+    .where(
+      and(
+        eq(readerPreferences.reviewReminder, true),
+        sql`EXTRACT(HOUR FROM ${now.toISOString()}::timestamptz AT TIME ZONE ${readerPreferences.timeZone}) = ${readerPreferences.reminderHour}`,
+        sql`${readerPreferences.lastReminderDate} IS DISTINCT FROM (${now.toISOString()}::timestamptz AT TIME ZONE ${readerPreferences.timeZone})::date`,
+      ),
+    )
+    .orderBy(sql`${readerPreferences.lastReminderDate} ASC NULLS FIRST`, readerPreferences.userId)
+    .limit(MAX_READERS_PER_RUN);
 
   const messages: PushMessage[] = [];
   let handled = 0;
@@ -34,19 +42,41 @@ export async function runReviewReminders(db: Database, now: Date): Promise<PushM
     if (!clock || clock.hour !== reader.reminderHour) continue;
     if (reader.lastReminderDate === clock.date) continue;
     handled += 1;
-    const [due] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(recallCards)
-      .where(and(eq(recallCards.userId, reader.userId), lte(recallCards.dueDate, clock.date)));
-    // Marked even when nothing is due, so the reader is checked once per local day.
-    await db
-      .update(readerPreferences)
-      .set({ lastReminderDate: clock.date })
-      .where(eq(readerPreferences.userId, reader.userId));
-    const dueCount = Number(due?.n ?? 0);
-    if (dueCount > 0) {
-      messages.push(...(await notifyReviewsDue(db, { userId: reader.userId, dueCount }, now)));
-    }
+    // Atomic claim + inbox creation: overlapping jobs cannot duplicate a local day, and a
+    // failed insert rolls back the claim so another invocation can safely try again.
+    const notified = await db.transaction(async (tx) => {
+      const claimed = await tx
+        .update(readerPreferences)
+        .set({ lastReminderDate: clock.date })
+        .where(
+          and(
+            eq(readerPreferences.userId, reader.userId),
+            eq(readerPreferences.reviewReminder, true),
+            eq(readerPreferences.reminderHour, reader.reminderHour),
+            eq(readerPreferences.timeZone, reader.timeZone),
+            sql`${readerPreferences.lastReminderDate} IS DISTINCT FROM ${clock.date}::date`,
+          ),
+        )
+        .returning({ dailyReviewLimit: readerPreferences.dailyReviewLimit });
+      const claim = claimed[0];
+      if (!claim) return [];
+      const [due] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(recallCards)
+        .where(and(eq(recallCards.userId, reader.userId), lte(recallCards.dueDate, clock.date)));
+      const [reviewed] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(reviewLogs)
+        .where(and(eq(reviewLogs.userId, reader.userId), eq(reviewLogs.localDate, clock.date)));
+      const dueCount = Math.min(
+        Number(due?.n ?? 0),
+        Math.max(0, claim.dailyReviewLimit - Number(reviewed?.n ?? 0)),
+      );
+      return dueCount > 0
+        ? notifyReviewsDue(tx, { userId: reader.userId, dueCount, localDate: clock.date }, now)
+        : [];
+    });
+    messages.push(...notified);
   }
   return messages;
 }

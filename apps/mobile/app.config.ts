@@ -44,12 +44,23 @@ function assertReleaseApiUrl() {
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   assertReleaseApiUrl();
+  const projectId = process.env.BUBO_EAS_PROJECT_ID;
+  if (
+    projectId &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
+  ) {
+    throw new Error('BUBO_EAS_PROJECT_ID must be a valid project UUID. See docs/notifications.md.');
+  }
   return {
     ...config,
     name: 'Bubo',
     slug: 'bubo',
     scheme: 'bubo',
     version: '0.3.0',
+    extra: {
+      ...config.extra,
+      ...(projectId ? { eas: { ...config.extra?.eas, projectId } } : {}),
+    },
     orientation: 'portrait',
     // Native-only product: no react-native-web / react-dom in the dependency tree.
     platforms: ['ios', 'android'],

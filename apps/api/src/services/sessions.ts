@@ -6,7 +6,7 @@ import {
 } from '@bubo/contracts';
 import { type Database, type Executor, schema } from '@bubo/database';
 import { addDays, applySessionToShelf, READING_STATUSES, type ReadingStatus } from '@bubo/domain';
-import { xpForReadingSession } from '@bubo/scoring';
+import { assessRecallWriting, reflectionFromRecall, xpForReadingSession } from '@bubo/scoring';
 import { and, desc, eq } from 'drizzle-orm';
 
 import { AppError } from '../lib/errors';
@@ -32,6 +32,8 @@ function toSession(row: SessionRow): ReadingSession {
     endPage: row.endPage,
     pagesRead: row.endPage - row.startPage,
     reflection: row.reflection,
+    recall: row.recallExercise,
+    assessment: row.recallAssessment,
     localDate: row.localDate,
     xpEarned: row.xpEarned,
   });
@@ -82,17 +84,42 @@ export async function recordSession(
     const [existing] = await tx
       .select()
       .from(readingSessions)
-      .where(eq(readingSessions.id, input.id))
+      .where(and(eq(readingSessions.id, input.id), eq(readingSessions.userId, userId)))
       .limit(1);
     if (existing) {
-      if (existing.userId !== userId) throw new AppError('CONFLICT', 'Session id already used.');
       return { result: await resultFor(tx, userId, existing), created: false };
     }
 
     // An already accepted UUID remains retryable after the 48-hour creation window.
     assertPlausible(input, now);
 
+    if (!input.recall)
+      invalid('recall', 'Complete the three-part recall exercise before finishing.');
+    const assessment = assessRecallWriting(input.recall);
+    if (!assessment.passed) {
+      throw new AppError('VALIDATION_FAILED', 'Complete the recall exercise before finishing.', {
+        issues: assessment.checks
+          .filter((check) => !check.passed)
+          .map((check) => ({ path: `recall.${check.key}`, message: check.message })),
+      });
+    }
+
+    // Serialize progress changes for this reader's entry, so concurrent finishes cannot regress it.
+    await tx
+      .select({ id: shelfEntries.id })
+      .from(shelfEntries)
+      .where(and(eq(shelfEntries.id, input.shelfEntryId), eq(shelfEntries.userId, userId)))
+      .for('update');
     const { entry, book } = await findEntry(tx, userId, input.shelfEntryId);
+
+    // A same-UUID request may have committed while this transaction waited for the entry lock.
+    const [acceptedWhileWaiting] = await tx
+      .select()
+      .from(readingSessions)
+      .where(and(eq(readingSessions.id, input.id), eq(readingSessions.userId, userId)))
+      .limit(1);
+    if (acceptedWhileWaiting)
+      return { result: await resultFor(tx, userId, acceptedWhileWaiting), created: false };
     const startPage = entry.currentPage;
     if (input.endPage < startPage) {
       invalid('endPage', `Must be at least the current page (${startPage}).`);
@@ -114,12 +141,15 @@ export async function recordSession(
         focusedSeconds: input.focusedSeconds,
         startPage,
         endPage: input.endPage,
-        reflection: input.reflection ? input.reflection : null,
+        reflection: reflectionFromRecall(input.recall),
+        recallExercise: input.recall,
+        recallAssessment: assessment,
         localDate: input.localDate,
         xpEarned,
       })
+      .onConflictDoNothing({ target: readingSessions.id })
       .returning();
-    if (!session) throw new AppError('INTERNAL_ERROR', 'Could not record the session.');
+    if (!session) throw new AppError('CONFLICT', 'Session id already used.');
 
     const status: ReadingStatus = (READING_STATUSES as readonly string[]).includes(entry.status)
       ? (entry.status as ReadingStatus)
@@ -143,7 +173,7 @@ export async function recordSession(
         startedAt: next.startedAt,
         finishedAt: next.finishedAt,
       })
-      .where(eq(shelfEntries.id, entry.id));
+      .where(and(eq(shelfEntries.id, entry.id), eq(shelfEntries.userId, userId)));
 
     // A reflection becomes a recall card: tomorrow the reader tries to remember it without peeking.
     if (session.reflection) {

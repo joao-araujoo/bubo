@@ -31,6 +31,7 @@
     "email:assets": "node scripts/email-assets.mjs",
     "email:preview": "tsx scripts/email-preview.ts",
     "email:check": "tsx scripts/email-check.ts",
+    "push:check": "node scripts/push-check.mjs",
     "audit:repo": "node scripts/audit-repo.mjs",
     "doctor": "node scripts/doctor.mjs",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run assets:check && npm run audit:repo",

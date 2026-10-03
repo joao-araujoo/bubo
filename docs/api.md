@@ -22,7 +22,8 @@
 | GET      | `/v1/shelf/:id`                        | session | one entry + recent sessions, its cards and its last 20 reviews                                             | 200 `ShelfEntryDetail`              | 404 (also for other readers' entries)       |
 | PATCH    | `/v1/shelf/:id`                        | session | status / current page / page count                                                                         | 200 `ShelfEntry`                    | 404, 422 (page beyond the book)             |
 | DELETE   | `/v1/shelf/:id`                        | session | remove the entry and its sessions                                                                          | 200 `{ deleted: true }`             | 404                                         |
-| POST     | `/v1/sessions`                         | session | record a finished focused session (idempotent on `id`)                                                     | 201 new / 200 retry `SessionResult` | 404, 422 implausible timing or pages        |
+| POST     | `/v1/sessions/assessment`              | session | check idea/detail/connection without recording; optional consented Gemini question                         | 200 `AssessSessionResponse`         | 404 owner entry, 422 shape, 429             |
+| POST     | `/v1/sessions`                         | session | record after server-side recall checklist passes (idempotent on `id`)                                      | 201 new / 200 retry `SessionResult` | 404, 422 recall, timing or pages            |
 | GET      | `/v1/recall/due?today=YYYY-MM-DD`      | session | cards due today or earlier (+ counts, next due date)                                                       | 200 `DueCardsResponse`              | 422 bad `today`                             |
 | POST     | `/v1/recall/cards`                     | session | create a card for a book on the shelf (first due tomorrow)                                                 | 201 `RecallCard`                    | 404, 422                                    |
 | DELETE   | `/v1/recall/cards/:id`                 | session | delete a card                                                                                              | 200 `{ deleted: true }`             | 404                                         |
@@ -178,6 +179,18 @@ The production Worker runs hourly (`0 * * * *`, `wrangler.toml`). `runScheduled`
 review reminder to readers who turned it on, at their local hour, once per local day and only when
 cards are due (ADR-022). Pushes go through the Expo push service with Android channels
 `lembretes` and `comunidade`; text carries names only, never content.
+
+## Session recall (ADR-027)
+
+New session UUIDs require `recall: { idea, detail, connection }`, each bounded by
+`SESSION_RECALL_FIELD_MAX_LENGTH`. `POST /v1/sessions/assessment` is a preview; final recording
+recalculates the versioned checklist inside the transaction before changing progress, XP or cards.
+Existing accepted UUIDs retain their original result, including legacy sessions.
+
+`assessment.score` is writing-checklist completion, not factual accuracy or retention.
+`factualVerification` is always `unavailable`: the API does not hold the read book text.
+Optional `coach: true` sends only the exercise to Gemini for a follow-up question. Provider failures
+do not change acceptance. See [core-validation.md](core-validation.md) for evidence and limits.
 
 ## Widget data (Task 09 extension, ADR-023)
 

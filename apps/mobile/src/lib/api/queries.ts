@@ -1,4 +1,5 @@
 import {
+  type AssessSessionRequest,
   type AddBookRequest,
   type MarkNotificationsRead,
   type ReaderPreferences,
@@ -255,6 +256,14 @@ export function useRecordSession(userId: string) {
   return useMutation({
     mutationFn: (body: CreateSessionRequest) => api.recordSession(body),
     onSuccess: invalidate,
+  });
+}
+
+/** A deliberate check, never an autosave or an automatic AI request. */
+export function useAssessSession() {
+  return useMutation({
+    mutationFn: (body: AssessSessionRequest) => api.assessSession(body),
+    retry: false,
   });
 }
 

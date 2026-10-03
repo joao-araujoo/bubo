@@ -53,7 +53,7 @@ function RootNavigator() {
   const reduced = useReducedMotion();
   const auth = useAuthState();
   const queryClient = useQueryClient();
-  useNotificationNavigation(auth.status === 'ready');
+  useNotificationNavigation(auth.status === 'ready' ? auth.userId : null);
   useWidgetSync(auth);
 
   useEffect(() => {

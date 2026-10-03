@@ -1,4 +1,6 @@
 import {
+  type AssessSessionRequest,
+  assessSessionResponseSchema,
   type MarkNotificationsRead,
   type PushTokenRequest,
   type ReaderPreferences,
@@ -205,6 +207,12 @@ export function createApiClient({
       request(apiPath(API_ROUTES.shelfEntry, { id }), deleteResponseSchema, { method: 'DELETE' }),
     recordSession: (body: CreateSessionRequest) =>
       request(API_ROUTES.sessions, sessionResultSchema, { method: 'POST', body }),
+    assessSession: (body: AssessSessionRequest) =>
+      request(API_ROUTES.sessionAssessment, assessSessionResponseSchema, {
+        method: 'POST',
+        body,
+        timeoutMs: body.coach ? 25_000 : 15_000,
+      }),
     getStats: (today: string, signal?: AbortSignal) =>
       request(`${API_ROUTES.stats}?today=${encodeURIComponent(today)}`, statsResponseSchema, {
         signal,

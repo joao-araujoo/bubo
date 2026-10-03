@@ -5,11 +5,11 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 
 ## Current remote state (keep this updated after every remote change)
 
-Last updated 2026-10-01 (ADR-026 widget calendar: `monthActiveDates` in /v1/me/stats). Owner-facing checklist in Portuguese:
+Last updated 2026-10-03 (ADR-027 recall checklist and ADR-028 push lifecycle deployed). Owner-facing checklist in Portuguese:
 [../CONFIGURAR.md](../CONFIGURAR.md).
 
 - **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
-  `ad7ebef7-169a-4b9f-a48d-9607fd2cb83e`, 2026-10-01; health/ready smoke OK, Neon unchanged) with an hourly cron trigger (`0 * * * *`,
+  `f98ae6bd-0d05-46cc-88da-d8099cb27e16`, 2026-10-03; health/ready smoke OK, migrations through `0015`) with an hourly cron trigger (`0 * * * *`,
   review reminders). The account's `workers.dev` subdomain `bubo-api` was
   registered automatically by the first deploy; renaming it changes every Worker URL on the account.
 - **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),
@@ -18,7 +18,7 @@ Last updated 2026-10-01 (ADR-026 widget calendar: `monthActiveDates` in /v1/me/s
   answers 503), `GOOGLE_BOOKS_API_KEY` (Google 429; Open Library/BrasilAPI answer),
   `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`, `MODERATOR_USER_IDS` (the
   moderation queue answers 403 to everyone until the owner adds their user id).
-- **Neon:** migrations `0001`–`0013` applied, 0 pending (`0013` on 2026-10-01). Production and the owner's local
+- **Neon:** migrations `0001`–`0015` applied, 0 pending (`0014` and `0015` on 2026-10-03, after verify: 407 tests). Production and the owner's local
   `dev:api` share this database — split into a `production` branch before real users.
 - **Legacy tables in Neon:** about 40 empty tables that no Bubo migration created (`clubs`,
   `club_members`, `club_polls`, `content_reports`, `posts`, `blocks`, `works`, `editions`, …). They
@@ -45,6 +45,30 @@ Last updated 2026-10-01 (ADR-026 widget calendar: `monthActiveDates` in /v1/me/s
   text, mark all read, 401 without session — 22/22, both accounts deleted.
 - **Push:** the Worker calls the Expo push service; no EAS project id or Firebase credentials are
   configured yet, so no device receives pushes (the inbox works).
+- **Recall + push lifecycle (2026-10-03; ADR-027/028):** verify passed (407 tests), migrations
+  `0014` and `0015` applied and a subsequent read-only check found zero pending. Deployed the
+  initial version `fcdd1815-0c24-4091-bfb3-cbf40c703714`, preserving the hourly cron, R2 binding and three existing secrets.
+  New sessions require the server writing checklist; distribute the new APK with this API.
+  Already accepted UUIDs remain idempotently confirmable. Optional Gemini coaching is
+  unavailable because the Worker has no `GEMINI_API_KEY`; book factual verification and
+  calibrated retention remain unavailable by design.
+- **Recall production smoke (2026-10-03):** 27/27 checks passed: health/ready/OpenAPI, isolated
+  signup, reminder opt-out, empty preview/missing recall rejection without XP/progress/cards,
+  concise checklist acceptance, optional coach contract, preview without activity writes,
+  final write, retry with one session/card, tomorrow's personal review and anonymous 401.
+  The temporary account was deleted, its session returned 401 and subsequent sign-in returned 401. No device tokens, messages or provider credentials were created.
+- **Recall short-answer follow-up (2026-10-03):** fixed false rejection of Portuguese one-letter
+  words (`a/e/o`) in specific three-word answers, while rejecting article-only padding. An
+  empty exercise now scores zero and waits for three answers before checking repetition.
+  Verify passed with 409 tests and the current version above was published. Production smoke
+  expanded to 30/30, including those three regressions; its second temporary account was
+  deleted and both session/sign-in revocation were confirmed. No new migration or mobile
+  contract was needed; evaluation runs only in the API.
+- **Android artifact (2026-10-03):** signed test APK at `build/android/bubo-test.apk`, ARM64/ARMv7,
+  embedded JS, four widget receivers and merged `POST_NOTIFICATIONS` verified. First
+  `packageRelease` failed; rerunning Gradle with preserved caches succeeded. No cause was
+  reproduced and no device was connected. iOS compilation and Android/iPhone acceptance
+  remain pending. See [build-mobile.md](build-mobile.md).
 - **Widgets API (2026-10-01):** `/v1/me/stats` adds reading-only `weekReadingDates`. No new
   migration; check found zero pending and migration command made no changes. `npm run deploy:api`
   passed verify (316 tests) and published `1f7b4dcc-3eb1-465b-96e9-e42f5902cbd7`, retaining the existing hourly cron.
@@ -63,7 +87,7 @@ Last updated 2026-10-01 (ADR-026 widget calendar: `monthActiveDates` in /v1/me/s
   receiving disabled. Owner deferred DNS; status not_started, Worker email secrets still absent.
   Public email delivery remains unavailable until verification/configuration. See [emails-dns.md](emails-dns.md).
 - **Emails API deploy (2026-10-01):** verify passed (340 tests); migration check found zero pending,
-  no database changes. Published the current version above, preserving the hourly cron and existing
+  no database changes. Published `ad7ebef7-169a-4b9f-a48d-9607fd2cb83e`, preserving the hourly cron and existing
   secrets. Production health/ready 200, unauthenticated stats 401, verification email action 503
   while unconfigured. No paid plan or email campaign was enabled; no DNS records were changed.
 
@@ -87,7 +111,7 @@ Last updated 2026-10-01 (ADR-026 widget calendar: `monthActiveDates` in /v1/me/s
    # PowerShell: $env:DATABASE_URL="postgres://…"; npm run db:migrate
    DATABASE_URL="postgres://…" npm run db:migrate
    ```
-   Expected output lists only applied pending files (currently through `0013_reader_preferences_notifications.sql`),
+   Expected output lists only applied pending files (currently through `0015_reader_push_receipts.sql`),
    or `migrations up to date`.
 3. Keep a Neon branch per environment. Never point development at production.
 

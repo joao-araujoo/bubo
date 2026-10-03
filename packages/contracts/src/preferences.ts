@@ -39,6 +39,8 @@ export const pushTokenRequestSchema = z.object({
       'Not an Expo push token.',
     ),
   platform: z.enum(['ios', 'android']),
+  /** Reject an asynchronous registration if the device has switched accounts mid-request. */
+  expectedUserId: z.string().min(1).max(255).optional(),
 });
 export type PushTokenRequest = z.infer<typeof pushTokenRequestSchema>;
 export const pushTokenResponseSchema = z.object({ registered: z.boolean() });

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, date, index, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
-import { users } from './auth';
+import { sessions, users } from './auth';
 import { clubs } from './community';
 
 /** Task 09 (ADR-022). Mirrors migrations/0013_reader_preferences_notifications.sql. */
@@ -46,10 +46,29 @@ export const pushTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     platform: text('platform').notNull(),
+    sessionId: text('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
+    registrationId: text('registration_id')
+      .notNull()
+      .default(sql`gen_random_uuid()::text`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [index('reader_push_tokens_user_idx').on(table.userId)],
+);
+
+/** Expo tickets are queued durably until the provider receipt is available (0015). */
+export const pushReceipts = pgTable(
+  'reader_push_receipts',
+  {
+    id: text('id').primaryKey(),
+    token: text('token')
+      .notNull()
+      .references(() => pushTokens.token, { onDelete: 'cascade' }),
+    registrationId: text('registration_id').notNull(),
+    createdAt: createdAt(),
+    checkAfter: timestamp('check_after', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('reader_push_receipts_check_idx').on(table.checkAfter)],
 );
 
 export const notifications = pgTable(

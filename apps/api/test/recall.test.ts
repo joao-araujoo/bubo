@@ -9,6 +9,8 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createHarness } from './harness';
+import { VALID_SESSION_RECALL } from './session-fixtures';
+import { reflectionFromRecall } from '@bubo/scoring';
 
 // "Server now" can be moved forward to simulate the next days.
 let now = new Date('2026-09-26T15:00:00.000Z');
@@ -57,6 +59,7 @@ async function recordSessionWithReflection(
       focusedSeconds: 20 * 60,
       endPage: 30,
       reflection,
+      ...(reflection ? { recall: { ...VALID_SESSION_RECALL, idea: reflection } } : {}),
       localDate: '2026-09-26',
     },
   });
@@ -76,7 +79,7 @@ describe('recall cards', () => {
       entry.id,
       'Meursault vive o absurdo sem se justificar.',
     );
-    await recordSessionWithReflection(cookie, entry.id, null);
+    expect((await recordSessionWithReflection(cookie, entry.id, null)).status).toBe(422);
 
     const today = await due(cookie, '2026-09-26');
     expect(today).toMatchObject({
@@ -91,7 +94,10 @@ describe('recall cards', () => {
     expect(tomorrow.cards[0]).toMatchObject({
       source: 'reflection',
       bookTitle: 'O Estrangeiro',
-      answer: 'Meursault vive o absurdo sem se justificar.',
+      answer: reflectionFromRecall({
+        ...VALID_SESSION_RECALL,
+        idea: 'Meursault vive o absurdo sem se justificar.',
+      }),
     });
     expect(tomorrow.cards[0]?.prompt).toContain('O Estrangeiro');
 
@@ -297,7 +303,10 @@ describe('spaced review (SM-2)', () => {
 describe('account deletion', () => {
   it('requires the password and erases every row owned by the reader', async () => {
     const { cookie, entry } = await readerWithBook();
-    await recordSessionWithReflection(cookie, entry.id, 'Algo para lembrar.');
+    expect(
+      (await recordSessionWithReflection(cookie, entry.id, 'Uma ideia importante para lembrar.'))
+        .status,
+    ).toBe(201);
 
     const wrong = await h.call('/v1/auth/delete-user', {
       method: 'POST',

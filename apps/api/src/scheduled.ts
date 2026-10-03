@@ -4,7 +4,7 @@ import { createDatabase, type DatabaseHandle } from '@bubo/database';
 import { type Bindings } from './env';
 import { createLogger, type Logger } from './lib/logger';
 import { type FetchLike } from './services/catalog';
-import { deliverPush } from './services/push';
+import { checkPushReceipts, deliverPush } from './services/push';
 import { runReviewReminders } from './services/reminders';
 
 export type ScheduledDeps = {
@@ -27,11 +27,15 @@ export async function runScheduled(env: Bindings, deps: ScheduledDeps = {}) {
   }
   const handle = (deps.databaseProvider ?? createDatabase)(config.env.DATABASE_URL);
   try {
-    const messages = await runReviewReminders(handle.db, (deps.now ?? (() => new Date()))());
-    const sent = await deliverPush(handle.db, messages, {
+    const now = (deps.now ?? (() => new Date()))();
+    const pushDeps = {
       fetch: deps.pushFetch ?? ((input, init) => fetch(input, init)),
       logger,
-    });
+      now: () => now,
+    } satisfies Parameters<typeof deliverPush>[2];
+    await checkPushReceipts(handle.db, pushDeps);
+    const messages = await runReviewReminders(handle.db, now);
+    const sent = await deliverPush(handle.db, messages, pushDeps);
     logger.info('review reminders', { reminders: messages.length, sent });
     return { sent, reminders: messages.length };
   } catch (error) {

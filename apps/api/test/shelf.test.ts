@@ -11,6 +11,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHarness } from './harness';
 import { recordSession } from '../src/services/sessions';
 import { createSessionRequestSchema } from '@bubo/contracts';
+import { reflectionFromRecall } from '@bubo/scoring';
+import { VALID_SESSION_RECALL } from './session-fixtures';
 
 // Fixed "server now" so session plausibility and streak dates are deterministic.
 const NOW = new Date('2026-09-26T15:00:00.000Z');
@@ -43,6 +45,7 @@ function sessionBody(shelfEntryId: string, overrides: Record<string, unknown> = 
     focusedSeconds: 25 * 60,
     endPage: 40,
     reflection: 'A ideia central ficou clara.',
+    recall: VALID_SESSION_RECALL,
     localDate: '2026-09-26',
     ...overrides,
   };
@@ -188,7 +191,8 @@ describe('reading sessions', () => {
       await (await h.call(`/v1/shelf/${entry.id}`, { cookie })).json(),
     );
     expect(detail.sessions).toHaveLength(1);
-    expect(detail.sessions[0]?.reflection).toBe('A ideia central ficou clara.');
+    expect(detail.sessions[0]?.reflection).toBe(reflectionFromRecall(VALID_SESSION_RECALL));
+    expect(detail.sessions[0]?.assessment).toMatchObject({ passed: true, score: 100 });
   });
 
   it('is idempotent on the client session id', async () => {

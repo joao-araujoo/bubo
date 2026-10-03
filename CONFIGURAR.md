@@ -1,11 +1,11 @@
 # Configurar o Bubo — tudo o que depende de você
 
-Este guia lista **cada conta, chave e decisão** que só o dono do projeto pode fazer. O código não
-depende de mais nada: o que está aqui é o que falta para o Bubo funcionar "perfeitamente" em
-produção e nas lojas. Estado técnico detalhado: [docs/release.md](docs/release.md) → "Current
+Este guia lista **as contas, chaves e decisões** que dependem do dono do projeto. Configuração,
+homologação em aparelhos e calibração do algoritmo são etapas distintas. Estado técnico detalhado:
+[docs/release.md](docs/release.md) → "Current
 remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
-Última atualização: 2026-10-01 (Task 09 concluída — preferências, notificações e push).
+Última atualização: 2026-10-03 (recordação obrigatória, pergunta Gemini opcional e ciclo de push).
 
 ---
 
@@ -14,7 +14,7 @@ remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.m
 | Item                           | Estado                                                                                                                                                                                                                                                                            |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API de produção                | `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`). `/v1/health` e `/v1/ready` respondem 200.                                                                                                                                                                            |
-| Banco Neon                     | Migrations `0001` a `0013` aplicadas, nenhuma pendente.                                                                                                                                                                                                                           |
+| Banco Neon                     | Migrations `0001` a `0015` aplicadas, nenhuma pendente.                                                                                                                                                                                                                           |
 | Segredos no Cloudflare         | `DATABASE_URL`, `BETTER_AUTH_SECRET` (gerado aleatoriamente), `BETTER_AUTH_URL`.                                                                                                                                                                                                  |
 | Armazenamento R2               | Bucket `bubo` existe e está ligado ao Worker como `MEDIA` (sem acesso público ainda).                                                                                                                                                                                             |
 | Testes automáticos em produção | Cadastro, catálogo, ISBN, sessões, cards, conquistas, clubes, debates anti-spoiler, clube privado com convite, enquetes, argumentos, reações, membros, feed, resenhas, amigos, ciclos, denúncia, bloqueio e exclusão de conta: todos passaram. As contas de teste foram apagadas. |
@@ -39,8 +39,8 @@ remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.m
 | 12  | **Tabelas antigas no Neon** (decisão)             | Nada quebra; o banco só fica com ~40 tabelas vazias que o Bubo não usa.                   | Baixa                   |
 | 13  | **Notificações push** (EAS + Firebase)            | Os avisos ficam só dentro do app; o celular não recebe lembretes nem avisos.              | Antes das lojas         |
 
-Não precisa configurar agora: `GEMINI_API_KEY` (nenhuma tela usa IA ainda) e
-`CATALOG_CONTACT_EMAIL` (opcional, só identifica o Bubo para a Open Library).
+`GEMINI_API_KEY` é opcional: a sessão e o checklist funcionam sem IA; a chave habilita uma pergunta
+extra quando o leitor consente (3.15). `CATALOG_CONTACT_EMAIL` também é opcional.
 
 ---
 
@@ -218,20 +218,42 @@ Opções:
 O servidor já envia os avisos e o app já sabe recebê-los. Falta ligar o push nas contas Expo e
 Google. Sem isso, os avisos continuam aparecendo na tela **Notificações** do app.
 
-1. **Projeto EAS** (uma vez): na pasta `apps/mobile`, rode `npx eas init`. Como a configuração
-   do app é `app.config.ts`, ele mostra o `projectId` e pede para colocá-lo em
-   `extra.eas.projectId`: me mande o id (não é segredo) que eu coloco.
+**Se você está começando do zero:** crie sua conta gratuita em [expo.dev/signup](https://expo.dev/signup)
+e entre no [console Firebase](https://console.firebase.google.com/) com sua conta Google. O Firebase
+será usado para push Android; o banco do Bubo continua no Neon. Não precisa contratar EAS Build,
+ativar Analytics nem migrar o banco.
+
+1. **Projeto Expo/EAS** (uma vez): no terminal da pasta `apps/mobile`, rode
+   `npx eas-cli@latest login` e depois `npx eas-cli@latest init`. Escolha criar o projeto Bubo.
+   Como a configuração é dinâmica, o CLI pode pedir a inclusão manual do id; copie o UUID
+   mostrado, também disponível no painel Expo em **Project settings → General**. Coloque o UUID
+   público em `BUBO_EAS_PROJECT_ID` no `apps/mobile/.env`. O app usa esse valor em
+   `extra.eas.projectId`; não precisa editar código nem usar EAS Build pago.
 2. **Android (Firebase / FCM)**:
    1. Em <https://console.firebase.google.com>, crie um projeto e adicione um app Android com o
       pacote `com.joaoaraujo.bubo`. Baixe o `google-services.json` (não vai para o Git).
-   2. Envie o arquivo para o EAS como variável de arquivo:
-      `npx eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`
+   2. Para APK local, mantenha o arquivo fora do repositório e defina `GOOGLE_SERVICES_JSON` no
+      `apps/mobile/.env` com seu caminho absoluto. Para builds EAS, envie como variável de arquivo:
+      `npx eas-cli@latest env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`
    3. No Firebase → Configurações do projeto → Contas de serviço, gere uma chave privada e envie
-      para o EAS: `npx eas credentials` → Android → "Google Service Account Key for FCM V1".
-3. **iOS**: na primeira build com `npx eas build -p ios`, aceite que o EAS crie a chave de push
-   da Apple (precisa da conta Apple Developer, item 7).
+      para o painel **Expo → Project settings → Credentials → Android → Add Application
+      Identifier** (`com.joaoaraujo.bubo`) → **FCM V1 service account key → Add a service account
+      key → Upload new key → Save**. Essa chave privada é outro arquivo, diferente do
+      `google-services.json`; mantenha fora do repo e do chat. Alternativa no terminal:
+      `npx eas-cli@latest credentials` → Android → "Google Service Account Key for FCM V1".
+3. **iOS**: vincule a chave APNs ao projeto Expo e ao bundle `com.joaoaraujo.bubo`, com
+   provisioning de push. Precisa da conta Apple do dono e de macOS/Xcode ou build EAS (item 7).
 4. Faça uma nova build (3.3). No app: Você → engrenagem → "Ativar notificações". No Android 13+
    o sistema pergunta se pode notificar.
+
+Antes de gerar o APK, rode `npm run push:check`: ele valida os nomes/configurações locais sem
+mostrar credenciais nem enviar mensagens. Um resultado local OK não comprova a credencial remota
+ou recebimento em aparelho. Roteiro de tela bloqueada, app fechado, troca de conta e recibos:
+[docs/notifications.md](docs/notifications.md).
+
+Referências oficiais para as telas e requisitos:
+[setup Expo](https://docs.expo.dev/push-notifications/push-notifications-setup/) e
+[credenciais FCM v1](https://docs.expo.dev/push-notifications/fcm-credentials/).
 
 Ícone da notificação no Android: enquanto não existir um ícone monocromático oficial do Bubo, o
 Android desenha a silhueta do símbolo oficial. Se o designer tiver o arquivo "Ícone minimal" em
@@ -260,11 +282,28 @@ só de JavaScript não inclui os arquivos nativos. Não precisam de Firebase nem
    redimensionar, dados vencidos, fontes grandes e acessibilidade.
 
 Neste ambiente foram verificados o código, testes, geração dos projetos e bundle Android.
-**APK Android compilado e assinatura/três receptores de widgets verificados em 2026-10-01.**
+**APK Android compilado e assinatura/quatro receptores de widgets verificados em 2026-10-03.**
 Swift/iOS ainda não foi compilado; instalação e aceite dos widgets em aparelhos continuam
 pendentes. Guia gratuito e evidências: [docs/build-mobile.md](docs/build-mobile.md).
 Não há widget Android específico de tela bloqueada nem Live Activity nesta entrega.
 Detalhes: [docs/widgets.md](docs/widgets.md).
+
+### 3.15 Pergunta extra com Gemini (opcional)
+
+A recordação obrigatória funciona sem chave. A IA apenas sugere uma pergunta baseada nos três
+campos quando o leitor liga a opção; ela não aprova a sessão nem certifica o conteúdo do livro.
+
+1. No projeto Google do dono, escolha o tratamento de dados adequado. O serviço gratuito pode
+   usar texto para melhorar produtos e revisão humana; o app informa isso antes do consentimento.
+2. Configure somente na API, nunca em `EXPO_PUBLIC_*` ou no app:
+   ```powershell
+   cd apps/api
+   npx wrangler secret put GEMINI_API_KEY --env production
+   ```
+3. Teste com texto sem informações pessoais. Limite: cinco tentativas por leitor por dia UTC;
+   ausência de chave, quota ou erro deixa a pergunta indisponível e preserva o checklist.
+
+Critérios, fontes e validação humana ainda necessária: [docs/core-validation.md](docs/core-validation.md).
 
 ## 4. Como conferir se está tudo certo
 
@@ -284,4 +323,4 @@ Para você não procurar o que ainda não foi feito:
 - Curva de retenção e Bubo Score (precisam de um modelo de memória documentado).
 - Login com Google/Apple, exigir verificação de email antes das lojas, exportação de dados (LGPD).
 - Alerta de "curva crítica", paisagem sonora, tema sépia e exportação (Anki/Notion).
-- Recursos de IA (Gemini) dentro dos fluxos.
+- Verificação de relatos contra o texto completo dos livros e retenção calibrada por revisões.
