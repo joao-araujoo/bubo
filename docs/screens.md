@@ -230,14 +230,15 @@ Pending on a device: Android 13+ permission prompt, muting a channel, tapping a 
 start, keyboard over composers on Android, theme persistence across restarts, 1.6× fonts and the
 dark theme on Você, Preferências and Notificações.
 
-## Native widgets (Task 09 extension, ADR-023 → restyled by ADR-026, 2026-10-01)
+## Native widgets (Task 09 extension, ADR-023 → ADR-026 → redesigned by ADR-029, 2026-10-03)
 
-| Screen / system surface                               | Route             | Status | Notes / needs                                                                                   |
-| ----------------------------------------------------- | ----------------- | ------ | ----------------------------------------------------------------------------------------------- |
-| Bubo na sua tela                                      | `widgets` (Você)  | ✅     | Duolingo-style previews of the 4 widgets with real data, today's mood timeline, preferences     |
-| Android home: streak / week / calendar / reading      | AppWidgetProvider | 🟡     | Scenes, flame, peeking Bubo, week checks, month runs; APK compiled; launcher acceptance pending |
-| iOS home: streak / week / calendar / reading          | WidgetKit         | 🟡     | Same scenes in SwiftUI, timeline at mood hours; Xcode compilation and device acceptance pending |
-| iOS lock (Sequência): circular / rectangular / inline | WidgetKit         | 🟡     | Streak + caption; title privacy on rectangular; rendering and VoiceOver acceptance pending      |
+| Screen / system surface                                   | Route             | Status | Notes / needs                                                                              |
+| --------------------------------------------------------- | ----------------- | ------ | ------------------------------------------------------------------------------------------ |
+| Bubo na sua tela                                          | `widgets` (Você)  | ✅     | Previews of the 5 widgets with real data, protection explained, mood timeline, preferences |
+| Liga semanal                                              | `liga`            | ✅     | `/v1/me/league`; empty state without friends; opened by the league widget and by Amigos    |
+| Android home: streak / week / calendar / reading / league | AppWidgetProvider | 🟡     | Canvas + Plus Jakarta Sans; validated on an Android 15 emulator (states, links, e2e)       |
+| iOS home: streak / week / calendar / reading / league     | WidgetKit         | 🟡     | Same compositions in SwiftUI; Xcode compilation and device acceptance pending              |
+| iOS lock (Sequência): circular / rectangular / inline     | WidgetKit         | 🟡     | Streak + caption; title privacy on rectangular; rendering and VoiceOver acceptance pending |
 
 Use the official poses and canonical theme/fonts; no new tab, fabricated activity or AI dependency.
 See [widgets.md](widgets.md) and [TESTAR-TELAS.md](TESTAR-TELAS.md).

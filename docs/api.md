@@ -17,6 +17,7 @@
 | GET      | `/v1/shelf`                            | session | the reader's shelf (`ShelfResponse`), newest first                                                         | 200                                 | 401, 503                                    |
 | GET      | `/v1/me/stats?today=YYYY-MM-DD`        | session | XP, streak, week activity, `readToday` from real sessions                                                  | 200 `StatsResponse`                 | 422 bad/missing `today`                     |
 | GET      | `/v1/me/achievements?today=`           | session | level (from XP) + 13 badges recomputed from activity (ADR-018)                                             | 200 `AchievementsResponse`          | 422 bad/missing `today`                     |
+| GET      | `/v1/me/league?today=`                 | session | weekly friends league: real weekly XP, rank, rank up to yesterday (ADR-029)                                | 200 `LeagueResponse`                | 422 bad/missing `today`                     |
 | GET      | `/v1/me/memory?today=&days=&tz=`       | session | Lembrei/Quase/Esqueci by day (7/30/90/365), by book, by local time of day; cards, focus (ADR-020)          | 200 `MemoryStatsResponse`           | 422 bad `today`/`days`/`tz`                 |
 | POST     | `/v1/shelf`                            | session | add a book manually (`quero ler` or `lendo`)                                                               | 201 `ShelfEntry`                    | 409 already on shelf, 422                   |
 | GET      | `/v1/shelf/:id`                        | session | one entry + recent sessions, its cards and its last 20 reviews                                             | 200 `ShelfEntryDetail`              | 404 (also for other readers' entries)       |
@@ -202,3 +203,19 @@ token exposure or migration is introduced. Shared local payload: `widgetSnapshot
 
 `monthActiveDates` (ADR-026): sorted dates from the first day of `today`'s month up to `today`
 with a session or a review, for the widget calendar. Defaults to `[]` when absent.
+
+`streakFreeze` (ADR-029): `{ available, max, earnEvery, progress, frozenDates }`, derived from
+activity with `computeStreakState` (7 active days earn 1 protection, max 2; a missed closed day
+consumes one). `streakDays` counts active days of the chain including protected days.
+`frozenDates` covers this week and month. Defaults to "nothing earned" when absent.
+Shared local payload: `widgetSnapshotSchema` (v3).
+
+## Weekly friends league (ADR-029)
+
+`GET /v1/me/league?today=YYYY-MM-DD` (session) → `LeagueResponse`: `weekStart`, `weekEnd`,
+`daysLeft` (today included), `sharing` (whether the reader shares activity), `me { rank,
+previousRank, weeklyXp }` and `entries[] { rank, name, weeklyXp, me }`. Participants: the reader
+plus accepted, unblocked friends with `share_activity`; XP = `reading_sessions.xp_earned` +
+`review_logs.xp_earned` in the reader's week, for friends only from `greatest(accepted_at,
+sharing_since)`. `previousRank` ranks with XP before `today` (null on Monday). No user ids are
+returned. 422 for a missing/invalid `today`.

@@ -51,6 +51,7 @@
 | [ADR-026](adr/ADR-026-streak-widget-scenes.md)              | Duolingo-style streak widgets: scenes, moods by hour, calendar                |
 | [ADR-027](adr/ADR-027-session-recall-gate.md)               | Mandatory structured recall, versioned writing gate and optional Gemini coach |
 | [ADR-028](adr/ADR-028-push-delivery-lifecycle.md)           | Push receipts, session-bound devices, consent and native lifecycle            |
+| [ADR-029](adr/ADR-029-widget-redesign-freeze-league.md)     | Widget redesign (canvas + Plus Jakarta), streak protection, weekly league     |
 
 ## Building and shipping
 

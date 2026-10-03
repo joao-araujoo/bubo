@@ -6,6 +6,7 @@ export * from './cycles';
 export * from './friends';
 export * from './ids';
 export * from './isbn';
+export * from './league';
 export * from './memory';
 export * from './onboarding';
 export * from './preferences';

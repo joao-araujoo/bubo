@@ -4,11 +4,9 @@ export {
   lightColors,
   palette,
   qrPalette,
-  widgetFlame,
-  widgetScenes,
+  widgetPalette,
   type ColorTokens,
   type CoverPalette,
-  type WidgetScenePalette,
 } from './colors';
 export { motion, radii, sizes, spacing } from './layout';
 export {

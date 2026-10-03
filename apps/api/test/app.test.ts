@@ -143,6 +143,7 @@ describe('GET /v1/openapi.json', () => {
     expect(Object.keys(doc.paths)).toEqual([
       '/v1/me/memory',
       '/v1/me/achievements',
+      '/v1/me/league',
       '/v1/health',
       '/v1/ready',
       '/v1/me',

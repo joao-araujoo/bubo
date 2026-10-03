@@ -129,7 +129,7 @@ export async function saveSocialPreferences(
 }
 
 /** Accepted friends with sharing on, excluding blocks in either direction. */
-const sharingFriends = (userId: string) => sql`
+export const sharingFriends = (userId: string) => sql`
   SELECT u.id, u.name, f.accepted_at, p.sharing_since
   FROM reading_club_friendships f
   JOIN users u ON u.id = CASE WHEN f.sender_id = ${userId} THEN f.recipient_id ELSE f.sender_id END

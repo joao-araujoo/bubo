@@ -19,10 +19,9 @@ const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
   // Bump when a persisted response shape gains a required field (v2: shelf detail `reviews`,
   // Task 06; v3: community and memory shapes, Task 08; v4: review tags and friends, Task 08
-  // slice 2; v5: daily limit/focus minutes; v6: reading-only widget days, Task 09), so an OTA
-  // update with the same app
-  // version never reads an older shape.
-  key: 'bubo.query-cache.v6',
+  // slice 2; v5: daily limit/focus minutes; v6: reading-only widget days, Task 09; v7: streak
+  // protection, ADR-029), so an OTA update with the same app version never reads an older shape.
+  key: 'bubo.query-cache.v7',
   throttleTime: 1_000,
 });
 
@@ -33,7 +32,8 @@ export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
   dehydrateOptions: {
     shouldDehydrateQuery: (query) =>
       query.state.status === 'success' &&
-      !['system', 'moderation', 'friends-feed'].includes(String(query.queryKey[0])),
+      // Friends' names and activity (feed, league) are never written to disk.
+      !['system', 'moderation', 'friends-feed', 'league'].includes(String(query.queryKey[0])),
   },
 };
 

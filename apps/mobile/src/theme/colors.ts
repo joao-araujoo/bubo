@@ -197,160 +197,56 @@ export const darkColors: ColorTokens = {
 export const qrPalette = { dark: palette.ink, light: palette.white } as const;
 
 /**
- * Home-screen widget scenes (ADR-026), after the Duolingo-style streak widgets: a saturated
- * vertical gradient where the purple Bubo pops, a big streak number and a short caption.
- * The native plugin generates Android/iOS colours from this table; never duplicate it.
- * `pill`/`pillText` style calendar runs and pending week days; `deco` tints the decorations.
+ * Home-screen widgets (ADR-029, after the owner's Duolingo references): one clean, near-white
+ * surface for every widget, a single accent per widget and Bubo carrying the emotion. The native
+ * plugin generates Android/iOS tokens from this table; never duplicate it.
  */
-export type WidgetScenePalette = {
-  top: string;
-  bottom: string;
-  text: string;
-  muted: string;
-  number: string;
-  pill: string;
-  pillText: string;
-  deco: string;
-  decoration: 'sparkles' | 'stars' | 'confetti' | 'embers' | 'hearts' | 'none';
-};
-
-/** Lit flame (activity today) and the red "!" badge when the streak is at risk. Unlit flames use the scene's `number` colour. */
-export const widgetFlame = { outer: '#FF9F1C', inner: '#FFD84D', alert: '#E5243B' } as const;
-
-export const widgetScenes = {
-  /** Daytime nudge: read a little today. */
-  sky: {
-    top: '#6CCBFF',
-    bottom: '#2F7BF5',
-    text: '#FFFFFF',
-    muted: '#E3F2FF',
-    number: '#FFFFFF',
-    pill: '#8FC4FF',
-    pillText: '#FFFFFF',
-    deco: '#FFFFFF',
-    decoration: 'sparkles',
-  },
-  /** Recall cards are waiting. */
-  teal: {
-    top: '#36DCC4',
-    bottom: '#0E8A8E',
-    text: '#FFFFFF',
-    muted: '#D8FFF8',
-    number: '#FFFFFF',
-    pill: '#5FD3C6',
-    pillText: '#FFFFFF',
-    deco: '#FFFFFF',
-    decoration: 'sparkles',
-  },
-  /** Evening: the streak is at risk. */
-  sunset: {
-    top: '#FFA94D',
-    bottom: '#F0443E',
-    text: '#FFFFFF',
-    muted: '#FFE6D6',
-    number: '#FFFFFF',
-    pill: '#FFA27A',
-    pillText: '#FFFFFF',
-    deco: '#FFE08A',
-    decoration: 'embers',
-  },
-  /** Last hours of the day with the streak still at risk. */
-  alarm: {
-    top: '#D4264F',
-    bottom: '#4C0820',
-    text: '#FFFFFF',
-    muted: '#FFD0DC',
-    number: '#FFFFFF',
-    pill: '#8E1838',
-    pillText: '#FFD0DC',
-    deco: '#FF8A3D',
-    decoration: 'embers',
-  },
-  /** Bubo sleeps: night sky with moon and stars. */
-  night: {
-    top: '#2B3576',
-    bottom: '#0D1236',
-    text: '#FFFFFF',
-    muted: '#C3CCEA',
-    number: '#FFC53D',
-    pill: '#3A4590',
-    pillText: '#C3CCEA',
-    deco: '#FFFFFF',
-    decoration: 'stars',
-  },
-  /** Today's reading is done. */
-  gold: {
-    top: '#FFE07A',
-    bottom: '#FFA81F',
-    text: '#5A3300',
-    muted: '#7A4A00',
-    number: '#7A3E00',
-    pill: '#FFF0BF',
-    pillText: '#B86400',
-    deco: '#FFFFFF',
-    decoration: 'confetti',
-  },
-  /** Weekly goal met; also the calendar when today is done. */
-  mint: {
-    top: '#EFFCF3',
-    bottom: '#C6F0D6',
-    text: '#0B5E33',
-    muted: '#2F7A50',
-    number: '#FF8A3D',
-    pill: '#FFE3BF',
-    pillText: '#E8780E',
-    deco: '#FF8A3D',
-    decoration: 'confetti',
-  },
-  /** First steps: no streak yet. */
-  candy: {
-    top: '#FF8CC3',
-    bottom: '#E3418C',
-    text: '#FFFFFF',
-    muted: '#FFE0EE',
-    number: '#FFFFFF',
-    pill: '#FF9CCB',
-    pillText: '#FFFFFF',
-    deco: '#FFFFFF',
-    decoration: 'hearts',
-  },
-  /** Calendar when today is still pending. */
-  periwinkle: {
-    top: '#8C9BFF',
-    bottom: '#5B5BEF',
-    text: '#FFFFFF',
-    muted: '#E5E9FF',
-    number: '#FFFFFF',
-    pill: '#A9B4FF',
-    pillText: '#FFE08A',
-    deco: '#FFFFFF',
-    decoration: 'sparkles',
-  },
-  /** Data is stale: open the app to refresh. */
-  slate: {
-    top: '#4B5168',
-    bottom: '#22253A',
-    text: '#FFFFFF',
-    muted: '#C9CCDA',
-    number: '#FFFFFF',
-    pill: '#5A6079',
-    pillText: '#C9CCDA',
-    deco: '#C9CCDA',
-    decoration: 'none',
-  },
-  /** Signed out or never synced. */
-  lavender: {
-    top: '#F6F1FF',
-    bottom: '#DCCBFF',
-    text: '#3B1680',
-    muted: '#6B6480',
-    number: '#7C3AED',
-    pill: '#EDE4FF',
-    pillText: '#7C3AED',
-    deco: '#A78BFA',
-    decoration: 'sparkles',
-  },
-} as const satisfies Record<string, WidgetScenePalette>;
+export const widgetPalette = {
+  /** Widget surface: near-white with a whisper of lavender, slightly deeper at the bottom. */
+  surface: '#FDFCFF',
+  surfaceEnd: '#F4EFFF',
+  /** League widget wash (lavender, as in the reference). */
+  leagueTop: '#F8F5FF',
+  leagueBottom: '#EAE2FF',
+  ink: palette.ink,
+  /** Captions ("Você está indo bem!"). */
+  muted: '#8A839F',
+  /** Weekday letters, future days. */
+  faint: '#B4AEC4',
+  /** Empty day circles and the progress track. */
+  empty: '#ECE8F4',
+  divider: '#E6E0F2',
+  /** Streak accent: the flame, checks and the streak number. */
+  flame: '#FF9416',
+  flameGlow: '#FFD24D',
+  flameText: '#F07000',
+  /** Calendar runs of consecutive active days. */
+  streakSoft: '#FFE8C7',
+  streakText: '#D26400',
+  /** Streak protection (ice): protected days and the protection chip. */
+  freeze: '#2DA8E0',
+  freezeSoft: '#DCF2FC',
+  freezeText: '#127FB3',
+  purple: palette.purple,
+  purpleInk: palette.purpleInk,
+  purpleSoft: palette.purpleSoft,
+  purpleLight: palette.purpleLight,
+  /** League podium steps and avatars. */
+  podium: '#DCD0FF',
+  podiumTop: '#E9E2FF',
+  avatar: '#F1EBFF',
+  /** League badge gem. */
+  gem: '#8ADCFF',
+  /** Rank going up (green is used for nothing else). */
+  up: '#1E9E50',
+  /** Time left in the league week. */
+  time: '#F07000',
+  /** Red "!" when the streak is at risk tonight. */
+  alert: '#E5243B',
+  white: palette.white,
+  /** Soft shadow under the book cover (alpha applied natively). */
+  shadow: '#3B1680',
+} as const;
 
 /**
  * Typographic fallback covers (BookCover), after the Stitch "Descobrir" covers: a deep, saturated

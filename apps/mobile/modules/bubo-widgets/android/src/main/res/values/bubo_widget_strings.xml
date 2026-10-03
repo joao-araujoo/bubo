@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="bubo_widget_streak_description">Seus dias seguidos com o Bubo</string>
+  <string name="bubo_widget_rhythm_description">Dias seguidos e os checks da semana</string>
+  <string name="bubo_widget_calendar_description">O mês de leitura, a sequência e as proteções</string>
+  <string name="bubo_widget_reading_description">Seu livro, sua página e um toque para continuar</string>
+  <string name="bubo_widget_league_description">Sua posição na liga semanal dos amigos</string>
+</resources>

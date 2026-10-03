@@ -17,12 +17,13 @@ import {
 import { requestWidgetPin, widgetsAvailable, type WidgetKind } from '../features/widgets/native';
 import {
   CalendarWidgetPreview,
+  LeagueWidgetPreview,
   MoodTimeline,
   ReadingWidgetPreview,
   StreakWidgetPreview,
   WeekWidgetPreview,
 } from '../features/widgets/WidgetPreview';
-import { useDueCards, useShelf, useStats } from '../lib/api/queries';
+import { useDueCards, useLeague, useShelf, useStats } from '../lib/api/queries';
 import { useAuthState } from '../lib/auth/session';
 import { useDevicePreferences } from '../lib/device-preferences';
 import { useTheme } from '../theme';
@@ -36,6 +37,7 @@ export default function WidgetsScreen() {
   const shelf = useShelf(userId);
   const stats = useStats(userId);
   const due = useDueCards(userId);
+  const league = useLeague(userId);
   const [notice, setNotice] = useState<string | null>(null);
   const [pinning, setPinning] = useState<WidgetKind | null>(null);
   const now = new Date();
@@ -49,6 +51,7 @@ export default function WidgetsScreen() {
           due: due.data,
           weeklyGoal: device.preferences.widgetWeeklyGoal,
           hideBookOnLockScreen: device.preferences.hideBookOnLockScreen,
+          league: league.data ?? null,
         })
       : null;
   const fresh = snapshot !== null && snapshot.expiresAt > now.getTime();
@@ -90,6 +93,11 @@ export default function WidgetsScreen() {
           O Bubo mostra sua sequência, comemora quando você lê e dá um empurrãozinho quando o dia
           está acabando. À noite, ele dorme.
         </Text>
+        <Text variant="bodySm">
+          Proteção de sequência: a cada 7 dias seguidos com leitura ou revisão você ganha uma
+          proteção (até 2). Se um dia passar sem atividade, ela cobre esse dia sozinha e aparece em
+          azul no calendário.
+        </Text>
       </BuboTip>
       {!widgetsAvailable ? (
         <InlineMessage
@@ -111,7 +119,7 @@ export default function WidgetsScreen() {
         />
       ) : null}
 
-      <SectionTitle icon="local-fire-department" title="Sequência" />
+      <SectionTitle icon="local-fire-department" title="Sequência (compacto)" />
       <Card>
         <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' }}>
           <StreakWidgetPreview snapshot={snapshot} now={now} />
@@ -129,7 +137,7 @@ export default function WidgetsScreen() {
       <Card>
         <WeekWidgetPreview snapshot={snapshot} now={now} />
         <Text variant="bodySm" color="textMuted">
-          Cada dia da semana com leitura ou revisão ganha um check.
+          Cada dia da semana com leitura ou revisão ganha um check; dias protegidos ficam azuis.
         </Text>
         {addButton('rhythm')}
       </Card>
@@ -138,7 +146,8 @@ export default function WidgetsScreen() {
       <Card>
         <CalendarWidgetPreview snapshot={snapshot} now={now} />
         <Text variant="bodySm" color="textMuted">
-          Seus dias ativos do mês. Dias seguidos aparecem ligados, e hoje fica marcado.
+          Seus dias ativos do mês. Dias seguidos aparecem ligados, hoje fica marcado e dias cobertos
+          pela proteção ganham um floco azul.
         </Text>
         {addButton('calendar')}
       </Card>
@@ -148,12 +157,22 @@ export default function WidgetsScreen() {
         <ReadingWidgetPreview
           snapshot={snapshot}
           now={now}
-          cover={current ? <BookCover {...current.book} width={40} /> : undefined}
+          cover={current ? <BookCover {...current.book} width={62} /> : undefined}
         />
         <Text variant="bodySm" color="textMuted">
           Seu livro, sua página e um toque para voltar à sessão.
         </Text>
         {addButton('reading')}
+      </Card>
+
+      <SectionTitle icon="emoji-events" title="Liga semanal" />
+      <Card>
+        <LeagueWidgetPreview snapshot={snapshot} now={now} />
+        <Text variant="bodySm" color="textMuted">
+          Sua posição entre amigos que compartilham as leituras, pelo XP real da semana. Toque para
+          ver a liga completa.
+        </Text>
+        {addButton('league')}
       </Card>
 
       {fresh ? (
@@ -202,7 +221,7 @@ export default function WidgetsScreen() {
         <Text variant="titleSm">Como adicionar</Text>
         <Text variant="bodySm">
           {Platform.OS === 'ios'
-            ? 'Toque e segure a tela inicial → Editar → Adicionar Widget → Bubo. Escolha Sequência, Sequência da semana, Calendário de leitura ou Continuar leitura. Na tela bloqueada, toque e segure → Personalizar → Adicionar Widgets → Bubo.'
+            ? 'Toque e segure a tela inicial → Editar → Adicionar Widget → Bubo. Escolha Sequência, Sequência da semana, Calendário de leitura, Continuar leitura ou Liga semanal. Na tela bloqueada, toque e segure → Personalizar → Adicionar Widgets → Bubo.'
             : 'Toque e segure um espaço vazio na tela inicial → Widgets → Bubo. Arraste o modelo escolhido e ajuste o tamanho.'}
         </Text>
         <Text variant="bodySm" color="textMuted">

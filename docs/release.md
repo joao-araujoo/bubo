@@ -5,11 +5,13 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 
 ## Current remote state (keep this updated after every remote change)
 
-Last updated 2026-10-03 (ADR-027 recall checklist and ADR-028 push lifecycle deployed). Owner-facing checklist in Portuguese:
+Last updated 2026-10-03 (ADR-029 streak protection and weekly league deployed; no migration). Owner-facing checklist in Portuguese:
 [../CONFIGURAR.md](../CONFIGURAR.md).
 
 - **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
-  `f98ae6bd-0d05-46cc-88da-d8099cb27e16`, 2026-10-03; health/ready smoke OK, migrations through `0015`) with an hourly cron trigger (`0 * * * *`,
+  `dab385b1-6dbe-4022-8ac1-36186c678ae3`, 2026-10-03 ADR-029: `/v1/me/stats.streakFreeze` and
+  `GET /v1/me/league`; verify 425 tests, health/ready 200, league 401 without session, route in
+  OpenAPI; migrations through `0015`) with an hourly cron trigger (`0 * * * *`,
   review reminders). The account's `workers.dev` subdomain `bubo-api` was
   registered automatically by the first deploy; renaming it changes every Worker URL on the account.
 - **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),

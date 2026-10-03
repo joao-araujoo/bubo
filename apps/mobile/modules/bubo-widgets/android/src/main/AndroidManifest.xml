@@ -16,5 +16,9 @@
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/bubo_reading_widget" />
     </receiver>
+    <receiver android:name=".LeagueWidget" android:exported="false" android:label="Liga semanal">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/bubo_league_widget" />
+    </receiver>
   </application>
 </manifest>

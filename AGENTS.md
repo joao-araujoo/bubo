@@ -146,6 +146,15 @@ see [docs/widgets.md](docs/widgets.md). **Redesign (ADR-026):** four Duolingo-st
 `widgetScenes`, hourly moods from `@bubo/domain` and `monthActiveDates` in `/v1/me/stats`. Do not confuse prebuild/autolinking/JS export with native
 device validation. Live Activities remain backlog 34; Android keyguard is not registered.
 
+**Widgets redesign, streak protection and weekly league (2026-10-03; ADR-029):** Android widgets
+are drawn on a Canvas (`BuboPainter.kt`) with Plus Jakarta Sans from module assets, because
+RemoteViews ignore `@font`; never put `<View>` or other non-RemoteViews classes in widget layouts
+(it caused "Can't load widget" in Sequência da semana). One clean surface (`widgetPalette`), no
+scenes. Streak protection is derived (`computeStreakState`, 7 active days → 1, max 2, from
+2026-10-03); `/v1/me/stats.streakFreeze`. Weekly friends league: `GET /v1/me/league`, screen
+`liga`, fifth widget; only consented sharing friends. Snapshot v3. Validated on an Android 15
+emulator; physical device and Swift compilation pending.
+
 - Owner-only setup lives in [CONFIGURAR.md](CONFIGURAR.md); the screen test script in
   [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md). Keep both current when screens or config change.
 - Transactional emails (ADR-025): optional signup verification/welcome, reset, reset security

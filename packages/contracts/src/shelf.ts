@@ -117,6 +117,19 @@ export const statsResponseSchema = z.object({
   reviewedToday: z.boolean(),
   /** Recall cards due on or before `today`. */
   dueCards: z.number().int().nonnegative(),
+  /**
+   * Streak protection derived from activity (ADR-029). `frozenDates` lists covered days of this
+   * week and month. Defaults to "nothing earned" for older APIs and cached responses.
+   */
+  streakFreeze: z
+    .object({
+      available: z.number().int().nonnegative(),
+      max: z.number().int().positive(),
+      earnEvery: z.number().int().positive(),
+      progress: z.number().int().nonnegative(),
+      frozenDates: z.array(localDateSchema),
+    })
+    .default({ available: 0, max: 2, earnEvery: 7, progress: 0, frozenDates: [] }),
 });
 export type StatsResponse = z.infer<typeof statsResponseSchema>;
 

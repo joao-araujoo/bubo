@@ -39,6 +39,7 @@ export const queryKeys = {
   memory: (userId: string, today: string, days: number, tz: number) =>
     ['memory', userId, today, days, tz] as const,
   achievements: (userId: string, today: string) => ['achievements', userId, today] as const,
+  league: (userId: string, today: string) => ['league', userId, today] as const,
   clubs: (userId: string, q: string) => ['clubs', userId, 'list', q] as const,
   club: (userId: string, clubId: string) => ['clubs', userId, 'club', clubId] as const,
   clubPosts: (userId: string, clubId: string) => ['clubs', userId, 'posts', clubId] as const,
@@ -171,6 +172,17 @@ export function useAchievements(userId: string | undefined) {
   });
 }
 
+/** Weekly friends league for the reader's local week (ADR-029); never persisted to disk. */
+export function useLeague(userId: string | undefined) {
+  const today = toLocalIsoDate(new Date());
+  return useQuery({
+    queryKey: queryKeys.league(userId ?? 'anonymous', today),
+    queryFn: ({ signal }) => api.getLeague(today, signal),
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+  });
+}
+
 /** Recall cards due on the reader's local today. */
 export function useDueCards(userId: string | undefined) {
   const today = toLocalIsoDate(new Date());
@@ -190,6 +202,7 @@ function useInvalidateReading(userId: string) {
       queryClient.invalidateQueries({ queryKey: ['stats', userId] }),
       queryClient.invalidateQueries({ queryKey: ['memory', userId] }),
       queryClient.invalidateQueries({ queryKey: ['achievements', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['league', userId] }),
       // Reading progress moves the anti-spoiler line in every club.
       queryClient.invalidateQueries({ queryKey: ['clubs', userId] }),
       queryClient.invalidateQueries({ queryKey: ['recall', userId] }),

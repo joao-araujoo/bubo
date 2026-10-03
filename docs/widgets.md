@@ -1,89 +1,101 @@
 # Widgets do Bubo
 
-Os widgets seguem o estilo dos widgets de sequência do Duolingo
-([ADR-026](adr/ADR-026-streak-widget-scenes.md)): uma cena colorida de ponta a ponta, a chama
-com o número da sequência, uma frase curta e o Bubo espiando da borda de baixo. Abra
-**Você → Bubo na sua tela** para ver os quatro modelos com os seus dados reais:
+Desde a [ADR-029](adr/ADR-029-widget-redesign-freeze-league.md), os widgets seguem a limpeza
+das referências do Duolingo com a identidade do Bubo: uma superfície clara, uma cor de destaque
+por widget, Plus Jakarta Sans e o Bubo oficial entrando pelo canto. Abra **Você → Bubo na sua
+tela** para ver as prévias com os seus dados reais.
 
-- **Sequência** (pequeno): chama + dias seguidos e a frase do momento. No iPhone também fica
-  na tela bloqueada (circular, retangular e em linha).
-- **Sequência da semana** (médio): “N dias de sequência” e um check em cada dia da semana com
-  leitura ou revisão. Hoje aparece com um anel até você ler.
-- **Calendário de leitura** (médio): os dias ativos do mês ficam ligados em faixas, e hoje
-  ganha um círculo. Fundo menta quando você já leu hoje e azul-lavanda enquanto não leu.
-- **Continuar leitura** (médio): cartão branco com capa, título, página, progresso e um toque
-  para voltar à sessão. No tamanho pequeno, mostra a página.
+| Widget                  | Tamanho principal | O que mostra                                                                   | Toque abre      |
+| ----------------------- | ----------------- | ------------------------------------------------------------------------------ | --------------- |
+| **Sequência**           | 2×2               | Chama + número, “dias seguidos”, proteções prontas                             | Hoje            |
+| **Sequência da semana** | 4×2               | “12 dias seguidos”, frase do momento, S T Q Q S S D com checks reais           | Hoje            |
+| **Calendário**          | 4×2               | Mês atual, dias seguidos em faixas laranja, dias protegidos em azul, sequência | Hoje            |
+| **Continuar leitura**   | 4×2 (2×2)         | Capa real (ou a capa tipográfica do app), título, autor, página, progresso     | Sessão do livro |
+| **Liga semanal**        | 4×2 (2×2)         | “#3 entre amigos”, movimento desde ontem, dias restantes, pódio com XP real    | `/liga`         |
+
+Quando estreitos, os modelos 4×2 viram a variante compacta. Todos se adaptam à proporção do
+launcher (um 4×2 do Pixel é mais alto que o de outros aparelhos).
+
+## Proteção de sequência
+
+A cada **7 dias seguidos** com leitura ou revisão você ganha **1 proteção** (até **2**). Se um
+dia terminar sem atividade, uma proteção cobre esse dia automaticamente: a sequência continua,
+mas o dia protegido não soma. Sem proteção, a sequência zera. A regra vale a partir de
+2026-10-03 (nunca retroativa) e é recalculada a partir das atividades reais
+(`computeStreakState`, `/v1/me/stats.streakFreeze`). Nada é guardado à parte.
+
+No calendário: **laranja** = dia válido, **azul com floco** = dia protegido, **normal** = sem
+atividade. Na semana, o dia protegido é um círculo azul com floco; o chip “❄ N” mostra
+proteções prontas. Com proteção pronta, a noite fica calma (sem alerta vermelho).
+
+## Liga semanal
+
+Você e os amigos aceitos que **compartilham as leituras** (Amigos → Privacidade), pelo XP real
+de sessões e revisões da semana (segunda a domingo). De cada amigo conta só a atividade depois
+que ele passou a compartilhar. “+1 posição hoje” compara com a posição só com o XP até ontem.
+Sem amigos, o widget mostra seu XP da semana e convida a adicionar amigos nos clubes. Avatares
+são as iniciais (o mesmo avatar do app). A liga nunca é salva no aparelho.
 
 ## O Bubo ao longo do dia
 
-O app calcula os humores do dia (`@bubo/domain`, `buildWidgetMoods`) e o widget troca sozinho
-nos horários abaixo, sem abrir o app:
+O app calcula os humores do dia (`@bubo/domain`, `buildWidgetMoods`) e o widget troca sozinho:
 
-| Quando                          | Cena            | Pose do Bubo | Frase                                |
-| ------------------------------- | --------------- | ------------ | ------------------------------------ |
-| Já leu hoje                     | dourada         | comemorando  | Leitura feita hoje!                  |
-| Só revisou hoje                 | dourada         | animando     | Revisão feita hoje!                  |
-| Meta semanal de leitura batida  | menta           | conquista    | Meta da semana!                      |
-| 6h, com revisões disponíveis    | verde-água      | revisando    | N revisões te esperam                |
-| 6h, com livro em leitura        | azul            | lendo        | Bora ler um pouquinho?               |
-| 6h, sem livro e com sequência   | azul            | feliz        | Bora manter o ritmo?                 |
-| 6h, sem sequência               | rosa            | boas-vindas  | Que tal começar hoje?                |
-| 18h, sequência em risco         | pôr do sol + !  | preocupado   | Salve sua sequência!                 |
-| 21h, sequência em risco         | vermelha + !    | surpreso     | Está ficando tarde!                  |
-| 22h, sequência em risco         | vermelha + !    | preocupado   | Última chance!                       |
-| Noite (22h–6h) sem risco        | noite estrelada | dormindo     | Missão cumprida. Bons sonhos! / Zzz… |
-| Dados antigos (dia virou, 24 h) | grafite         | com dúvida   | Abra o Bubo                          |
-| Sem conta ou nunca sincronizado | lavanda         | boas-vindas  | Olá!                                 |
+| Quando                             | Pose do Bubo                             | Frase                                                       |
+| ---------------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
+| Já leu hoje                        | comemorando                              | Leitura feita hoje! (30+ dias: “Que sequência linda!”)      |
+| Só revisou hoje                    | animando                                 | Revisão feita hoje!                                         |
+| Meta semanal de leitura batida     | conquista                                | Meta da semana batida!                                      |
+| Proteção usada ontem               | feliz                                    | A proteção salvou sua sequência                             |
+| 6h, com revisões disponíveis       | revisando                                | N revisões te esperam                                       |
+| 6h, com livro em leitura           | lendo                                    | Bora ler um pouquinho?                                      |
+| 6h, sequência alta (30+) sem livro | confiante                                | Bora manter o ritmo?                                        |
+| 6h, sem sequência                  | curioso                                  | Que tal começar hoje?                                       |
+| 18h, em risco, com proteção pronta | pensando                                 | Leia hoje: a proteção fica guardada                         |
+| 18h / 21h / 22h, em risco          | preocupado / surpreso / preocupado + “!” | Salve sua sequência! / Está ficando tarde! / Última chance! |
+| Noite (22h–6h)                     | dormindo                                 | Missão cumprida. Bons sonhos! / Zzz…                        |
+| Dados antigos                      | com dúvida                               | Abra o Bubo (sem números)                                   |
+| Sem conta                          | boas-vindas                              | Olá! Entre para ver sua sequência                           |
 
-A chama acende (laranja) só quando já houve leitura ou revisão hoje; antes disso ela aparece
-vazada. A sequência é a mesma do app: dias seguidos com sessão de leitura **ou** revisão.
-A meta semanal conta só dias de leitura. Os alertas da noite só aparecem quando existe uma
-sequência real a perder.
+No “Continuar leitura”, o Bubo lê enquanto o livro está em andamento, comemora quando você já
+leu hoje e aparece com a pilha de livros quando não há leitura ativa.
 
-Todas as poses são oficiais e copiadas byte a byte. O efeito de “espiar” é apenas o recorte
-da borda do widget; a imagem não é cortada, redesenhada nem recolorida.
+## Tipografia (limitação do Android)
+
+O Android ignora `android:fontFamily="@font/…"` em widgets (RemoteViews). Por isso o Android
+desenha cada widget num Canvas (`BuboPainter.kt`) com os arquivos oficiais da Plus Jakarta Sans
+(Regular, Medium, SemiBold, Bold, ExtraBold) copiados para os assets do módulo. Consequências:
+o texto acompanha a fonte do sistema só até +15 % (para caber nas células) e o leitor de tela
+lê uma descrição única do widget. No iPhone a fonte é carregada pela extensão (`UIAppFonts`).
 
 ## Adicionar no celular
 
-**Precisa de uma nova build nativa com os widgets incluídos.** Expo Go e uma atualização só de
-JavaScript não acrescentam o módulo/extension ao app ([Expo: módulos locais](https://docs.expo.dev/modules/get-started/)). A tela de prévias continua acessível em
-versões sem o módulo e explica essa diferença. Widgets do modelo anterior (Ritmo da semana /
-Bubo completo) somem depois da atualização e precisam ser adicionados de novo.
+**Precisa de uma nova build nativa.** Expo Go e atualização só de JavaScript não incluem os
+widgets.
 
-- **Android:** toque e segure uma área vazia da tela inicial → Widgets → Bubo → arraste um
-  modelo. Você também pode usar “Adicionar à tela inicial” no app quando o launcher permitir.
-  Os modelos médios, quando estreitos, viram o modelo pequeno. Não há widget Android
-  específico para a tela bloqueada.
-- **iPhone:** toque e segure a tela inicial → Editar → Adicionar Widget → Bubo. Na tela
-  bloqueada: toque e segure → Personalizar → Adicionar Widgets → Bubo → Sequência.
+- **Android:** toque e segure a tela inicial → Widgets → Bubo, ou use “Adicionar à tela
+  inicial” no app. As prévias do seletor mostram só a composição (sem números).
+- **iPhone:** Editar → Adicionar Widget → Bubo. Tela bloqueada: Personalizar → Adicionar
+  Widgets → Bubo → Sequência.
 
 ## Privacidade e dados
 
-“Ocultar título na tela bloqueada” vem ligado: no iPhone, o widget retangular mostra a página
-em vez do título. Capa nunca aparece na tela bloqueada. Nenhuma reflexão, resposta de memória,
-texto de clube, senha ou token é compartilhado com os widgets. Para limpar os dados deste
-aparelho, desligue “Atualizar meus widgets” ou saia da conta.
-
-As atualizações vêm das consultas da sua conta ao usar o app (`/v1/me/stats` traz a sequência e
-os dias ativos do mês). Quando a informação deixa de ser recente (virada do dia ou 24 horas desde
-a resposta mais antiga), o widget pede para abrir o Bubo e não mostra números. No Android, a
-troca de humor pode atrasar até ~30 min (limite de atualização do sistema); no iPhone, o widget
-agenda as trocas nos horários da tabela.
+Somente dados publicados e da própria conta entram no widget (sequência, dias, livro atual,
+posição na liga). Reflexões, respostas de memória e tokens nunca. “Ocultar título na tela
+bloqueada” vem ligado. Os dados expiram na virada do dia ou 24 h depois; sem dados recentes o
+widget pede para abrir o Bubo. Desligar “Atualizar meus widgets” ou sair da conta limpa tudo.
 
 ## Desenvolvimento e aceite
 
-As cores das cenas ficam em `src/theme/colors.ts` (`widgetScenes`, `widgetFlame`). O plugin
-local (`plugins/with-bubo-widgets.config.cjs`) gera a partir delas as cores, gradientes, faixas do
-calendário e decorações vetoriais (brilhos, lua e estrelas, confete, brasas, corações) do Android
-e o `BuboTokens.swift` do iOS. Layouts Android: `modules/bubo-widgets/android/src/main/res/layout`;
-SwiftUI: `native-widgets/BuboWidgets.swift`; prévias no app:
-`src/features/widgets/WidgetPreview.tsx`.
+- Cores: `src/theme/colors.ts` (`widgetPalette`, `coverPalettes`). O plugin
+  `plugins/with-bubo-widgets.config.cjs` gera `BuboTokens.kt`/`BuboTokens.swift` (cores e
+  ícones), copia poses e fontes e escreve os `appwidget-provider`.
+- Android: `modules/bubo-widgets/android/src/main/java/expo/modules/bubowidgets/`
+  (`BuboWidgetModel.kt`, `BuboPainter.kt`, `BuboWidgetProvider.kt`). Layouts estáticos só usam
+  `FrameLayout`, `LinearLayout` e `ImageView` (um teste impede `<View>` de novo).
+- iOS: `native-widgets/BuboWidgets.swift`. Prévias no app: `src/features/widgets/WidgetPreview.tsx`.
+- **Validado em 2026-10-03** num emulador Android 15 (x86_64): os cinco widgets, todos os
+  estados (sequência alta com proteção, risco às 19h e 22h, noite, usuário novo, sem livro, liga
+  com/sem amigos, líder, dados antigos, sem conta), deep links e um fluxo ponta a ponta real
+  (sessão → API local → app → widget). Pendentes: aceite em aparelho físico e compilação Swift.
 
-Para gerar o APK Android gratuito, rode `npm run build:android` na raiz; instalação e
-ferramentas em [build-mobile.md](build-mobile.md). iOS requer macOS/Xcode:
-`npm run ios --workspace @bubo/mobile`, com App Group/assinatura configurados na conta Apple.
-EAS deve descobrir a extensão `BuboWidgetsExtension` / `com.joaoaraujo.bubo.widgets` e os
-entitlements do App Group; veja [CONFIGURAR.md](../CONFIGURAR.md).
-
-O roteiro em [TESTAR-TELAS.md](TESTAR-TELAS.md) (seção 6c) continua pendente em aparelhos;
-Swift/iOS ainda não foi compilado.
+Roteiro de aceite: [TESTAR-TELAS.md](TESTAR-TELAS.md) seção 6c. APK: `npm run build:android`.

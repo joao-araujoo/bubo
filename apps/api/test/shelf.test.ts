@@ -313,6 +313,7 @@ describe('stats', () => {
       readToday: false,
       reviewedToday: false,
       dueCards: 0,
+      streakFreeze: { available: 0, max: 2, earnEvery: 7, progress: 0, frozenDates: [] },
     });
   });
 

@@ -1,6 +1,7 @@
 # ADR-026 — Streak widget scenes (Duolingo-style redesign)
 
-- Status: accepted (2026-10-01)
+- Status: accepted (2026-10-01); visual part superseded by
+  [ADR-029](ADR-029-widget-redesign-freeze-league.md) (2026-10-03)
 - Supersedes the visual part of [ADR-023](ADR-023-native-reading-widgets.md). Privacy, expiry
   and snapshot publishing from ADR-023 stay in force.
 

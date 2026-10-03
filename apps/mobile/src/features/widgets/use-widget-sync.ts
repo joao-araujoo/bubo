@@ -2,7 +2,7 @@ import { buildWidgetSnapshot, toLocalIsoDate } from '@bubo/domain';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { useDueCards, useShelf, useStats } from '../../lib/api/queries';
+import { useDueCards, useLeague, useShelf, useStats } from '../../lib/api/queries';
 import { type AuthState } from '../../lib/auth/session';
 import { useDevicePreferences } from '../../lib/device-preferences';
 import { clearWidgets, widgetPublisher, widgetsAvailable } from './native';
@@ -18,6 +18,8 @@ export function useWidgetSync(auth: AuthState) {
   const shelf = useShelf(userId);
   const stats = useStats(userId);
   const due = useDueCards(userId);
+  // Optional: an unavailable league never holds up the streak, calendar or book widgets.
+  const league = useLeague(userId);
   const today = toLocalIsoDate(new Date(clock));
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function useWidgetSync(auth: AuthState) {
       entries: shelf.data.entries,
       stats: stats.data,
       due: due.data,
+      league: league.data ?? null,
     });
     void widgetPublisher.publish(snapshot).catch(() => undefined);
   }, [
@@ -59,6 +62,7 @@ export function useWidgetSync(auth: AuthState) {
     stats.dataUpdatedAt,
     due.data,
     due.dataUpdatedAt,
+    league.data,
     today,
     preferences.hideBookOnLockScreen,
     preferences.widgetWeeklyGoal,

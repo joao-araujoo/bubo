@@ -1,6 +1,6 @@
 import { type StatsResponse, statsResponseSchema } from '@bubo/contracts';
 import { type Executor, schema } from '@bubo/database';
-import { addDays, computeStreak, startOfWeek } from '@bubo/domain';
+import { addDays, computeStreakState, startOfWeek, STREAK_FREEZE_RULES } from '@bubo/domain';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 
 const { readingSessions, recallCards, reviewLogs } = schema;
@@ -11,6 +11,7 @@ const STREAK_LOOKBACK_DAYS = 400;
 /**
  * Reader stats derived only from real activity (ADR-014):
  * XP = session XP + review XP; the week and the streak count days with a session OR a review.
+ * Missed days covered by an earned protection keep the streak alive (ADR-029).
  */
 export async function getStats(
   db: Executor,
@@ -20,7 +21,10 @@ export async function getStats(
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
   const monthStart = `${today.slice(0, 8)}01`;
-  const lookback = addDays(today, -STREAK_LOOKBACK_DAYS);
+  // Protection is replayed from its start date, so that window is always included (ADR-029).
+  const windowStart = addDays(today, -STREAK_LOOKBACK_DAYS);
+  const lookback =
+    windowStart < STREAK_FREEZE_RULES.since ? windowStart : STREAK_FREEZE_RULES.since;
 
   const [sessionTotals] = await db
     .select({
@@ -80,14 +84,13 @@ export async function getStats(
   const readDates = new Set(sessionDays.map((d) => d.localDate));
   const reviewDates = new Set(reviewDays.map((d) => d.localDate));
   const activeDates = new Set([...readDates, ...reviewDates]);
+  const streak = computeStreakState(activeDates, today);
+  const visibleFrom = weekStart < monthStart ? weekStart : monthStart;
 
   return statsResponseSchema.parse({
     today,
     xpTotal: Number(sessionTotals?.xp ?? 0) + Number(reviewTotals?.xp ?? 0),
-    streakDays: computeStreak(
-      [...activeDates].filter((d) => d <= today),
-      today,
-    ),
+    streakDays: streak.streakDays,
     sessionsCount: Number(sessionTotals?.count ?? 0),
     focusedMinutesThisWeek: Math.floor(Number(weekMinutes?.seconds ?? 0) / 60),
     focusedMinutesToday: Math.floor(Number(todayMinutes?.seconds ?? 0) / 60),
@@ -97,5 +100,12 @@ export async function getStats(
     readToday: readDates.has(today),
     reviewedToday: reviewDates.has(today),
     dueCards: Number(due?.count ?? 0),
+    streakFreeze: {
+      available: streak.freezesAvailable,
+      max: STREAK_FREEZE_RULES.max,
+      earnEvery: STREAK_FREEZE_RULES.earnEvery,
+      progress: streak.freezeProgress,
+      frozenDates: streak.frozenDates.filter((d) => d >= visibleFrom),
+    },
   });
 }

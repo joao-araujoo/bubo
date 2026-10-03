@@ -22,16 +22,24 @@ const POSES = [
   'surprised',
   'sleeping',
   'doubt',
+  'curious',
+  'confident',
+  'thinking',
+  'deep-reading',
 ];
-const KINDS = ['streak', 'rhythm', 'calendar', 'reading'];
-const RUNS = ['single', 'start', 'middle', 'end'];
-/** Scenes whose palettes also style the month calendar (light and pending). */
-const CALENDAR_SCENES = ['mint', 'periwinkle', 'slate', 'night', 'lavender'];
+// Must match WIDGET_KINDS in @bubo/contracts.
+const KINDS = ['streak', 'rhythm', 'calendar', 'reading', 'league'];
+/** Plus Jakarta Sans weights used by the widgets: [token, file]. */
 const FONTS = [
   ['regular', 'PlusJakartaSans_400Regular.ttf'],
+  ['medium', 'PlusJakartaSans_500Medium.ttf'],
+  ['semibold', 'PlusJakartaSans_600SemiBold.ttf'],
   ['bold', 'PlusJakartaSans_700Bold.ttf'],
-  ['black', 'PlusJakartaSans_800ExtraBold.ttf'],
+  ['extrabold', 'PlusJakartaSans_800ExtraBold.ttf'],
 ];
+/** Android resource names cannot contain "-": `deep-reading` → bubo_widget_deep_reading. */
+const poseResource = (pose) => `bubo_widget_${pose.replaceAll('-', '_')}`;
+
 const write = (file, text) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
@@ -53,21 +61,10 @@ function readTheme(root) {
 }
 
 /*
- * Vector art shared by both platforms. Every shape is a list of absolute commands
- * (M x y, L x y, Q x1 y1 x y, C x1 y1 x2 y2 x y, Z) in a 0–100 tall viewport, so Android gets
- * pathData and iOS gets the same geometry as Swift literals. Decorations only; never the mascot.
+ * Icon geometry shared by both platforms (24 × 24 viewport). Every shape is a list of absolute
+ * commands (M x y, L x y, Q x1 y1 x y, C x1 y1 x2 y2 x y, Z): Android gets a Kotlin float array
+ * and iOS a Swift literal of the same numbers. Simple icons only; never the mascot.
  */
-/** Colour of the vertical scene gradient at fraction `t`, to paint over decorations. */
-function mix(top, bottom, t) {
-  const channel = (hex, i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
-  const value = [0, 1, 2].map((i) =>
-    Math.round(channel(top, i) + (channel(bottom, i) - channel(top, i)) * t),
-  );
-  return `#${value
-    .map((v) => v.toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase()}`;
-}
 const round = (value) => Math.round(value * 100) / 100;
 function circle(cx, cy, r) {
   const k = 0.5523 * r;
@@ -80,129 +77,20 @@ function circle(cx, cy, r) {
     ['Z'],
   ];
 }
-function sparkle(x, y, s) {
-  return [
-    ['M', x, y - s],
-    ['Q', x, y, x + s, y],
-    ['Q', x, y, x, y + s],
-    ['Q', x, y, x - s, y],
-    ['Q', x, y, x, y - s],
-    ['Z'],
-  ];
+function polygon(points) {
+  return [['M', ...points[0]], ...points.slice(1).map((point) => ['L', ...point]), ['Z']];
 }
-function heart(x, y, s) {
-  return [
-    ['M', x, y + s * 0.9],
-    ['C', x - s * 1.7, y - s * 0.1, x - s * 0.7, y - s * 1.5, x, y - s * 0.45],
-    ['C', x + s * 0.7, y - s * 1.5, x + s * 1.7, y - s * 0.1, x, y + s * 0.9],
-    ['Z'],
-  ];
-}
-function confetti(x, y, w, h, degrees) {
+const rotate = ([x, y], degrees, [cx, cy] = [12, 12]) => {
   const a = (degrees * Math.PI) / 180;
-  const corner = (dx, dy) => [
-    x + dx * Math.cos(a) - dy * Math.sin(a),
-    y + dx * Math.sin(a) + dy * Math.cos(a),
-  ];
-  const points = [
-    corner(-w / 2, -h / 2),
-    corner(w / 2, -h / 2),
-    corner(w / 2, h / 2),
-    corner(-w / 2, h / 2),
-  ];
   return [
-    ['M', ...points[0]],
-    ['L', ...points[1]],
-    ['L', ...points[2]],
-    ['L', ...points[3]],
-    ['Z'],
+    cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a),
+    cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a),
   ];
-}
-
-/** Decoration layouts: [kind, x (0–100 of the width), y, size, alpha, tone?]. */
-const DECORATIONS = {
-  sparkles: [
-    ['sparkle', 84, 14, 6, 0.95],
-    ['sparkle', 94, 34, 3, 0.7],
-    ['sparkle', 70, 7, 2.5, 0.6],
-    ['sparkle', 8, 80, 3.2, 0.45],
-    ['dot', 90, 54, 1.4, 0.6],
-    ['dot', 62, 22, 1.2, 0.5],
-    ['sparkle', 30, 62, 2, 0.3],
-  ],
-  stars: [
-    ['moon', 86, 15, 8.5, 0.95],
-    ['sparkle', 70, 8, 2.6, 0.9],
-    ['sparkle', 14, 52, 2.2, 0.6],
-    ['dot', 60, 20, 1, 0.7],
-    ['dot', 95, 34, 1.2, 0.8],
-    ['dot', 50, 6, 0.8, 0.6],
-    ['dot', 76, 31, 0.9, 0.6],
-    ['dot', 7, 72, 1, 0.5],
-    ['dot', 22, 90, 0.8, 0.5],
-    ['dot', 93, 62, 1, 0.6],
-  ],
-  confetti: [
-    ['confetti', 72, 10, 3, 0.9, 0],
-    ['confetti', 90, 22, 3, 0.8, 1],
-    ['confetti', 60, 26, 2.4, 0.7, 2],
-    ['confetti', 95, 46, 2.6, 0.7, 3],
-    ['confetti', 10, 70, 2.6, 0.55, 4],
-    ['sparkle', 82, 38, 3, 0.8],
-    ['dot', 66, 4, 1.1, 0.7],
-    ['dot', 20, 86, 1, 0.5],
-  ],
-  embers: [
-    ['dot', 12, 72, 1.6, 0.8],
-    ['dot', 22, 86, 1, 0.6],
-    ['dot', 88, 66, 1.8, 0.75],
-    ['dot', 94, 82, 1.1, 0.6],
-    ['dot', 76, 46, 1, 0.5],
-    ['sparkle', 84, 18, 3.4, 0.7],
-    ['sparkle', 16, 42, 2, 0.45],
-  ],
-  hearts: [
-    ['heart', 85, 15, 5, 0.9],
-    ['heart', 95, 37, 3, 0.6],
-    ['heart', 10, 76, 3, 0.45],
-    ['sparkle', 70, 8, 2.5, 0.75],
-    ['dot', 62, 22, 1.2, 0.5],
-  ],
-  none: [],
 };
 
-/** Shapes for one decoration in a viewport `width` × 100; sizes never stretch. */
-function decorationShapes(decoration, width) {
-  const shapes = [];
-  for (const [kind, px, y, size, alpha, turn = 0] of DECORATIONS[decoration]) {
-    const x = (px / 100) * width;
-    if (kind === 'sparkle') shapes.push({ tone: 'deco', alpha, ops: sparkle(x, y, size) });
-    if (kind === 'dot') shapes.push({ tone: 'deco', alpha, ops: circle(x, y, size) });
-    if (kind === 'heart') shapes.push({ tone: 'deco', alpha, ops: heart(x, y, size) });
-    if (kind === 'confetti') {
-      shapes.push({
-        tone: 'deco',
-        alpha,
-        ops: confetti(x, y, size * 1.6, size * 0.8, 25 + turn * 47),
-      });
-    }
-    if (kind === 'moon') {
-      shapes.push({ tone: 'deco', alpha, ops: circle(x, y, size) });
-      // A "bite" in the sky colour turns the disc into a crescent.
-      shapes.push({
-        tone: 'sky',
-        sky: y / 100,
-        alpha: 1,
-        ops: circle(x + size * 0.45, y - size * 0.3, size * 0.82),
-      });
-    }
-  }
-  return shapes;
-}
-
-/** Streak flame (24 × 24): outer body and inner glow. */
-const FLAME = {
-  outer: [
+const ICONS = {
+  /** Streak flame: outer body and inner glow. */
+  flameOuter: [
     ['M', 12, 1.6],
     ['C', 12, 1.6, 19.6, 7.2, 19.6, 14.2],
     ['C', 19.6, 18.8, 16.2, 22.4, 12, 22.4],
@@ -212,7 +100,7 @@ const FLAME = {
     ['C', 9.6, 7.6, 12, 1.6, 12, 1.6],
     ['Z'],
   ],
-  inner: [
+  flameInner: [
     ['M', 12, 11.6],
     ['C', 12, 11.6, 15.9, 14.4, 15.9, 17.4],
     ['C', 15.9, 19.6, 14.1, 21.2, 12, 21.2],
@@ -222,164 +110,233 @@ const FLAME = {
     ['C', 11.5, 14.2, 12, 11.6, 12, 11.6],
     ['Z'],
   ],
+  /** White "!" of the at-risk badge (fill). */
+  alertMark: [
+    ['M', 10.6, 5.6],
+    ['L', 13.4, 5.6],
+    ['L', 12.9, 13.6],
+    ['L', 11.1, 13.6],
+    ['Z'],
+    ...circle(12, 17.2, 1.6),
+  ],
+  /** Strokes. */
+  check: [
+    ['M', 7.2, 12.4],
+    ['L', 10.4, 15.6],
+    ['L', 16.8, 9.2],
+  ],
+  chevron: [
+    ['M', 9.5, 6.5],
+    ['L', 15, 12],
+    ['L', 9.5, 17.5],
+  ],
+  snowflake: [0, 60, 120].flatMap((turn) => {
+    const arm = [
+      ['M', ...rotate([12, 3.5], turn)],
+      ['L', ...rotate([12, 20.5], turn)],
+    ];
+    const ticks = [
+      [
+        [9.4, 5.2],
+        [12, 7.6],
+        [14.6, 5.2],
+      ],
+      [
+        [9.4, 18.8],
+        [12, 16.4],
+        [14.6, 18.8],
+      ],
+    ].flatMap((tick) => [
+      ['M', ...rotate(tick[0], turn)],
+      ['L', ...rotate(tick[1], turn)],
+      ['L', ...rotate(tick[2], turn)],
+    ]);
+    return [...arm, ...ticks];
+  }),
+  clock: [...circle(12, 12, 8.6), ['M', 12, 7.4], ['L', 12, 12.2], ['L', 15.2, 14.2]],
+  trophyHandles: [
+    ['M', 6.6, 6.2],
+    ['L', 3.8, 6.2],
+    ['C', 3.8, 9.6, 5.2, 11.2, 7.4, 11.6],
+    ['M', 17.4, 6.2],
+    ['L', 20.2, 6.2],
+    ['C', 20.2, 9.6, 18.8, 11.2, 16.6, 11.6],
+  ],
+  /** Fills. */
+  trophy: [
+    ['M', 6.2, 3.6],
+    ['L', 17.8, 3.6],
+    ['L', 17.8, 9],
+    ['C', 17.8, 12.4, 15.2, 15, 12, 15],
+    ['C', 8.8, 15, 6.2, 12.4, 6.2, 9],
+    ['Z'],
+    ...polygon([
+      [10.7, 14.6],
+      [13.3, 14.6],
+      [13.3, 17.8],
+      [10.7, 17.8],
+    ]),
+    ...polygon([
+      [7.4, 17.8],
+      [16.6, 17.8],
+      [16.6, 20.6],
+      [7.4, 20.6],
+    ]),
+  ],
+  arrowUp: polygon([
+    [12, 5.5],
+    [20.5, 17.5],
+    [3.5, 17.5],
+  ]),
+  arrowDown: polygon([
+    [3.5, 6.5],
+    [20.5, 6.5],
+    [12, 18.5],
+  ]),
+  equal: [
+    ...polygon([
+      [5, 8.6],
+      [19, 8.6],
+      [19, 11],
+      [5, 11],
+    ]),
+    ...polygon([
+      [5, 13.4],
+      [19, 13.4],
+      [19, 15.8],
+      [5, 15.8],
+    ]),
+  ],
+  /** League badge: a hexagon, a lighter inner hexagon and a gem with a shine. */
+  badge: polygon([-90, -30, 30, 90, 150, 210].map((a) => rotate([12, 1], a + 90))),
+  badgeInner: polygon([-90, -30, 30, 90, 150, 210].map((a) => rotate([12, 3.2], a + 90))),
+  gemCut: polygon([
+    [7.2, 10.2],
+    [9.6, 7.2],
+    [14.4, 7.2],
+    [16.8, 10.2],
+    [12, 16.8],
+  ]),
+  gemShine: polygon([
+    [9.6, 7.2],
+    [12, 10.2],
+    [14.4, 7.2],
+  ]),
 };
-/** White "!" of the at-risk badge (24 × 24). */
-const ALERT_MARK = [
-  ['M', 10.6, 5.6],
-  ['L', 13.4, 5.6],
-  ['L', 12.9, 13.6],
-  ['L', 11.1, 13.6],
-  ['Z'],
-  ...circle(12, 17.2, 1.6),
-];
-const CHECK = [
-  ['M', 7.2, 12.4],
-  ['L', 10.4, 15.6],
-  ['L', 16.8, 9.2],
-];
 
-const pathData = (ops) =>
-  ops.map(([command, ...values]) => command + values.map(round).join(',')).join(' ');
-const vector = (width, height, paths) =>
-  `<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="${width}dp" android:height="${height}dp" android:viewportWidth="${width}" android:viewportHeight="${height}">\n${paths.join('\n')}\n</vector>\n`;
-const fill = (color, ops, alpha = 1) =>
-  `  <path android:fillColor="${color}" android:fillAlpha="${alpha}" android:pathData="${pathData(ops)}"/>`;
+function swiftOps(ops) {
+  const codes = { M: 0, L: 1, Q: 2, C: 3, Z: 4 };
+  return `[${ops.flatMap(([command, ...values]) => [codes[command], ...values.map(round)]).join(', ')}]`;
+}
+const kotlinOps = (ops) =>
+  `floatArrayOf(${ops
+    .flatMap(([command, ...values]) => [
+      { M: 0, L: 1, Q: 2, C: 3, Z: 4 }[command],
+      ...values.map(round),
+    ])
+    .map((value) => `${value}f`)
+    .join(', ')})`;
+const kotlinColor = (hex) => `0xFF${hex.slice(1).toUpperCase()}.toInt()`;
+const camel = (name) => name.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+
 const shape = (body) =>
   `<shape xmlns:android="http://schemas.android.com/apk/res/android" ${body}</shape>\n`;
 
 function generateAndroid(root) {
-  const res = path.join(root, 'modules/bubo-widgets/android/src/main/res');
-  const { lightColors, darkColors, widgetScenes, widgetFlame, palette } = readTheme(root);
-  const keys = ['surface', 'text', 'textMuted', 'primary', 'primarySoft', 'onPrimary', 'border'];
-  for (const [folder, colors] of [
-    ['values', lightColors],
-    ['values-night', darkColors],
-  ]) {
-    write(
-      path.join(res, folder, 'bubo_colors.xml'),
-      `<resources>\n${keys.map((key) => `  <color name="bubo_${key}">${colors[key]}</color>`).join('\n')}\n</resources>\n`,
-    );
-  }
-  // Scenes look the same in light and dark mode, like the reference widgets.
-  const sceneColors = Object.entries(widgetScenes).flatMap(([scene, colors]) =>
-    ['top', 'bottom', 'text', 'muted', 'number', 'pill', 'pillText', 'deco'].map(
-      (key) => `  <color name="bubo_scene_${scene}_${key}">${colors[key]}</color>`,
-    ),
-  );
-  write(
-    path.join(res, 'values/bubo_scenes.xml'),
-    `<resources>\n  <color name="bubo_flame">${widgetFlame.outer}</color>\n  <color name="bubo_flame_glow">${widgetFlame.inner}</color>\n  <color name="bubo_alert">${widgetFlame.alert}</color>\n  <color name="bubo_card">${palette.white}</color>\n  <color name="bubo_card_text">${palette.ink}</color>\n  <color name="bubo_card_muted">${palette.inkMuted}</color>\n  <color name="bubo_card_track">${palette.purpleSoft}</color>\n  <color name="bubo_card_fill">${palette.purple}</color>\n${sceneColors.join('\n')}\n</resources>\n`,
-  );
+  const main = path.join(root, 'modules/bubo-widgets/android/src/main');
+  const res = path.join(main, 'res');
+  const { widgetPalette, coverPalettes } = readTheme(root);
   for (const pose of POSES)
     copy(
       path.join(root, `assets/mascot/bubo-${pose}.png`),
-      path.join(res, `drawable-nodpi/bubo_widget_${pose}.png`),
+      path.join(res, `drawable-nodpi/${poseResource(pose)}.png`),
     );
-  for (const [name, file] of FONTS) {
-    copy(path.join(root, 'assets/fonts', file), path.join(res, `font/bubo_${name}.ttf`));
-  }
+  // RemoteViews ignore android:fontFamily="@font/…", so the widgets draw text on a Canvas with
+  // the official files loaded from the module's assets (ADR-029).
+  for (const [, file] of FONTS)
+    copy(path.join(root, 'assets/fonts', file), path.join(main, `assets/bubo-widgets/${file}`));
+  const kotlin = `// Generated by plugins/with-bubo-widgets.config.cjs from src/theme/colors.ts. Do not edit.
+package expo.modules.bubowidgets
+
+internal object BuboTokens {
+${Object.entries(widgetPalette)
+  .map(([key, hex]) => `  val ${camel(key)} = ${kotlinColor(hex)}`)
+  .join('\n')}
+  val coverFace = intArrayOf(${coverPalettes.map((c) => kotlinColor(c.face)).join(', ')})
+  val coverSpine = intArrayOf(${coverPalettes.map((c) => kotlinColor(c.spine)).join(', ')})
+  val coverText = intArrayOf(${coverPalettes.map((c) => kotlinColor(c.text)).join(', ')})
+  val coverAccent = intArrayOf(${coverPalettes.map((c) => kotlinColor(c.accent)).join(', ')})
+  val fonts = mapOf(${FONTS.map(([name, file]) => `"${name}" to "bubo-widgets/${file}"`).join(', ')})
+${Object.entries(ICONS)
+  .map(([name, ops]) => `  val ${name} = ${kotlinOps(ops)}`)
+  .join('\n')}
+}
+`;
+  write(path.join(main, 'java/expo/modules/bubowidgets/BuboTokens.kt'), kotlin);
   const drawable = (name, text) => write(path.join(res, `drawable/${name}.xml`), text);
-  for (const [scene, colors] of Object.entries(widgetScenes)) {
-    drawable(
-      `bubo_scene_${scene}`,
-      shape(
-        `android:shape="rectangle"><gradient android:angle="270" android:startColor="${colors.top}" android:endColor="${colors.bottom}"/><corners android:radius="24dp"/>`,
-      ),
-    );
-    for (const [suffix, width] of [
-      ['', 100],
-      ['_wide', 220],
-    ]) {
-      const paths = decorationShapes(colors.decoration, width).map((item) =>
-        fill(
-          item.tone === 'sky' ? mix(colors.top, colors.bottom, item.sky) : colors.deco,
-          item.ops,
-          item.alpha,
-        ),
-      );
-      drawable(
-        `bubo_deco_${scene}${suffix}`,
-        vector(width, 100, paths.length ? paths : [fill(colors.deco, circle(0, 0, 0.01), 0)]),
-      );
-    }
-    // Week circles: pending/missed days and today's ring.
-    drawable(
-      `bubo_week_${scene}`,
-      shape(`android:shape="oval"><solid android:color="${colors.pill}"/>`),
-    );
-    drawable(
-      `bubo_week_today_${scene}`,
-      shape(
-        `android:shape="oval"><solid android:color="${colors.pill}"/><stroke android:width="2dp" android:color="${colors.text}"/>`,
-      ),
-    );
-  }
-  for (const scene of CALENDAR_SCENES) {
-    const colors = widgetScenes[scene];
-    const corners = {
-      single: 'android:radius="9dp"',
-      start: 'android:topLeftRadius="9dp" android:bottomLeftRadius="9dp"',
-      middle: 'android:radius="0dp"',
-      end: 'android:topRightRadius="9dp" android:bottomRightRadius="9dp"',
-    };
-    // Runs fill the cell edge to edge (1dp row gap) so consecutive days read as one pill;
-    // today is a centred disc on top of its run, or a ring when there is no activity yet.
-    const pill = (run) =>
-      `  <item android:top="1dp" android:bottom="1dp"><shape android:shape="rectangle"><solid android:color="${colors.pill}"/><corners ${corners[run]}/></shape></item>\n`;
-    const disc = `  <item android:gravity="center" android:width="17dp" android:height="17dp"><shape android:shape="oval"><solid android:color="${colors.number}"/></shape></item>\n`;
-    const layers = (body) =>
-      `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n${body}</layer-list>\n`;
-    for (const run of RUNS) {
-      drawable(`bubo_cal_${scene}_${run}`, layers(pill(run)));
-      drawable(`bubo_cal_${scene}_${run}_today`, layers(pill(run) + disc));
-    }
-    drawable(
-      `bubo_cal_${scene}_ring`,
-      layers(
-        `  <item android:gravity="center" android:width="17dp" android:height="17dp"><shape android:shape="oval"><stroke android:width="1.5dp" android:color="${colors.number}"/></shape></item>\n`,
-      ),
-    );
-  }
+  // Root background (shown while the first bitmap renders) and picker-preview pieces.
   drawable(
-    'bubo_flame',
-    vector(24, 24, [fill(widgetFlame.outer, FLAME.outer), fill(widgetFlame.inner, FLAME.inner)]),
-  );
-  // Unlit flame: hollow, in the scene's number colour (no activity today yet).
-  for (const [scene, colors] of Object.entries(widgetScenes)) {
-    drawable(
-      `bubo_flame_off_${scene}`,
-      vector(24, 24, [
-        `  <path android:fillColor="${colors.number}" android:fillAlpha="0.92" android:fillType="evenOdd" android:pathData="${pathData([...FLAME.outer, ...FLAME.inner])}"/>`,
-      ]),
-    );
-  }
-  drawable(
-    'bubo_flame_alert',
-    vector(24, 24, [fill(widgetFlame.alert, circle(12, 12, 11)), fill(palette.white, ALERT_MARK)]),
-  );
-  drawable(
-    'bubo_check',
-    `<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">\n  <path android:strokeColor="${palette.white}" android:strokeWidth="2.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="${pathData(CHECK)}"/>\n</vector>\n`,
-  );
-  drawable(
-    'bubo_week_done',
-    `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n  <item><shape android:shape="oval"><solid android:color="${widgetFlame.outer}"/></shape></item>\n  <item android:drawable="@drawable/bubo_check"/>\n</layer-list>\n`,
-  );
-  drawable(
-    'bubo_card',
+    'bubo_widget_surface',
     shape(
-      `android:shape="rectangle"><solid android:color="${palette.white}"/><corners android:radius="16dp"/>`,
+      `android:shape="rectangle"><gradient android:angle="270" android:startColor="${widgetPalette.surface}" android:endColor="${widgetPalette.surfaceEnd}"/><corners android:radius="24dp"/>`,
     ),
   );
   drawable(
-    'bubo_progress',
-    `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n  <item android:id="@android:id/background"><shape><solid android:color="${palette.purpleSoft}"/><corners android:radius="4dp"/></shape></item>\n  <item android:id="@android:id/progress"><clip><shape><solid android:color="${palette.purple}"/><corners android:radius="4dp"/></shape></clip></item>\n</layer-list>\n`,
+    'bubo_widget_league_surface',
+    shape(
+      `android:shape="rectangle"><gradient android:angle="270" android:startColor="${widgetPalette.leagueTop}" android:endColor="${widgetPalette.leagueBottom}"/><corners android:radius="24dp"/>`,
+    ),
+  );
+  drawable(
+    'bubo_preview_bar',
+    shape(
+      `android:shape="rectangle"><solid android:color="${widgetPalette.empty}"/><corners android:radius="6dp"/>`,
+    ),
+  );
+  drawable(
+    'bubo_preview_accent',
+    shape(
+      `android:shape="rectangle"><solid android:color="${widgetPalette.flame}"/><corners android:radius="6dp"/>`,
+    ),
+  );
+  drawable(
+    'bubo_preview_purple',
+    shape(
+      `android:shape="rectangle"><solid android:color="${widgetPalette.purpleLight}"/><corners android:radius="6dp"/>`,
+    ),
+  );
+  drawable(
+    'bubo_preview_dot',
+    shape(`android:shape="oval"><solid android:color="${widgetPalette.empty}"/>`),
+  );
+  drawable(
+    'bubo_preview_dot_done',
+    shape(`android:shape="oval"><solid android:color="${widgetPalette.flame}"/>`),
+  );
+  drawable(
+    'bubo_preview_avatar',
+    shape(
+      `android:shape="oval"><solid android:color="${widgetPalette.avatar}"/><stroke android:width="2dp" android:color="${widgetPalette.podium}"/>`,
+    ),
+  );
+  drawable(
+    'bubo_preview_step',
+    shape(
+      `android:shape="rectangle"><solid android:color="${widgetPalette.podium}"/><corners android:topLeftRadius="8dp" android:topRightRadius="8dp"/>`,
+    ),
+  );
+  const pathData = (ops) =>
+    ops.map(([command, ...values]) => command + values.map(round).join(',')).join(' ');
+  drawable(
+    'bubo_preview_flame',
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">\n  <path android:fillColor="${widgetPalette.flame}" android:pathData="${pathData(ICONS.flameOuter)}"/>\n  <path android:fillColor="${widgetPalette.flameGlow}" android:pathData="${pathData(ICONS.flameInner)}"/>\n</vector>\n`,
   );
   const sizes = {
-    streak: { width: 110, height: 110, cellsW: 2, cellsH: 2, resize: 'horizontal|vertical' },
-    rhythm: { width: 250, height: 110, cellsW: 4, cellsH: 2, resize: 'horizontal|vertical' },
-    calendar: { width: 250, height: 140, cellsW: 4, cellsH: 2, resize: 'horizontal|vertical' },
-    reading: { width: 250, height: 110, cellsW: 4, cellsH: 2, resize: 'horizontal|vertical' },
+    streak: { width: 110, height: 110, cellsW: 2, cellsH: 2 },
+    rhythm: { width: 250, height: 110, cellsW: 4, cellsH: 2 },
+    calendar: { width: 250, height: 140, cellsW: 4, cellsH: 2 },
+    reading: { width: 250, height: 110, cellsW: 4, cellsH: 2 },
+    league: { width: 250, height: 110, cellsW: 4, cellsH: 2 },
   };
   for (const kind of KINDS) {
     const size = sizes[kind];
@@ -389,74 +346,32 @@ function generateAndroid(root) {
   android:minWidth="${size.width}dp" android:minHeight="${size.height}dp"
   android:minResizeWidth="110dp" android:minResizeHeight="110dp"
   android:targetCellWidth="${size.cellsW}" android:targetCellHeight="${size.cellsH}"
-  android:updatePeriodMillis="1800000" android:initialLayout="@layout/bubo_widget_${kind}"
-  android:previewLayout="@layout/bubo_widget_${kind}" android:resizeMode="${size.resize}"
+  android:updatePeriodMillis="1800000" android:initialLayout="@layout/bubo_widget_canvas"
+  android:previewLayout="@layout/bubo_preview_${kind}" android:resizeMode="horizontal|vertical"
+  android:description="@string/bubo_widget_${kind}_description"
   android:widgetCategory="home_screen" />\n`,
     );
   }
 }
 
-/** Swift literal for shapes: opcodes 0 M, 1 L, 2 Q, 3 C, 4 Z followed by their coordinates. */
-function swiftOps(ops) {
-  const codes = { M: 0, L: 1, Q: 2, C: 3, Z: 4 };
-  return `[${ops.flatMap(([command, ...values]) => [codes[command], ...values.map(round)]).join(', ')}]`;
-}
-
 function generateIos(root, platformRoot, bundleId, version) {
   const directory = path.join(platformRoot, TARGET);
   const group = `group.${bundleId}.widgets`;
-  const { lightColors, darkColors, widgetScenes, widgetFlame, palette } = readTheme(root);
-  const keys = [
-    'surface',
-    'text',
-    'textMuted',
-    'primary',
-    'primarySoft',
-    'onPrimary',
-    'accentText',
-  ];
-  const scenes = Object.entries(widgetScenes).map(([scene, colors]) => {
-    const art = (width) =>
-      `[${decorationShapes(colors.decoration, width)
-        .map((item) => {
-          const cover =
-            item.tone === 'sky'
-              ? `Color(hex: "${mix(colors.top, colors.bottom, item.sky)}")`
-              : 'nil';
-          return `BuboShape(cover: ${cover}, alpha: ${item.alpha}, ops: ${swiftOps(item.ops)})`;
-        })
-        .join(', ')}]`;
-    return `    case "${scene}": return BuboScene(top: Color(hex: "${colors.top}"), bottom: Color(hex: "${colors.bottom}"), text: Color(hex: "${colors.text}"), muted: Color(hex: "${colors.muted}"), number: Color(hex: "${colors.number}"), pill: Color(hex: "${colors.pill}"), pillText: Color(hex: "${colors.pillText}"), deco: Color(hex: "${colors.deco}"), square: ${art(100)}, wide: ${art(220)})`;
-  });
+  const { widgetPalette, coverPalettes } = readTheme(root);
+  const color = (hex) => `Color(hex: "${hex}")`;
   const swift = `import SwiftUI
 // Generated by plugins/with-bubo-widgets.config.cjs from src/theme/colors.ts. Do not edit.
 enum BuboTokens {
-${keys.map((key) => `  static func ${key}(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "${darkColors[key]}" : "${lightColors[key]}") }`).join('\n')}
-  static let flame = Color(hex: "${widgetFlame.outer}")
-  static let flameGlow = Color(hex: "${widgetFlame.inner}")
-  static let alert = Color(hex: "${widgetFlame.alert}")
-  static let card = Color(hex: "${palette.white}")
-  static let cardText = Color(hex: "${palette.ink}")
-  static let cardMuted = Color(hex: "${palette.inkMuted}")
-  static let cardTrack = Color(hex: "${palette.purpleSoft}")
-  static let cardFill = Color(hex: "${palette.purple}")
-  static let white = Color(hex: "${palette.white}")
-  static let flameOuter: [Double] = ${swiftOps(FLAME.outer)}
-  static let flameInner: [Double] = ${swiftOps(FLAME.inner)}
-  static let alertMark: [Double] = ${swiftOps(ALERT_MARK)}
-  static let check: [Double] = ${swiftOps(CHECK)}
-}
-struct BuboShape { let cover: Color?; let alpha: Double; let ops: [Double] }
-struct BuboScene {
-  let top: Color; let bottom: Color; let text: Color; let muted: Color; let number: Color
-  let pill: Color; let pillText: Color; let deco: Color
-  let square: [BuboShape]; let wide: [BuboShape]
-  static func named(_ id: String) -> BuboScene {
-    switch id {
-${scenes.join('\n')}
-    default: return named("lavender")
-    }
-  }
+${Object.entries(widgetPalette)
+  .map(([key, hex]) => `  static let ${camel(key)} = ${color(hex)}`)
+  .join('\n')}
+  static let coverFace: [Color] = [${coverPalettes.map((c) => color(c.face)).join(', ')}]
+  static let coverSpine: [Color] = [${coverPalettes.map((c) => color(c.spine)).join(', ')}]
+  static let coverText: [Color] = [${coverPalettes.map((c) => color(c.text)).join(', ')}]
+  static let coverAccent: [Color] = [${coverPalettes.map((c) => color(c.accent)).join(', ')}]
+${Object.entries(ICONS)
+  .map(([name, ops]) => `  static let ${name}: [Double] = ${swiftOps(ops)}`)
+  .join('\n')}
 }
 extension Color {
   init(hex: String) {
@@ -632,4 +547,4 @@ module.exports = function withBuboWidgets(config) {
 module.exports.generateAndroid = generateAndroid;
 module.exports.generateIos = generateIos;
 module.exports.addIosTarget = addIosTarget;
-module.exports.art = { decorationShapes, FLAME, CHECK, ALERT_MARK, mix };
+module.exports.art = { ICONS };

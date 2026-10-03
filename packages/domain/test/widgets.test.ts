@@ -4,7 +4,9 @@ import {
   buildWidgetMonth,
   buildWidgetMoods,
   buildWidgetSnapshot,
+  leaguePodium,
   moodAt,
+  nameInitials,
   toLocalIsoDate,
   widgetMoodNow,
 } from '../src';
@@ -62,13 +64,13 @@ describe('system widgets', () => {
   it('uses the latest reading book, real streak activity and reading-only goal days', () => {
     const snapshot = buildWidgetSnapshot(input());
     expect(snapshot).toMatchObject({
-      version: 2,
+      version: 3,
       streakDays: 3,
       activeToday: true,
       activeDays: 2,
       availableReviews: 1,
       pendingReviews: 20,
-      scene: 'gold',
+      tone: 'done',
       pose: 'celebrating',
       message: 'Leitura feita hoje!',
       hideBookOnLockScreen: true,
@@ -112,22 +114,23 @@ describe('system widgets', () => {
       activeToday: false,
       activeDays: 0,
       availableReviews: 0,
-      pose: 'welcome',
-      scene: 'candy',
+      pose: 'curious',
+      tone: 'welcome',
+      league: null,
     });
     // Without a streak there is nothing to lose: no "last chance" at night.
-    expect(snapshot.moods.map((mood) => mood.scene)).not.toContain('alarm');
+    expect(snapshot.moods.map((mood) => mood.tone)).not.toContain('risk');
     expect(snapshot.month.days.some((day) => day.active)).toBe(false);
   });
 
   it('nudges harder through the evening only while a real streak is at risk', () => {
     const moods = buildWidgetMoods(moodInput);
-    expect(moods.map((mood) => [mood.fromHour, mood.scene, mood.pose])).toEqual([
+    expect(moods.map((mood) => [mood.fromHour, mood.tone, mood.pose])).toEqual([
       [0, 'night', 'sleeping'],
-      [6, 'sky', 'reading'],
-      [18, 'sunset', 'worried'],
-      [21, 'alarm', 'surprised'],
-      [22, 'alarm', 'worried'],
+      [6, 'calm', 'reading'],
+      [18, 'risk', 'worried'],
+      [21, 'risk', 'surprised'],
+      [22, 'risk', 'worried'],
     ]);
     expect(moodAt(moods, 5).pose).toBe('sleeping');
     expect(moodAt(moods, 20).message).toBe('Salve sua sequência!');
@@ -138,14 +141,14 @@ describe('system widgets', () => {
 
   it('celebrates real activity and the weekly goal, then sleeps at night', () => {
     const read = buildWidgetMoods({ ...moodInput, activeToday: true, readToday: true });
-    expect(moodAt(read, 12)).toMatchObject({ scene: 'gold', pose: 'celebrating', lit: true });
-    expect(moodAt(read, 23)).toMatchObject({ scene: 'night', pose: 'sleeping', lit: true });
+    expect(moodAt(read, 12)).toMatchObject({ tone: 'done', pose: 'celebrating', lit: true });
+    expect(moodAt(read, 23)).toMatchObject({ tone: 'night', pose: 'sleeping', lit: true });
     const reviewed = buildWidgetMoods({ ...moodInput, activeToday: true });
     expect(moodAt(reviewed, 12).pose).toBe('cheering');
     const goal = buildWidgetMoods({ ...moodInput, activeToday: true, goalMet: true });
-    expect(moodAt(goal, 12)).toMatchObject({ scene: 'mint', pose: 'achievement' });
+    expect(moodAt(goal, 12)).toMatchObject({ tone: 'done', pose: 'achievement' });
     const due = buildWidgetMoods({ ...moodInput, availableReviews: 2 });
-    expect(moodAt(due, 9)).toMatchObject({ scene: 'teal', message: '2 revisões te esperam' });
+    expect(moodAt(due, 9)).toMatchObject({ pose: 'review', message: '2 revisões te esperam' });
     expect(moodAt(buildWidgetMoods({ ...moodInput, availableReviews: 1 }), 9).message).toBe(
       '1 revisão te espera',
     );
@@ -157,7 +160,7 @@ describe('system widgets', () => {
       '2026-10-06',
       new Set(['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-09']),
     );
-    expect(month).toMatchObject({ label: 'Outubro', offset: 3 });
+    expect(month).toMatchObject({ label: 'Outubro', title: 'Outubro 2026', offset: 3 });
     expect(month.days).toHaveLength(31);
     const run = (day: number) => month.days[day - 1]?.run;
     expect([run(3), run(4), run(5), run(6), run(7), run(9)]).toEqual([
@@ -189,7 +192,7 @@ describe('system widgets', () => {
       pendingReviews: 0,
       streakDays: 0,
       activeToday: false,
-      scene: 'slate',
+      tone: 'stale',
       pose: 'doubt',
     });
     data.updatedAt = data.now.getTime();
@@ -198,26 +201,26 @@ describe('system widgets', () => {
 
   it('shows honest fallbacks when the widget has no data or the data went stale', () => {
     expect(widgetMoodNow(null, new Date(2026, 9, 1, 12))).toMatchObject({
-      scene: 'lavender',
+      pose: 'welcome',
       fresh: false,
       title: 'Olá!',
     });
     const snapshot = buildWidgetSnapshot(input());
     expect(widgetMoodNow(snapshot, new Date(2026, 9, 1, 12))).toMatchObject({
       fresh: true,
-      scene: 'gold',
+      tone: 'done',
       title: null,
     });
-    expect(widgetMoodNow(snapshot, new Date(2026, 9, 1, 23))).toMatchObject({ scene: 'night' });
+    expect(widgetMoodNow(snapshot, new Date(2026, 9, 1, 23))).toMatchObject({ tone: 'night' });
     // Next day: yesterday's streak and activity are never shown as today's.
     expect(widgetMoodNow(snapshot, new Date(2026, 9, 2, 9))).toMatchObject({
-      scene: 'slate',
+      tone: 'stale',
       pose: 'doubt',
       lit: false,
       title: 'Abra o Bubo',
     });
     expect(widgetMoodNow(snapshot, new Date(2026, 9, 2, 3))).toMatchObject({
-      scene: 'night',
+      tone: 'night',
       pose: 'sleeping',
     });
   });
@@ -237,4 +240,80 @@ describe('system widgets', () => {
     data.weeklyGoal = 99;
     expect(buildWidgetSnapshot(data)).toMatchObject({ weeklyGoal: 7, book: { progress: 100 } });
   });
+
+  it('shows protected days, ready protections and a calm evening when a protection is ready', () => {
+    const data = input();
+    const snapshot = buildWidgetSnapshot({
+      ...data,
+      stats: {
+        ...data.stats,
+        weekActiveDates: ['2026-09-28', today()],
+        streakFreeze: { available: 1, max: 2, frozenDates: ['2026-09-29', '2026-09-30'] },
+      },
+    });
+    expect(snapshot.week.map((day) => day.state)).toEqual([
+      'done',
+      'frozen',
+      'frozen',
+      'today',
+      'future',
+      'future',
+      'future',
+    ]);
+    expect(snapshot.week.map((day) => day.letter).join('')).toBe('STQQSSD');
+    expect(snapshot.freeze).toEqual({ available: 1, max: 2, frozenYesterday: true });
+    // September days never leak into October's grid; inside the month they stand alone.
+    expect(snapshot.month.days.some((day) => day.frozen)).toBe(false);
+    const month = buildWidgetMonth(
+      '2026-10-09',
+      new Set(['2026-10-06', '2026-10-08']),
+      new Set(['2026-10-07', '2026-10-08']),
+    );
+    expect(month.days.slice(5, 8).map((day) => [day.run, day.frozen])).toEqual([
+      ['single', false],
+      ['none', true],
+      ['single', false], // active wins over protection
+    ]);
+    const evening = buildWidgetMoods({ ...moodInput, freezesAvailable: 1 });
+    expect(evening.some((mood) => mood.alert)).toBe(false);
+    expect(moodAt(evening, 19).message).toBe('Leia hoje: a proteção fica guardada');
+    const saved = buildWidgetMoods({ ...moodInput, hasBook: false, frozenYesterday: true });
+    expect(moodAt(saved, 9).message).toBe('A proteção salvou sua sequência');
+  });
+
+  it('puts the reader on the podium with real neighbours and drops a stale league', () => {
+    const entries = [1, 2, 3, 4, 5].map((rank) => ({ rank, me: rank === 3 }));
+    expect(leaguePodium(entries, 3).map((entry) => entry.rank)).toEqual([4, 3, 2]);
+    expect(leaguePodium(entries, 1).map((entry) => entry.rank)).toEqual([3, 2, 1]);
+    expect(leaguePodium(entries, 5).map((entry) => entry.rank)).toEqual([5, 4, 3]);
+    expect(leaguePodium(entries.slice(0, 1), 1).map((entry) => entry.rank)).toEqual([1]);
+    expect(nameInitials('Ana Maria Leitora')).toBe('AL');
+    const league = {
+      today: today(),
+      daysLeft: 4,
+      me: { rank: 1, previousRank: 2, weeklyXp: 60 },
+      entries: [
+        { rank: 1, name: 'Eu Mesmo', weeklyXp: 60, me: true },
+        { rank: 2, name: 'Lia', weeklyXp: 30, me: false },
+      ],
+    };
+    expect(buildWidgetSnapshot({ ...input(), league }).league).toEqual({
+      rank: 1,
+      previousRank: 2,
+      participants: 2,
+      weeklyXp: 60,
+      daysLeft: 4,
+      podium: [
+        { rank: 2, initials: 'L', xp: 30, me: false },
+        { rank: 1, initials: 'EM', xp: 60, me: true },
+      ],
+    });
+    expect(
+      buildWidgetSnapshot({ ...input(), league: { ...league, today: '2026-09-30' } }).league,
+    ).toBeNull();
+  });
 });
+
+function today() {
+  return toLocalIsoDate(new Date(2026, 9, 1, 12));
+}

@@ -249,7 +249,22 @@ Continuação de 2026-09-30 — Você → Minha memória:
 
 ---
 
-## 6c. Widgets Android e iOS (Task 09, ADR-023 / ADR-026)
+## 6c. Widgets Android e iOS (Task 09, ADR-023 / ADR-029)
+
+**Novo (ADR-029):** cinco widgets em superfície clara com Plus Jakarta Sans. Confira também:
+
+- **Sequência da semana** carrega (antes mostrava “Can't load widget”) e marca hoje com check
+  depois de ler; dias cobertos por proteção aparecem azuis com floco.
+- **Calendário**: mês atual, faixas laranja, hoje em destaque, dias protegidos em azul e
+  “N proteção(ões)” sob a sequência. Uma proteção exige 7 dias seguidos (desde 2026-10-03);
+  pule um dia depois disso e confira que a sequência continua.
+- **Continuar leitura**: sem bloco branco; capa real ou a capa tipográfica; título, autor,
+  página, progresso e “Continuar leitura ›”. O toque abre a sessão do livro.
+- **Liga semanal**: sem amigos, mostra seu XP da semana; com amigos que compartilham, mostra
+  “#N entre amigos”, movimento desde ontem, dias restantes e pódio. O toque abre a Liga.
+- Redimensione: estreitos viram a variante compacta; textos não cortam e o Bubo não deforma.
+
+Os itens abaixo continuam valendo; onde citam “cena colorida”, leia “superfície clara”.
 
 Abra **Você → Bubo na sua tela**. Sem módulo nativo, confira as prévias; os widgets do sistema
 precisam de uma nova build instalada (CONFIGURAR 3.14).

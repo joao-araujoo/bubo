@@ -15,6 +15,7 @@ import { completeOnboarding, getReaderProfile, toMeResponse } from '../services/
 import { getStats } from '../services/sessions';
 import { getMemoryStats } from '../services/memory';
 import { getAchievements } from '../services/achievements';
+import { getLeague } from '../services/league';
 import { getModerationQueue, isModerator } from '../services/moderation';
 import { moderate } from '../services/community';
 
@@ -65,6 +66,13 @@ export function readerRoutes(deps: { catalog: CatalogProvider }) {
     if (!query.success)
       throw new AppError('VALIDATION_FAILED', 'Query parameter "today" must be a calendar date.');
     return c.json(await getAchievements(c.get('db'), c.get('session').user.id, query.data.today));
+  });
+
+  routes.get(API_ROUTES.league, async (c) => {
+    const query = statsQuerySchema.safeParse({ today: c.req.query('today') });
+    if (!query.success)
+      throw new AppError('VALIDATION_FAILED', 'Query parameter "today" must be a calendar date.');
+    return c.json(await getLeague(c.get('db'), c.get('session').user.id, query.data.today));
   });
 
   routes.get(API_ROUTES.me, async (c) => {

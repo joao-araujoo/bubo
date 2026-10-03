@@ -118,6 +118,7 @@ function RootNavigator() {
           <Stack.Screen name="convidar/[clubId]" />
           <Stack.Screen name="convite/[code]" />
           <Stack.Screen name="amigos" />
+          <Stack.Screen name="liga" />
           <Stack.Screen name="configuracoes" />
           <Stack.Screen name="widgets" />
           <Stack.Screen name="notificacoes" />

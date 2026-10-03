@@ -31,6 +31,7 @@ import {
   type UpdateShelfEntryRequest,
   apiPath,
   achievementsResponseSchema,
+  leagueResponseSchema,
   blocksResponseSchema,
   clubDetailSchema,
   clubMembersResponseSchema,
@@ -359,6 +360,10 @@ export function createApiClient({
         achievementsResponseSchema,
         { signal },
       ),
+    getLeague: (today: string, signal?: AbortSignal) =>
+      request(`${API_ROUTES.league}?today=${encodeURIComponent(today)}`, leagueResponseSchema, {
+        signal,
+      }),
     getDueCards: (today: string, signal?: AbortSignal) =>
       request(
         `${API_ROUTES.recallDue}?today=${encodeURIComponent(today)}`,

@@ -14,6 +14,7 @@ import {
 } from './friends';
 
 import { achievementsResponseSchema } from './achievements';
+import { leagueResponseSchema } from './league';
 import {
   blockRequestSchema,
   blocksResponseSchema,
@@ -89,6 +90,7 @@ export const API_ROUTES = {
   stats: '/me/stats',
   memoryStats: '/me/memory',
   achievements: '/me/achievements',
+  league: '/me/league',
   shelf: '/shelf',
   shelfEntry: '/shelf/:id',
   sessions: '/sessions',
@@ -174,6 +176,15 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     tags: ['me'],
     auth: true,
     responses: { 200: { description: 'Achievements.', schema: achievementsResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.league,
+    summary:
+      'Weekly friends league: real weekly XP of the reader and sharing friends, rank and rank up to yesterday. Query: today.',
+    tags: ['me'],
+    auth: true,
+    responses: { 200: { description: 'League standings.', schema: leagueResponseSchema } },
   },
   {
     method: 'get',

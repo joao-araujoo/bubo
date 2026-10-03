@@ -276,7 +276,13 @@ async function buildNative(nativeRoot) {
     ['dump', 'xmltree', source, 'AndroidManifest.xml'],
     { env, capture: true },
   );
-  for (const receiver of ['StreakWidget', 'RhythmWidget', 'CalendarWidget', 'ReadingWidget']) {
+  for (const receiver of [
+    'StreakWidget',
+    'RhythmWidget',
+    'CalendarWidget',
+    'ReadingWidget',
+    'LeagueWidget',
+  ]) {
     if (!manifest.includes(`expo.modules.bubowidgets.${receiver}`))
       throw new Error(`APK sem ${receiver}.`);
   }
@@ -300,7 +306,7 @@ async function buildNative(nativeRoot) {
         architectures: config.architectures,
         signing: 'test-only',
         sha256,
-        widgets: ['streak', 'rhythm', 'calendar', 'reading'],
+        widgets: ['streak', 'rhythm', 'calendar', 'reading', 'league'],
       },
       null,
       2,

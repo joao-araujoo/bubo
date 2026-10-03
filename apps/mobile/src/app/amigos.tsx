@@ -1,5 +1,6 @@
 import { type FriendsFeed, type FriendsResponse } from '@bubo/contracts';
 import { readingProgress } from '@bubo/domain';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 
@@ -337,6 +338,12 @@ export default function FriendsScreen() {
       />
       {notice ? <InlineMessage tone="success" message={notice} /> : null}
       {failure ? <InlineMessage tone="error" message={failure} /> : null}
+      <Button
+        label="Liga semanal dos amigos"
+        variant="secondary"
+        icon="emoji-events"
+        onPress={() => router.push('/liga')}
+      />
 
       {segment === 'feed' ? (
         feed.isPending ? (
@@ -458,7 +465,7 @@ export default function FriendsScreen() {
               <Toggle
                 icon="visibility"
                 title="Compartilhar minhas leituras"
-                description="Amigos aceitos veem o livro de catálogo que você está lendo, a página e as próximas sessões (minutos e páginas). Reflexões e respostas de memória nunca são compartilhadas."
+                description="Amigos aceitos veem o livro de catálogo que você está lendo, a página, as próximas sessões (minutos e páginas) e o seu XP da semana na liga semanal. Reflexões e respostas de memória nunca são compartilhadas."
                 value={list.data.preferences.shareActivity}
                 onValueChange={(value) =>
                   savePreferences({ ...list.data.preferences, shareActivity: value })

@@ -35,6 +35,7 @@ class BuboWidgetsModule : Module() {
         "rhythm" -> RhythmWidget::class.java
         "calendar" -> CalendarWidget::class.java
         "reading" -> ReadingWidget::class.java
+        "league" -> LeagueWidget::class.java
         else -> null
       }
       if (Build.VERSION.SDK_INT >= 26 && provider != null && manager.isRequestPinAppWidgetSupported) {

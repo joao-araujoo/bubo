@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, mkdirSync, copyFileSync, writeFileSy
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { WIDGET_POSES, WIDGET_SCENES } from '@bubo/contracts';
+import { WIDGET_KINDS, WIDGET_POSES } from '@bubo/contracts';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
@@ -44,46 +44,76 @@ describe('native widget generation', () => {
     copy('native-widgets/BuboWidgets.swift');
     const poses = WIDGET_POSES.map((pose) => pose);
     poses.forEach((pose) => copy(`assets/mascot/bubo-${pose}.png`));
-    ['400Regular', '700Bold', '800ExtraBold'].forEach((weight) =>
-      copy(`assets/fonts/PlusJakartaSans_${weight}.ttf`),
-    );
+    const fonts = ['400Regular', '500Medium', '600SemiBold', '700Bold', '800ExtraBold'];
+    fonts.forEach((weight) => copy(`assets/fonts/PlusJakartaSans_${weight}.ttf`));
     plugin.generateAndroid(temporary);
     plugin.generateIos(temporary, path.join(temporary, 'ios'), 'com.joaoaraujo.bubo', '0.3.0');
-    const android = path.join(temporary, 'modules/bubo-widgets/android/src/main/res');
+    const main = path.join(temporary, 'modules/bubo-widgets/android/src/main');
+    const android = path.join(main, 'res');
     const ios = path.join(temporary, 'ios/BuboWidgetsExtension');
     poses.forEach((pose) => {
       const canonical = hash(path.join(mobile, `assets/mascot/bubo-${pose}.png`));
-      expect(hash(path.join(android, `drawable-nodpi/bubo_widget_${pose}.png`))).toBe(canonical);
+      const resource = `bubo_widget_${pose.replaceAll('-', '_')}`;
+      expect(hash(path.join(android, `drawable-nodpi/${resource}.png`))).toBe(canonical);
       expect(hash(path.join(ios, `Assets.xcassets/bubo-${pose}.imageset/mascot.png`))).toBe(
         canonical,
       );
     });
-    expect(hash(path.join(android, 'font/bubo_bold.ttf'))).toBe(
-      hash(path.join(mobile, 'assets/fonts/PlusJakartaSans_700Bold.ttf')),
-    );
-    const light = readFileSync(path.join(android, 'values/bubo_colors.xml'), 'utf8');
-    const dark = readFileSync(path.join(android, 'values-night/bubo_colors.xml'), 'utf8');
-    expect(light).not.toBe(dark);
-    expect(hash(path.join(android, 'font/bubo_black.ttf'))).toBe(
-      hash(path.join(mobile, 'assets/fonts/PlusJakartaSans_800ExtraBold.ttf')),
+    // RemoteViews ignore @font, so Android loads the official files from assets (ADR-029).
+    fonts.forEach((weight) => {
+      const file = `PlusJakartaSans_${weight}.ttf`;
+      const canonical = hash(path.join(mobile, 'assets/fonts', file));
+      expect(hash(path.join(main, `assets/bubo-widgets/${file}`))).toBe(canonical);
+      expect(hash(path.join(ios, file))).toBe(canonical);
+    });
+    const kotlin = readFileSync(
+      path.join(main, 'java/expo/modules/bubowidgets/BuboTokens.kt'),
+      'utf8',
     );
     const tokens = readFileSync(path.join(ios, 'BuboTokens.swift'), 'utf8');
-    expect(tokens).toContain('scheme == .dark');
-    // Every scene the domain can pick exists on both platforms, from the theme table.
-    const scenes = readFileSync(path.join(android, 'values/bubo_scenes.xml'), 'utf8');
-    WIDGET_SCENES.forEach((scene) => {
-      expect(tokens).toContain(`case "${scene}"`);
-      expect(scenes).toContain(`bubo_scene_${scene}_top`);
-      expect(
-        readFileSync(path.join(android, `drawable/bubo_scene_${scene}.xml`), 'utf8'),
-      ).toContain('gradient');
-    });
-    expect(tokens.match(/case "/g)).toHaveLength(WIDGET_SCENES.length);
+    // One palette: both platforms get the same widget colours and icon geometry from the theme.
+    const theme = readFileSync(path.join(mobile, 'src/theme/colors.ts'), 'utf8');
+    expect(theme).toContain("flame: '#FF9416'");
+    expect(kotlin).toContain('val flame = 0xFFFF9416.toInt()');
+    expect(tokens).toContain('static let flame = Color(hex: "#FF9416")');
+    for (const icon of ['flameOuter', 'snowflake', 'check', 'trophy', 'badge', 'gemCut', 'clock']) {
+      expect(kotlin).toContain(`val ${icon} = floatArrayOf(`);
+      expect(tokens).toContain(`static let ${icon}: [Double] = [`);
+    }
+    expect(kotlin).toContain('PlusJakartaSans_800ExtraBold.ttf');
+    expect(readFileSync(path.join(ios, 'BuboWidgetsExtension-Info.plist'), 'utf8')).toContain(
+      '<string>PlusJakartaSans_600SemiBold.ttf</string>',
+    );
     expect(readFileSync(path.join(ios, 'BuboWidgetsExtension.entitlements'), 'utf8')).toContain(
       'group.com.joaoaraujo.bubo.widgets',
     );
-    expect(readFileSync(path.join(android, 'xml/bubo_streak_widget.xml'), 'utf8')).toContain(
-      'home_screen',
+    WIDGET_KINDS.forEach((kind) => {
+      const info = readFileSync(path.join(android, `xml/bubo_${kind}_widget.xml`), 'utf8');
+      expect(info).toContain('home_screen');
+      expect(info).toContain('@layout/bubo_widget_canvas');
+      expect(info).toContain(`@layout/bubo_preview_${kind}`);
+    });
+    // Static layouts never use classes RemoteViews refuse (the old week widget used <View>).
+    const layouts = path.join(mobile, 'modules/bubo-widgets/android/src/main/res/layout');
+    for (const file of [
+      'bubo_widget_canvas.xml',
+      ...WIDGET_KINDS.map((kind) => `bubo_preview_${kind}.xml`),
+    ]) {
+      const xml = readFileSync(path.join(layouts, file), 'utf8');
+      const tags = [...xml.matchAll(/<([A-Za-z.]+)[\s>]/g)].map((match) => match[1]);
+      expect(
+        tags.filter((tag) => !['FrameLayout', 'LinearLayout', 'ImageView'].includes(tag ?? '')),
+      ).toEqual([]);
+    }
+    const manifest = readFileSync(
+      path.join(mobile, 'modules/bubo-widgets/android/src/main/AndroidManifest.xml'),
+      'utf8',
+    );
+    ['Streak', 'Rhythm', 'Calendar', 'Reading', 'League'].forEach((name) =>
+      expect(manifest).toContain(`.${name}Widget`),
+    );
+    expect(readFileSync(path.join(mobile, 'native-widgets/BuboWidgets.swift'), 'utf8')).toContain(
+      'BuboLeagueWidget()',
     );
     // Regeneration must not introduce new IDs, different assets or another palette.
     const before = hash(path.join(ios, 'BuboWidgetsExtension-Info.plist'));

@@ -1,5 +1,18 @@
 # Roadmap
 
+## Widgets, proteção de sequência e liga semanal — 2026-10-03 (ADR-029)
+
+- Causa do “Sequência da semana” quebrado: o layout usava `<View>`, proibido em RemoteViews
+  (“Can't load widget”). Widgets Android agora são desenhados em Canvas com Plus Jakarta Sans
+  (o Android ignora `@font` em widgets), superfície clara única, poses oficiais por estado e
+  layouts que se adaptam ao tamanho. iOS redesenhado em SwiftUI com as mesmas composições.
+- Proteção de sequência derivada da atividade (7 dias → 1 proteção, máx. 2; sem tabela nova):
+  `/v1/me/stats.streakFreeze`, `streakDays` com dias protegidos, calendário azul com floco.
+- Liga semanal de amigos (`GET /v1/me/league`, tela `liga`, widget novo) com XP real e
+  consentimento de compartilhamento. Snapshot v3.
+- Validado num emulador Android 15: cinco widgets, todos os estados, deep links e fluxo real
+  sessão → API → app → widget. Pendentes: aparelho físico, compilação Swift, nova build nativa.
+
 ## Núcleo e push — 2026-10-03
 
 - API publicada com migrações `0014`/`0015`, `verify` verde (409 testes), smoke de produção

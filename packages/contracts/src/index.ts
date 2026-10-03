@@ -5,6 +5,7 @@ export * from './cycles';
 export * from './friends';
 export * from './errors';
 export * from './health';
+export * from './league';
 export * from './me';
 export * from './memory';
 export * from './notifications';
