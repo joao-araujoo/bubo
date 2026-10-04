@@ -5,7 +5,6 @@ import { type TextInput, View } from 'react-native';
 import {
   BuboMascot,
   Button,
-  Card,
   FormScreen,
   InlineMessage,
   LinkButton,
@@ -60,18 +59,8 @@ export default function SignInScreen() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <BuboMascot animated pose="welcome" size={72} />
-        <Card containerStyle={{ flex: 1 }} style={{ padding: theme.spacing.md }}>
-          <Text variant="bodySm">
-            Que bom ter você de volta! Suas memórias literárias continuam vivas e salvas aqui.
-          </Text>
-        </Card>
-      </View>
-      <View style={{ gap: theme.spacing.xs }}>
-        <Text variant="heading" accessibilityRole="header">
+        <Text variant="heading" accessibilityRole="header" style={{ flex: 1 }}>
           Entrar na sua Estante
-        </Text>
-        <Text variant="body" color="textMuted">
-          Acesse suas sessões ativas e a fila de repetição espaçada.
         </Text>
       </View>
       {formError ? <InlineMessage tone="error" message={formError} /> : null}

@@ -1,21 +1,21 @@
+import { MIN_CATALOG_QUERY_LENGTH } from '@bubo/domain';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Button,
-  EmptyState,
   FormScreen,
   HeaderButton,
   InlineMessage,
   LinkButton,
-  SelectableCard,
   Text,
 } from '../design-system';
 import { catalogErrorMessage, useDebouncedValue } from '../features/catalog/catalog';
-import { CatalogBookRow } from '../features/catalog/CatalogBookRow';
+import { CatalogSearchResults } from '../features/catalog/CatalogSearchResults';
 import { ManualBookForm, type ManualBookFormHandle } from '../features/catalog/ManualBookForm';
 import { SearchField } from '../features/catalog/SearchField';
+import { ShelfStatusPicker, type AddShelfStatus } from '../features/catalog/ShelfStatusPicker';
 import { useAddFromCatalog, useShelfLookup } from '../features/catalog/useAddFromCatalog';
 import { ApiError } from '../lib/api/client';
 import { useAddBook, useCatalogSearch } from '../lib/api/queries';
@@ -23,44 +23,13 @@ import { useAuthState } from '../lib/auth/session';
 import { haptics } from '../lib/haptics';
 import { useTheme } from '../theme';
 
-type Status = 'reading' | 'want_to_read';
-
-function StatusPicker({ status, onChange }: { status: Status; onChange: (s: Status) => void }) {
-  const theme = useTheme();
-  return (
-    <View accessibilityRole="radiogroup" style={{ gap: theme.spacing.sm }}>
-      <Text variant="label">Status</Text>
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <SelectableCard
-            mode="radio"
-            icon="bookmark-border"
-            title="Quero ler"
-            selected={status === 'want_to_read'}
-            onPress={() => onChange('want_to_read')}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <SelectableCard
-            mode="radio"
-            icon="auto-stories"
-            title="Estou lendo"
-            selected={status === 'reading'}
-            onPress={() => onChange('reading')}
-          />
-        </View>
-      </View>
-    </View>
-  );
-}
-
 /** Manual entry (Stitch "Adicionar manualmente"). */
-function ManualMode({ userId }: { userId: string }) {
+function ManualMode({ userId, initialStatus }: { userId: string; initialStatus: AddShelfStatus }) {
   const router = useRouter();
   const theme = useTheme();
   const form = useRef<ManualBookFormHandle>(null);
   const add = useAddBook(userId);
-  const [status, setStatus] = useState<Status>('want_to_read');
+  const [status, setStatus] = useState<AddShelfStatus>(initialStatus);
   const [formError, setFormError] = useState<string | null>(null);
   const [formKey, setFormKey] = useState(0);
 
@@ -110,112 +79,110 @@ function ManualMode({ userId }: { userId: string }) {
       <ManualBookForm
         key={formKey}
         ref={form}
-        onScanPress={() => router.replace('/scanner-isbn')}
+        onScanPress={() => router.replace({ pathname: '/scanner-isbn', params: { status } })}
       />
       <View style={{ marginTop: theme.spacing.xs }}>
-        <StatusPicker status={status} onChange={setStatus} />
+        <ShelfStatusPicker status={status} onChange={setStatus} disabled={add.isPending} />
       </View>
     </FormScreen>
   );
 }
 
 /** Catalog search first (Google Books + Open Library), with ISBN scan and manual fallbacks. */
-function SearchMode({ userId }: { userId: string }) {
+function SearchMode({ userId, initialStatus }: { userId: string; initialStatus: AddShelfStatus }) {
   const theme = useTheme();
   const router = useRouter();
   const [text, setText] = useState('');
+  const [status, setStatus] = useState<AddShelfStatus>(initialStatus);
   const q = useDebouncedValue(text.trim());
   const results = useCatalogSearch(userId, q);
-  const { addToShelf, pendingId } = useAddFromCatalog(userId, 'replace');
+  const { addToShelf, pendingId } = useAddFromCatalog(userId, 'stay');
   const entryFor = useShelfLookup(userId);
-  const books = q.length >= 2 ? (results.data?.results ?? []) : [];
+  const books = q.length >= MIN_CATALOG_QUERY_LENGTH ? (results.data?.results ?? []) : [];
 
   return (
-    <FormScreen eyebrow="Estante inteligente" title="Adicionar livro">
-      <SearchField
-        value={text}
-        onChangeText={setText}
-        onScanPress={() => router.push('/scanner-isbn')}
-        loading={q.length >= 2 && results.isFetching}
-        autoFocus
-      />
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: theme.spacing.md,
-        }}
-      >
-        <LinkButton label="Escanear ISBN" onPress={() => router.push('/scanner-isbn')} />
-        <Text variant="body" color="textMuted">
-          •
-        </Text>
-        <LinkButton label="Adicionar manual" onPress={() => router.setParams({ manual: '1' })} />
-      </View>
-
-      {q.length < 2 ? (
-        <EmptyState
-          mascot="recallPrompt"
-          title="Qual livro você quer adicionar?"
-          description="Busque pelo título, autor ou ISBN. Confira a edição encontrada antes de adicionar."
+    <FormScreen
+      eyebrow="Sua coleção de leituras"
+      title="Adicionar livros"
+      scroll={false}
+      footer={
+        <Button
+          label="Ver minha estante"
+          variant="secondary"
+          icon="menu-book"
+          fullWidth
+          onPress={() => router.replace('/(tabs)/estante')}
         />
-      ) : results.isPending ? (
-        <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Buscando livros" />
-      ) : results.isError ? (
-        <>
-          <InlineMessage tone="error" message={catalogErrorMessage(results.error)} />
-          <Button
-            label="Tentar de novo"
-            icon="refresh"
-            variant="secondary"
-            onPress={() => void results.refetch()}
-          />
-        </>
-      ) : books.length === 0 ? (
-        <EmptyState
-          mascot="notFound"
-          title="Nenhum livro encontrado"
-          description="Confira a grafia, tente o nome do autor ou adicione manualmente."
-          action={
-            <Button
-              label="Adicionar manualmente"
-              icon="edit"
-              variant="secondary"
-              fullWidth
-              onPress={() => router.setParams({ manual: '1' })}
-            />
-          }
-        />
-      ) : (
-        books.map((book) => {
-          const entryId = entryFor(book);
-          return (
-            <CatalogBookRow
-              key={book.catalogId}
-              book={book}
-              onOpen={() =>
-                router.push({ pathname: '/catalogo/[id]', params: { id: book.catalogId } })
+      }
+    >
+      <CatalogSearchResults
+        books={books}
+        searching={text.trim().length >= MIN_CATALOG_QUERY_LENGTH}
+        loading={results.isPending}
+        updating={text.trim() !== q}
+        error={results.isError ? catalogErrorMessage(results.error) : null}
+        partial={Object.values(results.data?.sources ?? {}).includes('error')}
+        pendingId={pendingId}
+        entryFor={entryFor}
+        onOpen={(book) =>
+          router.push({ pathname: '/catalogo/[id]', params: { id: book.catalogId, status } })
+        }
+        onOpenEntry={(id) => router.push({ pathname: '/livro/[id]', params: { id } })}
+        onAdd={(book) => void addToShelf(book, status)}
+        onRetry={() => void results.refetch()}
+        onManual={() => router.setParams({ manual: '1', status })}
+        header={
+          <>
+            <SearchField
+              value={text}
+              onChangeText={setText}
+              onScanPress={() => router.push({ pathname: '/scanner-isbn', params: { status } })}
+              loading={
+                text.trim().length >= MIN_CATALOG_QUERY_LENGTH &&
+                (text.trim() !== q || results.isFetching)
               }
-              badge={entryId ? 'Na estante' : undefined}
-              action={{
-                label: 'Adicionar',
-                icon: 'add',
-                loading: pendingId === book.catalogId,
-                disabled: pendingId !== null,
-                onPress: () => void addToShelf(book),
-              }}
+              autoFocus
             />
-          );
-        })
-      )}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}
+            >
+              <LinkButton
+                label="Escanear ISBN"
+                onPress={() => router.push({ pathname: '/scanner-isbn', params: { status } })}
+              />
+              <Text variant="body" color="textMuted">
+                •
+              </Text>
+              <LinkButton
+                label="Adicionar manual"
+                onPress={() => router.setParams({ manual: '1', status })}
+              />
+            </View>
+            <ShelfStatusPicker status={status} onChange={setStatus} disabled={pendingId !== null} />
+            <Text variant="caption" color="textMuted">
+              Confira idioma e edição antes de adicionar. Você pode adicionar vários livros sem sair
+              da busca.
+            </Text>
+          </>
+        }
+      />
     </FormScreen>
   );
 }
 
 export default function AddBookScreen() {
   const auth = useAuthState();
-  const { manual } = useLocalSearchParams<{ manual?: string }>();
+  const { manual, status } = useLocalSearchParams<{ manual?: string; status?: string }>();
   const userId = auth.status === 'ready' ? auth.userId : '';
-  return manual === '1' ? <ManualMode userId={userId} /> : <SearchMode userId={userId} />;
+  const initialStatus = status === 'finished' || status === 'reading' ? status : 'want_to_read';
+  return manual === '1' ? (
+    <ManualMode userId={userId} initialStatus={initialStatus} />
+  ) : (
+    <SearchMode userId={userId} initialStatus={initialStatus} />
+  );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildMemoryPath,
+  delayedRecallWindow,
   type MemoryPathSession,
   reviewOutcome,
   summarizeMemoryDays,
@@ -15,6 +16,23 @@ const session = (id: string, localDate: string, endedAt: string): MemoryPathSess
   endPage: 30,
   pagesRead: 20,
   focusedSeconds: 1500,
+});
+
+describe('delayedRecallWindow', () => {
+  it('requires at least 24 actual hours and rejects invalid elapsed time', () => {
+    for (const elapsed of [-1, 0, 86_399.999, Number.NaN, Infinity, -Infinity]) {
+      expect(delayedRecallWindow(elapsed)).toBeNull();
+    }
+  });
+
+  it('uses exact elapsed-time boundaries at one, seven and thirty days', () => {
+    expect(delayedRecallWindow(86_400)).toBe('oneToSixDays');
+    expect(delayedRecallWindow(7 * 86_400 - 0.001)).toBe('oneToSixDays');
+    expect(delayedRecallWindow(7 * 86_400)).toBe('sevenToTwentyNineDays');
+    expect(delayedRecallWindow(30 * 86_400 - 0.001)).toBe('sevenToTwentyNineDays');
+    expect(delayedRecallWindow(30 * 86_400)).toBe('thirtyPlusDays');
+    expect(delayedRecallWindow(365 * 86_400)).toBe('thirtyPlusDays');
+  });
 });
 
 describe('reviewOutcome', () => {

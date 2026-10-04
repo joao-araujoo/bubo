@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { newReadingGoal, pauseFocusClock, shouldShowReadingGoalNotice } from '@bubo/domain';
 
 const storage = vi.hoisted(() => {
   const rows = new Map<string, string>();
@@ -16,6 +17,7 @@ const storage = vi.hoisted(() => {
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: storage }));
 import {
   clearSessionDraft,
+  createSessionDraftPersistence,
   readSessionDraft,
   writeSessionDraft,
   type SessionDraft,
@@ -90,6 +92,8 @@ it('reads legacy drafts without inventing an approved recall exercise', async ()
   storage.rows.set('bubo.session-draft.v1.a', JSON.stringify(draft));
   expect(await readSessionDraft('a')).toEqual(draft);
   expect((await readSessionDraft('a'))?.recall).toBeUndefined();
+  expect((await readSessionDraft('a'))?.goalSeconds).toBeUndefined();
+  expect((await readSessionDraft('a'))?.goalNoticeShown).toBeUndefined();
 });
 it('keeps the same session UUID when local cleanup fails and allows retrying cleanup', async () => {
   await writeSessionDraft('a', draft);
@@ -106,5 +110,121 @@ it('surfaces failed writes and malformed drafts instead of claiming they were sa
   storage.rows.set('bubo.session-draft.v1.a', '{broken');
   await expect(readSessionDraft('a')).rejects.toThrow();
   await clearSessionDraft('a');
+  expect(await readSessionDraft('a')).toBeNull();
+});
+
+it('recovers a five-minute goal with the same clock, UUID and completed notice for its account', async () => {
+  const miniDraft = { ...draft, ...newReadingGoal('5'), goalNoticeShown: true };
+  await writeSessionDraft('a', miniDraft);
+  expect(await readSessionDraft('a')).toEqual(miniDraft);
+  expect(await readSessionDraft('b')).toBeNull();
+  expect(() =>
+    writeSessionDraft('a', { ...miniDraft, goalSeconds: 600 } as unknown as SessionDraft),
+  ).toThrow();
+  expect(await readSessionDraft('a')).toEqual(miniDraft);
+});
+
+it('applies a notice to the latest paused clock instead of resurrecting a stale running snapshot', async () => {
+  const running: SessionDraft = {
+    ...draft,
+    ...newReadingGoal('5'),
+    runningSince: 1000,
+    accumulatedMs: 0,
+    endedAt: null,
+  };
+  const confirmed = vi.fn();
+  const persistence = createSessionDraftPersistence('a', running, confirmed);
+  const pause = persistence.persist((current) => ({
+    ...current,
+    ...pauseFocusClock(current, 301000),
+  }));
+  const notice = persistence.persist((current) =>
+    shouldShowReadingGoalNotice(current, 301000) ? { ...current, goalNoticeShown: true } : current,
+  );
+  await Promise.all([pause, notice]);
+  const recovered = await readSessionDraft('a');
+  expect(recovered?.runningSince).toBeNull();
+  expect(recovered?.accumulatedMs).toBe(300000);
+  expect(recovered?.goalNoticeShown).toBe(true);
+  expect(recovered?.endedAt).toBeNull();
+  expect(recovered?.id).toBe(running.id);
+  expect(confirmed).toHaveBeenCalledTimes(2);
+});
+
+it('keeps the notice when a subsequent timer transition is queued concurrently', async () => {
+  const miniDraft = { ...draft, ...newReadingGoal('5'), accumulatedMs: 300000, endedAt: null };
+  const persistence = createSessionDraftPersistence('a', miniDraft, vi.fn());
+  const notice = persistence.persist((current) => ({ ...current, goalNoticeShown: true }));
+  const finish = persistence.persist((current) => ({
+    ...current,
+    ...pauseFocusClock(current, 302000),
+    endedAt: 302000,
+  }));
+  await Promise.all([notice, finish]);
+  expect((await readSessionDraft('a'))?.goalNoticeShown).toBe(true);
+  expect((await readSessionDraft('a'))?.endedAt).toBe(302000);
+});
+
+it('does not confirm a goal on write failure and resolves the retry from the last durable clock', async () => {
+  const miniDraft = { ...draft, ...newReadingGoal('5'), endedAt: null };
+  await writeSessionDraft('a', miniDraft);
+  const confirmed = vi.fn();
+  const persistence = createSessionDraftPersistence('a', miniDraft, confirmed);
+  storage.setItem.mockRejectedValueOnce(new Error('disk unavailable'));
+  await expect(
+    persistence.persist((current) => ({
+      ...current,
+      goalNoticeShown: true,
+      accumulatedMs: 300000,
+    })),
+  ).rejects.toThrow('disk unavailable');
+  expect(confirmed).not.toHaveBeenCalled();
+  expect(await readSessionDraft('a')).toEqual(miniDraft);
+  let retryInput: SessionDraft | null = null;
+  await persistence.persist((current) => {
+    retryInput = current;
+    return { ...current, accumulatedMs: 301000, goalNoticeShown: true };
+  });
+  expect(retryInput).toEqual(miniDraft);
+  expect((await readSessionDraft('a'))?.goalNoticeShown).toBe(true);
+  expect(confirmed).toHaveBeenCalledOnce();
+});
+
+it('discards after an in-flight goal update without reviving a persisted draft', async () => {
+  const miniDraft = { ...draft, ...newReadingGoal('5'), endedAt: null };
+  const fresh = { ...miniDraft, id: '00000000-0000-4000-8000-000000000002' };
+  const confirmed = vi.fn();
+  const persistence = createSessionDraftPersistence('a', miniDraft, confirmed);
+  const notice = persistence.persist((current) => ({ ...current, goalNoticeShown: true }));
+  const discard = persistence.discard(fresh);
+  await Promise.all([notice, discard]);
+  expect(await readSessionDraft('a')).toBeNull();
+  expect(confirmed).toHaveBeenLastCalledWith(fresh);
+});
+
+it('does not discard another draft when a removed-book screen holds an old UUID', async () => {
+  await writeSessionDraft('a', draft);
+  await expect(clearSessionDraft('a', '00000000-0000-4000-8000-000000000002')).rejects.toThrow(
+    'Session draft changed',
+  );
+  expect(await readSessionDraft('a')).toEqual(draft);
+  await clearSessionDraft('a', draft.id);
+  expect(await readSessionDraft('a')).toBeNull();
+});
+
+it('rejects late timer changes after discard instead of applying them to a new session', async () => {
+  const miniDraft = { ...draft, ...newReadingGoal('5'), endedAt: null };
+  const fresh = { ...miniDraft, id: '00000000-0000-4000-8000-000000000002' };
+  await writeSessionDraft('a', miniDraft);
+  const confirmed = vi.fn();
+  const persistence = createSessionDraftPersistence('a', miniDraft, confirmed);
+  const removal = persistence.discard(fresh);
+  const lateChange = expect(
+    persistence.persist((current) => ({ ...current, goalNoticeShown: true })),
+  ).rejects.toThrow('Session draft changed');
+  await Promise.all([removal, lateChange]);
+  expect(await readSessionDraft('a')).toBeNull();
+  expect(confirmed).toHaveBeenLastCalledWith(fresh);
+  await expect(persistence.persist(miniDraft)).rejects.toThrow('Session draft changed');
   expect(await readSessionDraft('a')).toBeNull();
 });

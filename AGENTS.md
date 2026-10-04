@@ -116,15 +116,55 @@ Tasks 01–05 and 07–09 are complete in code (Task 05 still needs owner/device
 - Comunidade part 2: invites, polls, reviews, friends, cycles, global moderation (Task 08)
 - Você: preferences with real effect, notification inbox, push + review reminder cron (Task 09)
 
+**Discover (2026-10-03; ADR-031):** `GET /v1/catalog/discover` builds Skoob-style shelves from a
+taste graph (Dijkstra over shelf → authors/subjects → books, `@bubo/domain/recommend.ts`) using
+only Open Library works with Portuguese editions, plus "Mais lidos no Bubo" (≥ 2 real readers).
+Catalog burst 503 fixed (5 s queue, keyless Google `skipped`); covers no longer flash the
+typographic fallback. Owner: `CATALOG_CONTACT_EMAIL`, device acceptance.
+
+**Search/Estante (2026-10-04; ADR-033):** search returns real partial books after a 1.2 s merge
+window while slower sources finish in background; cover metadata/ingestion has a 100 ms foreground
+allowance. Virtualized lists, bounded prefetch, six-second stalled image candidates, stable search
+focus and API-accepted cache updates. Estante has local title/author search, counts/status filters,
+ordering and quick status actions. Adding supports Quero ler/Lendo/Já li across details, ISBN and
+manual entry, without leaving results. Direct `finished` insertion is atomic; no sessions/XP/
+streaks are generated. `finishedAt` is a declaration now, not a historical completion date for
+Replay. Local implementation; updated API/app publication and visual/device acceptance pending.
+Stories, monthly Replay and annual Replay already remain backlog ideas 21–23, without dates.
+
+**Reading return (2026-10-04; ADR-032):** ideas 01–03/06 implemented/consolidated in code:
+durable-session consolidation, real page/latest available writing from 20 recent sessions
+(three-line preview + expand), optional fixed warmup question answered mentally, five-minute
+normal session and one primary action in Hoje. Optional history loading/retryable failures may
+use this account's real cached entry; authentication errors and confirmed missing books prevail.
+Priority: saved draft → loading/error retry → offered reviews → return after 7+ local calendar
+days without reading → continuation after reading today → normal reading → choose a book.
+Real reading today prevents a return claim from stale recency; review priority shows secondary
+book context, while recovery offers only its draft's book.
+`/v1/me/stats.lastReadingDate` comes only from accepted owner-scoped sessions. A 300-second goal
+and its acknowledgement persist in the local draft; never replace an existing draft, finish
+automatically or award activity before the API accepts. Only a confirmed missing shelf entry
+offers explicit local draft discard; network failures preserve it. `npm run verify` passed
+(495 tests; format/lint/typecheck/assets/audit green). No current visual/device run, migration,
+deployment, remote change or git commit. Device acceptance remains pending; no new owner setup.
+
 **Task 06 (memory and stats)** is done except a documented retention model (curve, Bubo Score).
+Observed delayed recall is implemented (ADR-030): self-assessments grouped by actual 1–6,
+7–29 and 30+ day gaps, with counts and no prediction. Calibrated retention and Score remain open.
+Continuation validation (2026-10-03): verify passed (441 tests), API published, production smoke passed and
+temporary accounts removed. Current ARM64/ARMv7 test APK includes five widget receivers and
+concise copy. Main screens were checked via current JS on an existing Android debug emulator;
+physical-device acceptance and Swift compilation remain pending (docs/release.md).
 **Task 07 (Comunidade: clubs, anti-spoiler debates, reports, blocks; ADR-019)** is complete and
 deployed. **Task 08 (Comunidade part 2)** is complete and deployed: slice 1 (ADR-020: private clubs +
 invites, members, polls, reactions, club feed; `0009`) and slice 2 (ADR-021: book reviews with
 tags, friends + opt-in friends feed, club reading cycles, global moderation via
 `MODERATOR_USER_IDS`; `0010`–`0012`). Device acceptance is pending. **Task 09 (ADR-022; `0013`)** is complete and
 deployed: preferences, inbox, Expo push (hourly cron), Você rebuilt. Push on devices needs the
-owner (EAS project id, Firebase). **Next:** Task 06 retention model (curve, Bubo Score) or AI
-flows (Gemini), as the owner prefers.
+owner (EAS project id, Firebase). **Next:** accept the reading-return slice on a device, then
+continue the ordered future-ideas checklist (saved quotations and their recall links, 07/09).
+Task 06's calibrated retention
+model/Score and source-bounded AI flows remain separate open work.
 
 **Core and push (2026-10-03; ADR-027/028):** new sessions require a three-part recall exercise
 (idea, detail, connection/question) that passes the server's versioned writing checklist before

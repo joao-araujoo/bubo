@@ -1,5 +1,6 @@
 import { type CatalogBook } from '@bubo/contracts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import {
@@ -15,6 +16,7 @@ import {
 } from '../../design-system';
 import { authorLine, catalogErrorMessage, editionLabel } from '../../features/catalog/catalog';
 import { useAddFromCatalog } from '../../features/catalog/useAddFromCatalog';
+import { ShelfStatusPicker, type AddShelfStatus } from '../../features/catalog/ShelfStatusPicker';
 import { ApiError } from '../../lib/api/client';
 import { useCatalogBook } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
@@ -103,12 +105,21 @@ function BookDetails({ book }: { book: CatalogBook }) {
 export default function CatalogBookScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id = '' } = useLocalSearchParams<{ id: string }>();
+  const { id = '', status: requestedStatus } = useLocalSearchParams<{
+    id: string;
+    status?: string;
+  }>();
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : '';
   const query = useCatalogBook(userId, id);
   const { addToShelf, pendingId } = useAddFromCatalog(userId);
-  const book = query.data?.book;
+  const [status, setStatus] = useState<AddShelfStatus>(
+    requestedStatus === 'finished' || requestedStatus === 'reading'
+      ? requestedStatus
+      : 'want_to_read',
+  );
+  const canUseBook = !query.isError || (query.error instanceof ApiError && query.error.retryable);
+  const book = canUseBook ? query.data?.book : undefined;
   const entryId = query.data?.shelfEntryId ?? null;
 
   const footer = book ? (
@@ -120,21 +131,14 @@ export default function CatalogBookScreen() {
         onPress={() => router.replace({ pathname: '/livro/[id]', params: { id: entryId } })}
       />
     ) : (
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+      <View style={{ gap: theme.spacing.sm }}>
+        <ShelfStatusPicker status={status} onChange={setStatus} disabled={pendingId !== null} />
         <Button
-          label="Quero ler"
-          icon="bookmark-border"
-          variant="secondary"
-          style={{ flex: 1 }}
-          disabled={pendingId !== null}
-          onPress={() => void addToShelf(book, 'want_to_read')}
-        />
-        <Button
-          label="Estou lendo"
-          icon="auto-stories"
-          style={{ flex: 1 }}
+          label="Adicionar à estante"
+          icon="bookmark-add"
+          fullWidth
           loading={pendingId !== null}
-          onPress={() => void addToShelf(book, 'reading')}
+          onPress={() => void addToShelf(book, status)}
         />
       </View>
     )
@@ -142,7 +146,26 @@ export default function CatalogBookScreen() {
 
   return (
     <FormScreen footer={footer}>
-      {query.isPending ? (
+      {book ? (
+        <>
+          {query.isError ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <InlineMessage
+                tone="error"
+                message="Os dados salvos estão disponíveis, mas não conseguimos atualizar este livro agora."
+              />
+              <Button
+                label="Tentar atualizar"
+                icon="refresh"
+                variant="secondary"
+                loading={query.isFetching}
+                onPress={() => void query.refetch()}
+              />
+            </View>
+          ) : null}
+          <BookDetails book={book} />
+        </>
+      ) : query.isPending ? (
         <ActivityIndicator
           color={theme.colors.primary}
           style={{ marginTop: theme.spacing.xxxl }}
@@ -160,7 +183,9 @@ export default function CatalogBookScreen() {
                 icon="edit"
                 variant="secondary"
                 fullWidth
-                onPress={() => router.replace('/adicionar-livro?manual=1')}
+                onPress={() =>
+                  router.replace({ pathname: '/adicionar-livro', params: { manual: '1', status } })
+                }
               />
             }
           />
@@ -175,8 +200,6 @@ export default function CatalogBookScreen() {
             />
           </>
         )
-      ) : book ? (
-        <BookDetails book={book} />
       ) : null}
     </FormScreen>
   );

@@ -72,7 +72,7 @@ export default function NewBookReviewScreen() {
 
   if (club.isPending)
     return (
-      <FormScreen title="Avaliar & Resenhar" eyebrow="Resenha" eyebrowDot>
+      <FormScreen title="Nova resenha">
         <ActivityIndicator
           color={theme.colors.primary}
           accessibilityLabel="Carregando livro do clube"
@@ -81,7 +81,7 @@ export default function NewBookReviewScreen() {
     );
   if (club.isError)
     return (
-      <FormScreen title="Avaliar & Resenhar" eyebrow="Resenha" eyebrowDot>
+      <FormScreen title="Nova resenha">
         <EmptyState
           mascot="offline"
           title="Não foi possível abrir o clube"
@@ -95,7 +95,7 @@ export default function NewBookReviewScreen() {
   const data = club.data;
   if (!data.membership)
     return (
-      <FormScreen title="Avaliar & Resenhar" eyebrow="Resenha" eyebrowDot>
+      <FormScreen title="Nova resenha">
         <EmptyState
           mascot="emptyCommunity"
           title="Entre no clube para publicar"
@@ -177,9 +177,7 @@ export default function NewBookReviewScreen() {
 
   return (
     <FormScreen
-      title="Avaliar & Resenhar"
-      eyebrow="Resenha"
-      eyebrowDot
+      title="Nova resenha"
       footer={
         <>
           {error ? <InlineMessage tone="error" message={error} /> : null}
@@ -227,7 +225,7 @@ export default function NewBookReviewScreen() {
         </View>
       </Card>
 
-      <BuboTip pose="takingNotes" title="Dica crítica do Bubo" titleIcon="verified">
+      <BuboTip pose="takingNotes" title="Sem spoiler">
         <Text variant="bodySm">
           Conte o que ficou com você, com suas palavras. Se comentar o desfecho, ligue a proteção:
           quem ainda está antes da página escolhida vê só um véu.
@@ -260,7 +258,7 @@ export default function NewBookReviewScreen() {
 
       <SectionTitle
         icon="psychology"
-        title="Como essa leitura reverberou?"
+        title="Como foi a leitura?"
         trailing={
           <Text variant="label" color="accentText">
             {`${tags.length}/${REVIEW_TAGS_MAX}`}

@@ -57,8 +57,15 @@ flips the guard to the tabs. Existing answers are pre-filled if a reader redoes 
   - "Lendo agora" shows the reading book with **Continuar leitura** (starts a session) and
     **Atualizar** (opens the book).
 - **Estante:**
-  - Real entries grouped by status, plus "Adicionar livro".
-  - Each row opens the book screen: status chips, progress editor, session history, remove.
+  - Real entries in a virtualized list, with counts and filters for Todos, Lendo, Quero ler,
+    Lidos, Pausados and Abandonados. Local title/author search ignores accents; ordering can be
+    Recentes, Título or Autor.
+  - "Adicionar livro" respects the active reading/finished filter. Search, detail, ISBN and
+    manual entry offer Quero ler, Lendo and Já li. Search remains open to add several books.
+  - Each row opens the book screen and offers quick status changes; status controls are at the
+    top of the detail, before the memory path, progress editor, session history and remove.
+  - API-accepted entries appear immediately; recommendations refresh in the background.
+    Marking Já li organizes the shelf without recording sessions, XP or streaks (ADR-033).
 - **Focused session** (ADR-014):
   - The timer runs on timestamps and keeps the screen awake while running.
   - Finishing needs at least 1 minute. Then the reader enters the page reached and an optional

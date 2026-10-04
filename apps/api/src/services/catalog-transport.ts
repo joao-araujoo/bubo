@@ -1,11 +1,24 @@
 import { type CatalogSource } from '@bubo/domain';
 
+import { type Logger } from '../lib/logger';
 import { type CatalogCache } from './catalog-cache';
 import { type FetchLike } from './catalog';
 
 export type Fetched = { ok: true; data: unknown } | { ok: false; status: number };
 type State = { next: Map<string, number>; pending: Map<string, Promise<Fetched>> };
 const states = new WeakMap<CatalogCache, State>();
+
+/**
+ * Longest wait for a paced slot. Discover chains up to three Open Library calls and a reader may
+ * type while it loads; a 2 s bound turned that ordinary burst into 503s (ADR-031).
+ */
+export const MAX_QUEUE_WAIT_MS = 5000;
+
+/** Spacing per source. Open Library allows 3 req/s to identified clients, 1 req/s otherwise. */
+export function pacingMs(source: CatalogSource, identified: boolean): number {
+  if (source === 'google') return 200;
+  return source === 'openlibrary' && identified ? 350 : 1000;
+}
 
 /** Per-isolate pacing, shared across requests, with bounded queues and in-flight coalescing. */
 export class CatalogTransport {
@@ -16,10 +29,16 @@ export class CatalogTransport {
       cache: CatalogCache;
       timeoutMs: number;
       contact?: string;
+      logger?: Logger;
     },
   ) {
     this.state = states.get(options.cache) ?? { next: new Map(), pending: new Map() };
     states.set(options.cache, this.state);
+  }
+
+  /** True while a source is backing off after a 429/403. */
+  async backingOff(source: CatalogSource): Promise<boolean> {
+    return Boolean(await this.options.cache.get(`upstream:backoff:${source}`));
   }
 
   async get(url: string, source: CatalogSource): Promise<Fetched> {
@@ -31,7 +50,19 @@ export class CatalogTransport {
     if (cached !== undefined) return { ok: true, data: cached };
     const pending = this.state.pending.get(key);
     if (pending) return pending;
-    const task = this.fetch(url, source, key);
+    const started = Date.now();
+    const task = this.fetch(url, source, key).then((result) => {
+      // Ids and timings only: query strings can carry readers' book titles.
+      if (!result.ok && result.status !== 404) {
+        this.options.logger?.warn('catalog upstream failed', {
+          source,
+          status: result.status,
+          path: new URL(url).pathname,
+          ms: Date.now() - started,
+        });
+      }
+      return result;
+    });
     this.state.pending.set(key, task);
     try {
       return await task;
@@ -45,8 +76,8 @@ export class CatalogTransport {
     if (await this.options.cache.get(backoff)) return { ok: false, status: 429 };
     const now = Date.now();
     const start = Math.max(now, this.state.next.get(source) ?? now);
-    if (start - now > 2000) return { ok: false, status: 429 };
-    this.state.next.set(source, start + (source === 'google' ? 200 : 1000));
+    if (start - now > MAX_QUEUE_WAIT_MS) return { ok: false, status: 429 };
+    this.state.next.set(source, start + pacingMs(source, Boolean(this.options.contact)));
     if (start > now) await new Promise((resolve) => setTimeout(resolve, start - now));
     if (await this.options.cache.get(backoff)) return { ok: false, status: 429 };
     const controller = new AbortController();

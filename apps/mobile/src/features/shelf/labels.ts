@@ -19,8 +19,8 @@ export const STATUS_META: Record<
   },
   paused: { label: 'Pausado', section: 'Pausados', tone: 'orange', icon: 'pause-circle-outline' },
   finished: {
-    label: 'Terminado',
-    section: 'Terminados',
+    label: 'Lido',
+    section: 'Lidos',
     tone: 'success',
     icon: 'check-circle-outline',
   },

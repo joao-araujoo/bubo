@@ -49,7 +49,11 @@ import {
   moderationQueueSchema,
   globalModerationRequestSchema,
 } from './community';
-import { catalogBookResponseSchema, catalogSearchResponseSchema } from './catalog';
+import {
+  catalogBookResponseSchema,
+  catalogDiscoverResponseSchema,
+  catalogSearchResponseSchema,
+} from './catalog';
 import { errorResponseSchema } from './errors';
 import { assessSessionRequestSchema, assessSessionResponseSchema } from './session-assessment';
 import { memoryStatsResponseSchema } from './memory';
@@ -102,6 +106,7 @@ export const API_ROUTES = {
   catalogSearch: '/catalog/search',
   catalogBook: '/catalog/books/:catalogId',
   catalogIsbn: '/catalog/isbn/:isbn',
+  catalogDiscover: '/catalog/discover',
   clubs: '/clubs',
   club: '/clubs/:id',
   clubMembership: '/clubs/:id/membership',
@@ -164,7 +169,7 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     method: 'get',
     path: API_ROUTES.memoryStats,
     summary:
-      'Recorded review self-assessments by day, book and time of day. Query: today, days (7|30|90|365), tz (UTC offset minutes).',
+      'Recorded review self-assessments by day, book, time of day and actual delay between reviews. Query: today, days (7|30|90|365), tz (UTC offset minutes).',
     tags: ['me'],
     auth: true,
     responses: { 200: { description: 'Review history.', schema: memoryStatsResponseSchema } },
@@ -357,6 +362,20 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
       503: {
         description: 'No usable results and at least one catalog source failed.',
         schema: errorResponseSchema,
+      },
+    },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.catalogDiscover,
+    summary:
+      'Discover sections: taste-graph recommendations from the shelf and interests, most read in Bubo and in Portuguese. Query: genre.',
+    tags: ['catalog'],
+    auth: true,
+    responses: {
+      200: {
+        description: 'Sections (possibly fewer when Open Library is unavailable, see sources).',
+        schema: catalogDiscoverResponseSchema,
       },
     },
   },

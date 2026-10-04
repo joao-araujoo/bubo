@@ -17,8 +17,8 @@ import { useTheme } from '../../theme';
 
 const PILLARS = [
   { icon: 'menu-book', title: 'Leitura', subtitle: 'Sem pressa' },
-  { icon: 'psychology', title: 'Recall', subtitle: 'Sem espiar' },
-  { icon: 'verified', title: 'Retenção', subtitle: 'Para sempre' },
+  { icon: 'psychology', title: 'Lembrar', subtitle: 'Sem espiar' },
+  { icon: 'verified', title: 'Revisão', subtitle: 'No seu ritmo' },
 ] as const;
 
 /** Onboarding 1/6 — Filosofia Bubo (before creating an account). */
@@ -52,10 +52,6 @@ export default function WelcomeScreen() {
           <Text variant="display" color="accentText">
             Lembre.
           </Text>
-        </Text>
-        <Text variant="bodyLg" color="textMuted" align="center">
-          O Bubo ajuda você a descobrir o que realmente ficou guardado depois que a última página é
-          fechada.
         </Text>
       </View>
       <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>

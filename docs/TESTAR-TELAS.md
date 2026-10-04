@@ -4,7 +4,8 @@ Lista de **todas as telas que existem hoje**, como chegar em cada uma e o que co
 terminar as configurações de [../CONFIGURAR.md](../CONFIGURAR.md). Status de cada tela frente ao
 Stitch: [screens.md](screens.md).
 
-Última atualização: 2026-10-01 (Task 09 concluída — preferências, notificações e push). Total: 47 telas, mais 2 de desenvolvimento.
+Última atualização: 2026-10-04 (retomada, meta opcional de cinco minutos e Hoje adaptativo).
+O roteiro inclui Widgets e Liga semanal, além das telas numeradas e das duas de desenvolvimento.
 
 ---
 
@@ -33,7 +34,7 @@ outra conta): uma cria o clube e escreve, a outra entra e vê o bloqueio anti-sp
 
 ### Checklist geral (vale para toda tela)
 
-- [ ] Tema claro e escuro (Você → Aparência).
+- [ ] Tema claro e escuro (Você → Preferências → Tema).
 - [ ] Fonte grande do sistema (1,6×): nada cortado, botões com texto inteiro.
 - [ ] Tela pequena (ex.: 360 px de largura) e teclado aberto: campos e botões acessíveis.
 - [ ] "Reduzir movimento" do sistema ligado: sem animações que girem ou fiquem em loop.
@@ -74,33 +75,119 @@ Guia de ativação: [emails-dns.md](emails-dns.md).
 
 ## 3. Abas principais
 
-| #   | Tela           | O que conferir                                                                                                                                |
-| --- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 13  | **Hoje**       | Sequência e XP reais no topo, sino com avisos não lidos; "Lendo agora"; "Recuperação ativa"; semana cognitiva; missão com a sua meta de foco. |
-| 14  | **Estante**    | Livros agrupados por status; vazio mostra o Bubo; botão para adicionar.                                                                       |
-| 15  | **Revisar**    | Cards de hoje (respeita o limite diário) e selo na aba; limite atingido → "Meta de revisões cumprida"; sem cards → explica como criar.        |
-| 16  | **Comunidade** | Ver seção 6.                                                                                                                                  |
-| 17  | **Você**       | Ver tela 47 (perfil novo). Aparência agora fica em Preferências.                                                                              |
+| #   | Tela           | O que conferir                                                                                                                                                                                               |
+| --- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 13  | **Hoje**       | Sequência e XP reais, sino; ação principal conforme retomada, dados, revisões disponíveis ou leitura; sem Revisões vazio; livro atual, semana e missão. Roteiro ADR-032 abaixo; aceite em aparelho pendente. |
+| 14  | **Estante**    | Livros agrupados por status; vazio mostra o Bubo; botão para adicionar.                                                                                                                                      |
+| 15  | **Revisar**    | Cards de hoje (respeita o limite diário) e selo na aba; limite atingido → "Meta de revisões cumprida"; sem cards → explica como criar.                                                                       |
+| 16  | **Comunidade** | Ver seção 6.                                                                                                                                                                                                 |
+| 17  | **Você**       | Ver tela 47 (perfil novo). Aparência agora fica em Preferências.                                                                                                                                             |
+
+Textos enxutos (2026-10-03): confirme que o card explicativo no fim de Hoje foi removido, que as
+opções de Você se chamam **Preferências** e **Widgets**, e que instruções de ação, consentimento
+Gemini, privacidade, anti-spoiler e erros continuam legíveis. Confira também os labels de Estante,
+Revisar, Comunidade, Minha memória, sessão/resultado, Notificações, debate, Nova resenha e Nova enquete.
+Aceite em aparelho continua pendente; checks de código e compilação não substituem este roteiro.
+
+Boas-vindas deve mostrar **Leitura / Lembrar / Revisão**, sem prometer retenção permanente.
+Login mantém os campos, recuperação de senha e erros, com os parágrafos repetidos removidos.
+
+No passe de 2026-10-03, login real, Hoje sem o card final, Você, Preferências, cinco prévias de widgets e
+Minha memória vazia em 7/30/90/365 dias foram conferidos no emulador Android com a fonte atual
+via Metro. Sem erro de execução observado; conta temporária apagada depois. A nova build ARM64/ARMv7
+foi compilada separadamente, sem instalação física. Fontes ampliadas, TalkBack e widgets no launcher
+continuam no roteiro de aceite abaixo.
 
 ## 4. Livros e leitura
 
-| #   | Tela                      | Como chegar                                             | O que conferir                                                                                                                         |
-| --- | ------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 18  | Descobrir livros          | Estante → botão de bússola no topo                      | Temas por interesse; busca por título, autor ou ISBN; "Uma das bibliotecas não respondeu" quando o Google falha.                       |
-| 19  | Detalhe do catálogo       | Tocar num livro da busca                                | Edição, idioma, páginas; "Adicionar"; "Abrir na estante" se já estiver lá.                                                             |
-| 20  | Leitor de ISBN            | Botão de ISBN no campo de busca ou "Escanear ISBN"      | Pede permissão da câmera; lê o código de barras; ISBN manual como alternativa.                                                         |
-| 21  | Adicionar livro           | Estante → "+ Livro" (busca, ISBN ou "Adicionar manual") | Título obrigatório; páginas 1–20000.                                                                                                   |
-| 22  | Livro (Jornada literária) | Tocar num livro da Estante                              | Status, progresso, **Caminho de memória** (sessões, revisões e a próxima revisão), histórico de sessões, cards, remover.               |
-| 23  | Sessão de leitura focada  | Livro → Iniciar/Continuar leitura                       | Cronômetro e recuperação após fechar o app; ao fim: página + ideia, detalhe e ligação/dúvida obrigatórios; conferir antes de concluir. |
-| 24  | Resultado da sessão       | Fim da sessão                                           | Só aparece após aceite da API; minutos, páginas, XP e sequência reais; os três campos viram card para amanhã.                          |
+| #   | Tela                      | Como chegar                                             | O que conferir                                                                                                                                                                                                                                                                                                                                               |
+| --- | ------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 18  | Descobrir livros          | Estante → botão de bússola no topo                      | "Para você" com motivo em cada livro ("Mesma autoria de…", "Ficção científica, como…"), "Porque você leu X", "Mais lidos no Bubo" (só com 2+ leitores) e "Mais lidos em português"; nada que já está na estante; gêneros só com edições em português. Enquanto carrega: blocos neutros (sem capa falsa). Busca rápida digitando sem "catálogo indisponível". |
+| 19  | Detalhe do catálogo       | Tocar num livro da busca                                | Edição, idioma, páginas; "Adicionar"; "Abrir na estante" se já estiver lá.                                                                                                                                                                                                                                                                                   |
+| 20  | Leitor de ISBN            | Botão de ISBN no campo de busca ou "Escanear ISBN"      | Pede permissão da câmera; lê o código de barras; ISBN manual como alternativa.                                                                                                                                                                                                                                                                               |
+| 21  | Adicionar livro           | Estante → "+ Livro" (busca, ISBN ou "Adicionar manual") | Título obrigatório; páginas 1–20000.                                                                                                                                                                                                                                                                                                                         |
+| 22  | Livro (Jornada literária) | Tocar num livro da Estante                              | Status, progresso, **Caminho de memória** (sessões, revisões e a próxima revisão), histórico de sessões, cards, remover.                                                                                                                                                                                                                                     |
+| 23  | Sessão de leitura focada  | Livro → Iniciar/Continuar leitura                       | Antes de voltar com página/anotação real e pergunta opcional; sessão normal ou cinco minutos, recuperação e descarte órfão; ao fim, página + ideia/detalhe/ligação obrigatórios e aceite da API. Botões em uma linha com nomes completos para leitor de tela; roteiro ADR-032 abaixo.                                                                        |
+| 24  | Resultado da sessão       | Fim da sessão                                           | Só aparece após aceite da API; minutos, páginas, XP e sequência reais; os três campos viram card para amanhã.                                                                                                                                                                                                                                                |
+
+### Busca e Estante (ADR-033, 2026-10-04)
+
+1. Em Estante, toque **Adicionar livro**, escolha **Já li**, busque título/autor e adicione dois
+   livros sem sair dos resultados. Cada botão vira **Abrir estante** após salvar.
+2. Abra os detalhes antes de adicionar: a escolha **Já li** deve continuar selecionada. Repita
+   por ISBN e pelo formulário manual, com e sem número de páginas.
+3. Volte à Estante: confira **Lidos**, contagem, busca sem acentos, ordenação por título/autor,
+   limpar filtros e atualização ao puxar. Altere Lendo/Já li na própria lista e veja o detalhe.
+4. Em Descobrir, digite até passar de 2 para 3 letras e continue digitando/apagando. O foco e o
+   teclado devem permanecer; resultados da busca anterior não devem poder ser adicionados enquanto
+   o texto muda. O campo de busca fica acessível durante a rolagem.
+5. Confira capas na primeira visita e ao voltar: quadro neutro durante carga, capa real sem flash
+   tipográfico, alternativa quando uma imagem falha/demora. Role muitos resultados sem travamento.
+6. Teste uma biblioteca lenta, rede interrompida e retry. Resultados parciais devem ser identificados;
+   uma falha não deve parecer "Nenhum livro encontrado". Dados conhecidos só sobrevivem a falhas
+   recuperáveis; sessão expirada e livro confirmado ausente prevalecem.
+7. Marcar um livro antigo como **Já li** não aumenta XP, sequência, sessões ou minutos. Confira
+   fontes grandes, tela pequena, tema escuro e TalkBack/VoiceOver, incluindo nomes dos status.
+
+Aceite visual/em aparelho desta melhoria permanece pendente. O app instalado só recebe o novo
+fluxo com uma atualização; a inclusão direta em Já li requer a API atualizada.
+
+### Hoje adaptativo (ADR-032, 2026-10-04)
+
+Este é o roteiro de aceite da nova continuação. `npm run verify` passou (495 testes), com
+formato/lint/tipos/assets/audit verdes. Não houve execução visual/aparelho atual; o roteiro
+permanece pendente. Use uma conta de teste e registros reais; não altere o histórico de uma
+conta pessoal para forçar estados.
+
+1. Com uma sessão guardada, Hoje oferece retomá-la mesmo havendo revisões. Ao abrir, UUID,
+   tempo, campos e envio pendente continuam. Sem rascunho, carregamento não deve parecer estante
+   vazia; falha de dados apresenta **Tentar de novo**.
+2. Com cards oferecidos hoje, a ação principal é revisar. Ao atingir o limite diário, Hoje deixa
+   de insistir nesses cards. Sem cards oferecidos, não há card de Revisões vazio ocupando espaço.
+3. Com livro em leitura e última sessão real em data local de sete ou mais dias atrás, a ação
+   principal oferece cinco minutos. Com seis dias, não deve alegar afastamento. Uma conta sem
+   sessões não recebe afirmação de tempo longe. Visitar o app, atualizar página ou revisar não
+   substitui uma leitura aceita.
+4. Depois de salvar leitura hoje, o convite passa a continuar; sem livro em leitura, aparece
+   escolha de livro. Em conflito com revisões disponíveis, revisar mantém prioridade. O livro
+   atual, Sua semana e a missão continuam com valores reais.
+5. Confira tema claro/escuro, fonte grande, TalkBack/VoiceOver e retorno à tela após virar a data
+   local. Datas de leituras antigas mantêm o dia local salvo na sessão mesmo após mudar o fuso.
+
+### Antes de voltar, cinco minutos e recuperação (ADR-032)
+
+1. Hoje → continuar livro, ou Livro → iniciar leitura: antes do timer, **Antes de voltar** mostra
+   página atual e a última anotação/recordação disponível nas 20 sessões recentes reais. Confira
+   resumo de até três linhas, **Ver anotação completa** e **Recolher anotação**. Sem anotação,
+   mostra estado honesto. Com livro real em cache e histórico carregando/falha temporária, é
+   possível começar sem esperar; erro de autenticação ou livro removido não é ignorado pelo cache.
+   **Tentar lembrar** abre a pergunta “O que você lembra do trecho anterior?”; pense sem digitar.
+   **Começar agora** / **Pular e começar** inicia sem resposta obrigatória ou envio à IA.
+2. **Ler só 5 minutos** inicia a sessão normal. Pause por um minuto: o tempo pausado não compõe
+   a meta. Ao alcançar cinco minutos focados, confira o aviso leve; o cronômetro continua e
+   Recordação segue disponível. Você pode ler além de cinco minutos ou encerrar antes, respeitando
+   o mínimo normal de um minuto e a recordação obrigatória.
+3. Feche/encerre o app e reinicie o aparelho antes e depois dos cinco minutos. Retome: tempo,
+   meta, campos e UUID preservados; o aviso não dispara novamente como uma nova conquista.
+   Abra uma sessão normal guardada pelo atalho de cinco minutos: sua meta anterior não muda.
+   Nenhum tempo guardado gera XP/página/card antes do aceite da API.
+4. Desconecte a rede, escreva a recordação e tente concluir: mantenha o rascunho, reconecte e
+   confirme o mesmo envio. A sessão/XP/card deve existir uma única vez. Confira também pausa,
+   relógio alterado, limite de quatro horas e descarte sem atividade.
+5. Numa conta de teste, guarde uma sessão e remova o livro da Estante. Retome: ausência confirmada
+   oferece descarte do registro local correspondente. Cancele: ele permanece. Confirme: Hoje
+   deixa de oferecer aquela retomada. Em erro de rede, somente retry; não apagar o rascunho.
+6. Fonte grande e leitor de tela: página, pergunta, aviso, erros e ações continuam alcançáveis.
+   O aviso de meta é no app; não esperar push, Live Activity ou notificação em segundo plano.
 
 ### Recordação obrigatória (ADR-027)
 
-1. Leia por pelo menos um minuto e toque **Ir para a recordação**. Feche o livro e preencha ideia,
+1. Leia por pelo menos um minuto e toque **Recordação** (bandeira). Feche o livro e preencha ideia,
    detalhe e ligação ou dúvida. Campo vazio, texto repetido e respostas genéricas devem pedir
    elaboração; página, XP e sequência não mudam.
 2. Uma tentativa específica e curta deve passar; teste também bullets, ausência de acentos,
-   dúvida sincera e poema. O resultado diz **checklist de escrita**, sem prometer compreensão.
+   dúvida sincera e poema. O resultado identifica a conferência de escrita, sem prometer compreensão
+   ou retenção e sem apresentar uma nota de memória.
 3. Edite um campo depois de conferir: concluir volta a ficar indisponível. Durante a conferência,
    campos, consentimento e descarte ficam bloqueados, inclusive com armazenamento lento.
 4. A opção de IA começa desligada. Só ligue com texto de teste sem dados pessoais. Sem chave,
@@ -114,26 +201,33 @@ Guia de ativação: [emails-dns.md](emails-dns.md).
 
 ## 5. Memória e progresso
 
-Continuação de 2026-09-30 — Você → Minha memória:
+Continuação de 2026-10-03 — Você → Minha memória (ADR-030):
 
 - Alternar 7, 30, 90 e 365 dias, inclusive rapidamente e sem conexão.
 - Conferir carregamento, erro/retry e vazio de cada período, sem dados do filtro anterior.
 - Rolar o histórico diário; conferir datas, autoavaliações e totais.
 - Conferir foco mesmo sem revisões, horários locais e abrir cada livro listado.
 - Revisar um card e voltar: dados devem atualizar; trocar conta não pode mostrar a anterior.
+- Conferir **Lembrei após um intervalo** nas faixas **1–6 dias**, **7–29 dias** e **30+ dias**:
+  cada percentual vem com **Lembrei/total**, por exemplo uma contagem `2/3` junto do percentual.
+  O intervalo usa o tempo real desde a revisão anterior do card, ou desde sua criação na primeira
+  revisão; tentativas com menos de 24 horas não entram nessa seção.
+- Faixa sem observações mostra **Sem revisões**, sem barra ou `0%` inferido. Se nenhuma faixa
+  tiver observações no período, a seção inteira fica oculta. Em conta nova, não aparece resultado
+  de memória inventado. Não há curva preditiva nem Bubo Score.
 - Validar tema claro/escuro, fonte ampliada e leitor de tela em aparelho (aceite pendente).
 
-| #   | Tela                 | Como chegar                | O que conferir                                                                                             |
-| --- | -------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 25  | Revisão "sem espiar" | Revisar → Ainda lembro?    | Tentar → mostrar → Lembrei/Quase/Esqueci; falha ao salvar mantém o card; resumo no fim.                    |
-| 26  | Minha memória        | Você → Minha memória       | 7/30/90/365 dias; gráfico, foco, horários, dados por livro; aviso de autoavaliações; vazio e retry.        |
-| 27  | Mural de conquistas  | Você → Mural de conquistas | Nível pelo XP real; 13 conquistas; bloqueadas mostram progresso (ex.: 3/10); nenhuma é dada sem atividade. |
+| #   | Tela                 | Como chegar                | O que conferir                                                                                                         |
+| --- | -------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 25  | Revisão "sem espiar" | Revisar → Revisar          | Tentar → mostrar → Lembrei/Quase/Esqueci; falha ao salvar mantém o card; resumo no fim.                                |
+| 26  | Minha memória        | Você → Minha memória       | 7/30/90/365 dias; gráfico, foco, horários, livros; Lembrei após um intervalo com contagem e percentual; vazio e retry. |
+| 27  | Mural de conquistas  | Você → Mural de conquistas | Nível pelo XP real; 13 conquistas; bloqueadas mostram progresso (ex.: 3/10); nenhuma é dada sem atividade.             |
 
 ## 6. Comunidade (Tasks 07 e 08) — use duas contas: **A** e **B**
 
 | #   | Tela                 | Como chegar                                                                                      | O que conferir                                                                                                                                                                                                                                                                                                                                      |
 | --- | -------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 28  | Comunidade (aba)     | Aba Comunidade                                                                                   | Abas "Feed Geral / Seus Clubes / Descobrir". Sem clubes: card do Bubo "Clubes sem spoiler". Feed: chips dos seus clubes, "Radar dos clubes" (novos nas últimas 24 h), debates e enquetes dos seus clubes, cobertos se passam da sua página. Descobrir: busca, filtros (Na sua estante, Com meta semanal, Mais ativos), caixa "Recebeu um convite?". |
+| 28  | Comunidade (aba)     | Aba Comunidade                                                                                   | Abas "Novidades / Meus clubes / Descobrir". Sem clubes: card do Bubo "Clubes sem spoiler". Novidades: chips dos seus clubes, contagem de novidades em 24 h, debates e enquetes cobertos além da sua página. Descobrir: busca, filtros (Na sua estante, Com meta semanal, Mais ativos), caixa "Recebeu um convite?".                                 |
 | 29  | Criar novo clube     | Comunidade → "+ Clube"                                                                           | Nome (3–60), proposta, ícone, livro **do catálogo** da sua Estante (livro manual não aparece), meta semanal, **público ou privado**. Limite de 5 clubes.                                                                                                                                                                                            |
 | 30  | Clube                | Tocar num clube                                                                                  | **B (não membro):** perfil do clube (topo roxo, estatísticas, dica do Bubo com sua página) e "Entrar e aceitar as diretrizes"; ao entrar, o livro vai para a Estante dele. **Membro:** abas Debates & Fórum / Enquetes / Membros / Diretrizes. Menu ⋮: "Sobre o clube", sair (membro) ou excluir (criador).                                         |
 | 31  | Novo debate          | Clube → "Novo tópico"                                                                            | Título, tipo de discussão, capítulo, página (com −10/−1/+1/+10), citação opcional, texto. Página maior que o livro é recusada. Página 0 = debate geral.                                                                                                                                                                                             |
@@ -145,7 +239,7 @@ Continuação de 2026-09-30 — Você → Minha memória:
 | 37  | Membros              | Clube → aba Membros                                                                              | Páginas reais de cada membro, média do clube, distribuição por faixa de páginas (a sua destacada), totais (páginas, discussões, votos), busca e filtros.                                                                                                                                                                                            |
 | 38  | Convidar membros     | Clube → ícone de pessoa com "+" no topo, ou "Convidar amigos" no perfil                          | QR de verdade, código ABCD-2345, link com "Copiar", WhatsApp/Telegram/E-mail/Mais. Só o criador vê "Gerar novo código" (o antigo para de funcionar).                                                                                                                                                                                                |
 | 39  | Abrir convite        | Link do convite, QR, ou Descobrir → "Recebeu um convite?"                                        | Mostra o perfil do clube (inclusive privado) e "Aceitar convite". Código errado/antigo: "Convite expirado". Se você já é membro, vai direto ao clube.                                                                                                                                                                                               |
-| 40  | Avaliar & Resenhar   | Clube → aba Resenhas → "Escrever resenha", ou Estante → livro do catálogo → "Avaliar & resenhar" | Estrelas de 1 a 5 com legenda, até 3 marcas em "Como essa leitura reverberou?", título (3+), texto (30+) com contagem de palavras. Proteção anti-spoiler: desligada = página 0; ligada = "Até o meio", "Até onde li", "Final / desfecho" ou página exata. "Onde compartilhar" mostra só o clube.                                                    |
+| 40  | Nova resenha         | Clube → aba Resenhas → "Escrever resenha", ou Estante → livro do catálogo → "Avaliar & resenhar" | Estrelas de 1 a 5 com legenda, até 3 marcas em "Como foi a leitura?", título (3+), texto (30+) com contagem de palavras. Proteção anti-spoiler: desligada = página 0; ligada = "Até o meio", "Até onde li", "Final / desfecho" ou página exata. "Onde compartilhar" mostra só o clube.                                                              |
 | 41  | Resenha              | Tocar numa resenha (aba Resenhas ou feed)                                                        | Autor com nível e botão "Amizade" (ou "Pedido enviado"/"Amigos"), estrelas, marcas, véu se a página passa da sua, respostas como num debate. Denunciar, bloquear, apagar e moderação iguais aos debates.                                                                                                                                            |
 | 42  | Feed de amigos       | Comunidade → ícone de pessoas no topo                                                            | Abas Atividade / Amigos / Privacidade. Atividade: "Lendo agora" (livro em andamento e % de quem compartilha) e sessões recentes (minutos e páginas, nunca reflexões). Amigos: pedidos recebidos (Aceitar/Recusar), amigos e pedidos enviados, com desfazer e bloquear. Privacidade: receber pedidos e compartilhar leituras (desligado por padrão). |
 | 43  | Ciclos do clube      | Clube → linha "Ciclos & leituras anteriores" abaixo do livro                                     | Bubo historiador, totais reais (concluídos, % na meta, páginas), filtro por ano, ciclo atual com dias restantes e progresso do grupo e o seu, linha do tempo dos encerrados. Só o criador abre (páginas por pessoa + 7/14/30/60/90 dias) e encerra.                                                                                                 |
@@ -223,11 +317,11 @@ Continuação de 2026-09-30 — Você → Minha memória:
 
 ## 6b. Você, preferências e notificações (Task 09)
 
-| #   | Tela                    | Como chegar                                                  | O que conferir                                                                                                                                                                                                                                                                        |
-| --- | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 45  | Preferências cognitivas | Você → engrenagem no topo, ou Você → Preferências cognitivas | Rigor (Suave / Equilibrado / Intensivo), revisões por dia (5–50), meta diária de foco, meta anual, tema (salvo ao reabrir o app), vibração, notificações (estado do aparelho, lembrete + horário, clubes, amigos), escudo anti-spoiler sempre ligado. "Salvar" só ativa com mudanças. |
-| 46  | Notificações            | Sino no topo do Hoje ou do Você                              | Todas / Memória / Comunidade; card "Hora de revisar" só com lembranças vencidas; avisos por dia; aceitar/recusar amizade ali mesmo; "Lidas" zera o contador do sino.                                                                                                                  |
-| 47  | Você (novo)             | Aba Você                                                     | Avatar com estrela, nível e XP para o próximo nível, livros lidos / Lembrei 30 dias / sequência, conquistas recentes, meta anual, seu jeito de ler, atalhos.                                                                                                                          |
+| #   | Tela         | Como chegar                                       | O que conferir                                                                                                                                                                                                                                                                             |
+| --- | ------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 45  | Preferências | Você → engrenagem no topo, ou Você → Preferências | Ritmo das revisões (Suave / Equilibrado / Intensivo), revisões por dia (5–50), meta diária de foco, meta anual, tema (salvo ao reabrir o app), vibração, notificações (estado do aparelho, lembrete + horário, clubes, amigos), anti-spoiler sempre ativo. "Salvar" só ativa com mudanças. |
+| 46  | Notificações | Sino no topo do Hoje ou do Você                   | Todas / Memória / Comunidade; card "Hora de revisar" só com lembranças vencidas; avisos por dia; aceitar/recusar amizade ali mesmo; "Lidas" zera o contador do sino.                                                                                                                       |
+| 47  | Você (novo)  | Aba Você                                          | Avatar com estrela, nível e XP para o próximo nível, livros lidos / Lembrei 30 dias / sequência, conquistas recentes, meta anual, seu jeito de ler, atalhos.                                                                                                                               |
 
 ### Roteiro de preferências
 
@@ -264,26 +358,26 @@ Continuação de 2026-09-30 — Você → Minha memória:
   “#N entre amigos”, movimento desde ontem, dias restantes e pódio. O toque abre a Liga.
 - Redimensione: estreitos viram a variante compacta; textos não cortam e o Bubo não deforma.
 
-Os itens abaixo continuam valendo; onde citam “cena colorida”, leia “superfície clara”.
+Os itens abaixo usam o desenho atual de superfície clara (ADR-029).
 
-Abra **Você → Bubo na sua tela**. Sem módulo nativo, confira as prévias; os widgets do sistema
+Abra **Você → Widgets**. Sem módulo nativo, confira as prévias; os widgets do sistema
 precisam de uma nova build instalada (CONFIGURAR 3.14).
 
 Para o APK Android gratuito: `npm run build:android`, depois copie `build/android/bubo-test.apk`
 para o celular ou rode `npm run install:android` com USB autorizado. Feche o terminal/Metro e
 confira que o app continua abrindo e os widgets aparecem no seletor do launcher.
 
-1. **Android:** adicione os quatro modelos (Sequência, Sequência da semana, Calendário de
-   leitura, Continuar leitura) pelo botão no app ou pelo seletor Widgets → Bubo. Compare com
-   as prévias do app: cena colorida de ponta a ponta, chama + número, frase e Bubo espiando de
-   baixo sem distorção. Redimensione: os médios estreitos viram o pequeno. **iOS:** confira
+1. **Android:** adicione os cinco modelos (Sequência, Sequência da semana, Calendário de
+   leitura, Continuar leitura e Liga semanal) pelo botão no app ou pelo seletor Widgets → Bubo.
+   Compare com as prévias do app: superfície clara, fonte Plus Jakarta Sans, chama + número e
+   mascote oficial sem distorção. Redimensione: os médios estreitos viram o pequeno. **iOS:** confira
    pequeno/médio e as três variantes de Sequência na tela bloqueada.
    Widgets do modelo anterior (Ritmo da semana / Bubo completo) devem sumir após a atualização.
 2. Sem livro em leitura: estado vazio, sem capa/título/percentual inventados. Com um livro:
    widget mostra a página real; toque abre livro/sessão autenticados. Confirme que a sessão
    não começa a registrar atividade apenas por instalar/tocar no widget.
-3. Conclua uma sessão: a chama acende (laranja), a cena fica dourada com o Bubo comemorando,
-   o dia ganha check na semana e entra na faixa do calendário (fundo menta). Página/progresso
+3. Conclua uma sessão: a chama acende (laranja), o Bubo comemora,
+   o dia ganha check na semana e entra na faixa laranja do calendário. Página/progresso
    atualizam. Um dia só de revisão também acende a chama (“Revisão feita hoje!”), mas não
    conta para a meta semanal de leitura; ao bater a meta, aparece “Meta da semana!”.
 4. Revise até o limite diário: a contagem de revisões oferecidas cai a zero, mesmo que existam
@@ -301,8 +395,10 @@ confira que o app continua abrindo e os widgets aparecem no seletor do launcher.
 8. Confira tema claro/escuro do sistema, fonte grande, TalkBack/VoiceOver, ações e labels.
    Android específico de tela bloqueada e Live Activity não fazem parte deste recorte.
 
-**APK Android compilado e verificado em 2026-10-01** (assinatura, três receptores de widgets
-e bundle embarcado). **Aceite em aparelho ainda pendente:** não houve celular conectado.
+**Evidências históricas:** APK Android compilado e verificado em 2026-10-01 (assinatura,
+três receptores de widgets e bundle embarcado); build anterior de 2026-10-03 com quatro
+receptores verificados. O código atual oferece cinco modelos. **Aceite em aparelho físico ainda
+pendente:** não houve celular conectado nesses testes de compilação.
 Swift/iOS ainda não foi compilado; o comportamento do launcher/WidgetKit exige este roteiro.
 
 ## 7. Só em desenvolvimento

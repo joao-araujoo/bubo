@@ -10,7 +10,7 @@ npm run build:android
 
 O comando valida o projeto com `npm run verify`, prepara Java e o SDK no Windows 64 bits,
 confere a API, gera o projeto nativo com os assets oficiais e compila um APK independente.
-Verifica a assinatura, os quatro receptores de widgets, a permissão de notificações e o JavaScript dentro do APK antes de
+Verifica a assinatura, os cinco receptores de widgets, a permissão de notificações e o JavaScript dentro do APK antes de
 entregar **`build/android/bubo-test.apk`**. `build-info.json` registra data, API, arquiteturas
 e SHA-256. Nenhuma conta Expo, cartão, assinatura, EAS, loja ou serviço de CI é necessário.
 
@@ -41,10 +41,16 @@ reset de senha e outras integrações têm os limites registrados em [CONFIGURAR
 
 ## Conferir os widgets
 
-Abra **Você → Bubo na sua tela**, ligue a atualização e adicione um modelo. Ou toque e segure
-uma área vazia da tela inicial → **Widgets → Bubo**. Teste os quatro, redimensione e conclua uma
+Abra **Você → Widgets**, ligue a atualização e adicione um modelo. Ou toque e segure
+uma área vazia da tela inicial → **Widgets → Bubo**. Teste os cinco (Sequência, Sequência da semana,
+Calendário de leitura, Continuar leitura e Liga semanal), redimensione e conclua uma
 sessão para ver página/dias atualizados. Toque no widget para abrir o app; saia da conta para
-conferir que os dados somem. Roteiro completo: [TESTAR-TELAS.md, seção 6c](TESTAR-TELAS.md#6c-widgets-android-e-ios-task-09-adr-023).
+conferir que os dados somem. Roteiro completo: [TESTAR-TELAS.md, seção 6c](TESTAR-TELAS.md#6c-widgets-android-e-ios-task-09-adr-023--adr-029).
+
+Confira também **Você → Preferências**, **Revisar → Revisar** e **Você → Minha memória**.
+Minha memória mostra **Lembrei após um intervalo** de 1–6, 7–29 e 30+ dias apenas com observações
+reais: cada percentual vem com sua contagem; faixas vazias mostram **Sem revisões**. Essa seção
+resume autoavaliações e não exibe curva preditiva nem Bubo Score (ADR-030).
 
 ## Ferramentas e configuração
 
@@ -113,7 +119,18 @@ Não use `prebuild --clean` para acelerar: isso descarta projetos/cache nativos 
 Compilação, assinatura e presença dos widgets no APK são verificáveis no computador.
 Funcionamento visual no launcher e nos aparelhos continua sendo um aceite separado.
 
-**Verificado em 2026-10-03:** `npm run verify` passou (407 testes); APK Android compilado
+**Build final — 2026-10-03, 20h20 (São Paulo):** `npm run build:android` concluiu com
+`npm run verify` verde (441 testes). O APK `build/android/bubo-test.apk` contém as arquiteturas
+`arm64-v8a` e `armeabi-v7a`, assinatura de teste validada, os cinco receptores de widgets
+(incluindo Liga semanal), `POST_NOTIFICATIONS` e JavaScript embarcado verificados.
+`build-info.json` registra `2026-10-03T23:20:34.762Z` e SHA-256
+`bd9acdda36c44c178a0c594a709dcb3686f42773e8c993e3aaff9031a9c7d0ac`.
+
+A interface usando a API de produção foi conferida no emulador existente com build debug e Metro.
+Essa execução é distinta do APK ARM acima: instalação e aceite da build final em Android físico
+continuam pendentes. Swift/iOS ainda não foi compilado.
+
+**Evidência histórica — build anterior de 2026-10-03:** `npm run verify` passou (407 testes); APK Android compilado
 nas duas arquiteturas, assinatura validada, quatro receptores de widgets, `POST_NOTIFICATIONS`
 e bundle embarcado confirmados. A primeira execução falhou em `packageRelease`; repetir
 `assembleRelease` com os mesmos caches concluiu a compilação, sem limpeza ou alteração de

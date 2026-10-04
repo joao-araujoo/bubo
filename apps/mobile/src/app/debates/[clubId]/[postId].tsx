@@ -400,7 +400,7 @@ export default function TopicScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
             <Icon name="psychology" size={16} color="accentText" />
             <Text variant="caption" color="accentText" style={{ flex: 1 }}>
-              Resposta cognitiva
+              Sua resposta
             </Text>
             <Text variant="label" color="textMuted" style={{ fontSize: 12 }}>
               Página

@@ -36,6 +36,12 @@ export function workMatchKey(title: string, authors: readonly string[]): string 
   return `${mainTitle}|${lastName}`;
 }
 
+/**
+ * Shortest text worth sending to the catalog. Open Library rejects queries under 3 characters
+ * ("Query too short"), so shorter input would only fail (ADR-031).
+ */
+export const MIN_CATALOG_QUERY_LENGTH = 3;
+
 /** Hosts the API accepts cover images from (https only). */
 export const COVER_HOSTS = [
   'books.google.com',
@@ -73,6 +79,25 @@ export function openLibraryIsbnCover(isbn13: string): string {
 /** Open Library cover by cover id. */
 export function openLibraryCoverById(coverId: number): string {
   return `https://covers.openlibrary.org/b/id/${coverId}-L.jpg?default=false`;
+}
+
+/**
+ * The same cover at a size that fits `width` (layout points): small covers ask Open Library for
+ * its medium image (~180 px, a third of the bytes) and Google for a 200 px rendition. Other URLs
+ * (e.g. the R2 cover cache) are returned unchanged.
+ */
+export function coverUrlForWidth(url: string, width: number): string {
+  if (width > 110) return url;
+  if (url.startsWith('https://covers.openlibrary.org/')) {
+    return url.replace(/-L\.jpg(?=\?|$)/, '-M.jpg');
+  }
+  if (
+    url.startsWith('https://books.google.com/') ||
+    url.startsWith('https://books.googleusercontent.com/')
+  ) {
+    return url.replace('fife=w400-h600', 'fife=w200-h300');
+  }
+  return url;
 }
 
 /** Ordered, de-duplicated cover candidates for a stored book. The client tries them in order. */

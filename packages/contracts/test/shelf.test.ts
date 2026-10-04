@@ -6,6 +6,7 @@ import {
   API_ROUTES,
   catalogSearchQuerySchema,
   createSessionRequestSchema,
+  statsResponseSchema,
   updateShelfEntryRequestSchema,
 } from '../src';
 
@@ -23,9 +24,26 @@ const session = {
 describe('shelf contracts', () => {
   it('defaults new books to "quero ler"', () => {
     expect(addBookRequestSchema.parse({ title: 'Duna' }).status).toBe('want_to_read');
-    expect(addBookRequestSchema.safeParse({ title: 'Duna', status: 'finished' }).success).toBe(
-      false,
-    );
+    for (const status of ['paused', 'abandoned']) {
+      expect(addBookRequestSchema.safeParse({ title: 'Duna', status }).success).toBe(false);
+    }
+  });
+
+  it('accepts already-read books without client-supplied reading history', () => {
+    expect(
+      addBookRequestSchema.parse({
+        title: 'Duna',
+        status: 'finished',
+        currentPage: 123,
+        startedAt: '2020-01-01T00:00:00.000Z',
+        finishedAt: '2020-02-01T00:00:00.000Z',
+        xpEarned: 500,
+      }),
+    ).toEqual({ title: 'Duna', status: 'finished' });
+    expect(addBookRequestSchema.parse({ catalogId: 'gb:duneGB0001', status: 'finished' })).toEqual({
+      catalogId: 'gb:duneGB0001',
+      status: 'finished',
+    });
   });
 
   it('accepts a catalog pick and ignores client-sent metadata', () => {
@@ -58,6 +76,40 @@ describe('shelf contracts', () => {
   it('fills route params safely', () => {
     expect(apiPath(API_ROUTES.shelfEntry, { id: 'a/b' })).toBe('/shelf/a%2Fb');
     expect(() => apiPath(API_ROUTES.shelfEntry, {})).toThrow();
+  });
+});
+
+describe('stats reading recency', () => {
+  const olderStats = {
+    today: '2026-10-04',
+    xpTotal: 0,
+    streakDays: 0,
+    sessionsCount: 0,
+    focusedMinutesThisWeek: 0,
+    focusedMinutesToday: 0,
+    weekActiveDates: [],
+    weekReadingDates: [],
+    readToday: false,
+    reviewedToday: false,
+    dueCards: 0,
+  };
+
+  it('defaults missing recency to null for older APIs and cached responses', () => {
+    expect(statsResponseSchema.parse(olderStats).lastReadingDate).toBeNull();
+    expect(
+      statsResponseSchema.parse({ ...olderStats, lastReadingDate: null }).lastReadingDate,
+    ).toBeNull();
+  });
+
+  it('accepts a recorded calendar date and rejects impossible dates', () => {
+    expect(
+      statsResponseSchema.parse({ ...olderStats, lastReadingDate: '2024-02-29' }).lastReadingDate,
+    ).toBe('2024-02-29');
+    for (const invalid of ['2026-02-29', '2026-13-01', '2026-10-04T00:00:00Z']) {
+      expect(
+        statsResponseSchema.safeParse({ ...olderStats, lastReadingDate: invalid }).success,
+      ).toBe(false);
+    }
   });
 });
 

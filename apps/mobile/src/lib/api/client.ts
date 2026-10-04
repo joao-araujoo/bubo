@@ -51,6 +51,7 @@ import {
   moderationResponseSchema,
   reportResponseSchema,
   catalogBookResponseSchema,
+  catalogDiscoverResponseSchema,
   catalogSearchResponseSchema,
   deleteResponseSchema,
   dueCardsResponseSchema,
@@ -68,6 +69,7 @@ import {
   API_ROUTES,
 } from '@bubo/contracts';
 import { API_PREFIX } from '@bubo/config';
+import { type Genre } from '@bubo/domain';
 import { type z } from 'zod';
 
 import { authHeaders } from '../auth/client';
@@ -408,6 +410,14 @@ export function createApiClient({
         throw error;
       }
     },
+    /** Discover sections; a genre narrows them to that genre's most read books. */
+    getCatalogDiscover: (genre: Genre | null, signal?: AbortSignal) =>
+      request(
+        `${API_ROUTES.catalogDiscover}${genre ? `?genre=${encodeURIComponent(genre)}` : ''}`,
+        catalogDiscoverResponseSchema,
+        // A cold recommendation chains paced library calls; later visits come from the cache.
+        { signal, timeoutMs: 25_000 },
+      ),
     getCatalogBook: (catalogId: string, signal?: AbortSignal) =>
       request(apiPath(API_ROUTES.catalogBook, { catalogId }), catalogBookResponseSchema, {
         signal,

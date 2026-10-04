@@ -19,7 +19,27 @@ const NOW = new Date('2026-09-26T15:00:00.000Z');
 let h: Awaited<ReturnType<typeof createHarness>>;
 
 beforeAll(async () => {
-  h = await createHarness({ now: () => NOW });
+  h = await createHarness({
+    now: () => NOW,
+    catalogFetch: async (input) => {
+      const url = new URL(input);
+      if (
+        url.hostname === 'www.googleapis.com' &&
+        url.pathname === '/books/v1/volumes/alreadyRead01'
+      ) {
+        return Response.json({
+          id: 'alreadyRead01',
+          volumeInfo: {
+            title: 'Leitura anterior do catálogo',
+            authors: ['Autora da edição'],
+            pageCount: 320,
+            language: 'pt',
+          },
+        });
+      }
+      throw new Error('network disabled in tests');
+    },
+  });
 }, 60_000);
 afterAll(async () => {
   await h.close();
@@ -81,6 +101,97 @@ describe('shelf CRUD', () => {
     const { cookie } = await h.signUp();
     const { body } = await addBook(cookie, { title: 'O Estrangeiro', status: 'reading' });
     expect(shelfEntrySchema.parse(body).startedAt).not.toBeNull();
+  });
+
+  it.each([
+    { title: 'Já li com páginas conhecidas', totalPages: 240, expectedPage: 240 },
+    { title: 'Já li sem saber as páginas', totalPages: null, expectedPage: 0 },
+  ])('adds an already-read manual book: $title', async ({ title, totalPages, expectedPage }) => {
+    const { cookie } = await h.signUp();
+    const before = Date.now();
+    const { response, body } = await addBook(cookie, {
+      title,
+      ...(totalPages !== null ? { totalPages } : {}),
+      status: 'finished',
+      startedAt: '2020-01-01T00:00:00.000Z',
+      finishedAt: '2020-02-01T00:00:00.000Z',
+    });
+    expect(response.status).toBe(201);
+    const entry = shelfEntrySchema.parse(body);
+    expect(entry).toMatchObject({
+      status: 'finished',
+      currentPage: expectedPage,
+      startedAt: null,
+      book: { totalPages },
+    });
+    expect(entry.finishedAt).not.toBeNull();
+    expect(Date.parse(entry.finishedAt ?? '')).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(entry.finishedAt ?? '')).toBeLessThanOrEqual(Date.now());
+
+    const detail = shelfEntryDetailSchema.parse(
+      await (await h.call(`/v1/shelf/${entry.id}`, { cookie })).json(),
+    );
+    expect(detail.sessions).toEqual([]);
+    expect(detail.cards).toEqual([]);
+    const stats = statsResponseSchema.parse(
+      await (await h.call('/v1/me/stats?today=2026-09-26', { cookie })).json(),
+    );
+    expect(stats).toMatchObject({
+      xpTotal: 0,
+      streakDays: 0,
+      sessionsCount: 0,
+      lastReadingDate: null,
+      focusedMinutesToday: 0,
+      focusedMinutesThisWeek: 0,
+      weekActiveDates: [],
+      weekReadingDates: [],
+      readToday: false,
+      dueCards: 0,
+    });
+    expect((await addBook(cookie, { title, status: 'finished' })).response.status).toBe(409);
+  });
+
+  it('adds an already-read catalog edition atomically with server metadata and no activity', async () => {
+    const { cookie } = await h.signUp();
+    const { response, body } = await addBook(cookie, {
+      catalogId: 'gb:alreadyRead01',
+      status: 'finished',
+      title: 'Injected title',
+      totalPages: 999,
+      currentPage: 100,
+    });
+    expect(response.status).toBe(201);
+    const entry = shelfEntrySchema.parse(body);
+    expect(entry).toMatchObject({
+      status: 'finished',
+      currentPage: 320,
+      startedAt: null,
+      book: {
+        title: 'Leitura anterior do catálogo',
+        author: 'Autora da edição',
+        totalPages: 320,
+        catalogId: 'gb:alreadyRead01',
+      },
+    });
+    expect(entry.finishedAt).not.toBeNull();
+    const list = shelfResponseSchema.parse(await (await h.call('/v1/shelf', { cookie })).json());
+    expect(list.entries).toHaveLength(1);
+    expect(list.entries[0]).toEqual(entry);
+    const detail = shelfEntryDetailSchema.parse(
+      await (await h.call(`/v1/shelf/${entry.id}`, { cookie })).json(),
+    );
+    expect(detail.sessions).toEqual([]);
+    expect(detail.cards).toEqual([]);
+    const stats = statsResponseSchema.parse(
+      await (await h.call('/v1/me/stats?today=2026-09-26', { cookie })).json(),
+    );
+    expect(stats).toMatchObject({
+      xpTotal: 0,
+      streakDays: 0,
+      sessionsCount: 0,
+      lastReadingDate: null,
+      readToday: false,
+    });
   });
 
   it('updates status and progress with consistent timestamps', async () => {
@@ -305,6 +416,7 @@ describe('stats', () => {
       xpTotal: 0,
       streakDays: 0,
       sessionsCount: 0,
+      lastReadingDate: null,
       focusedMinutesThisWeek: 0,
       focusedMinutesToday: 0,
       weekActiveDates: [],

@@ -5,7 +5,15 @@ homologação em aparelhos e calibração do algoritmo são etapas distintas. Es
 [docs/release.md](docs/release.md) → "Current
 remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
-Última atualização: 2026-10-03 (recordação obrigatória, pergunta Gemini opcional e ciclo de push).
+Última atualização: 2026-10-03 (recordação obrigatória, pergunta Gemini opcional, ciclo de push,
+textos enxutos e autoavaliações após intervalo).
+
+Na fonte atual, **Você → Preferências** reúne os ajustes; **Você → Widgets** mostra os cinco
+modelos. **Você → Minha memória** inclui **Lembrei após um intervalo** (1–6, 7–29 e 30+ dias):
+percentual com contagem, **Sem revisões** nas faixas vazias e seção oculta sem observações.
+São autoavaliações registradas, sem curva preditiva ou Bubo Score (ADR-030). Evidências de
+publicação da API e compilação do app ficam em [docs/release.md](docs/release.md) e
+[docs/build-mobile.md](docs/build-mobile.md); aceite em aparelhos continua separado.
 
 ---
 
@@ -40,7 +48,9 @@ remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.m
 | 13  | **Notificações push** (EAS + Firebase)            | Os avisos ficam só dentro do app; o celular não recebe lembretes nem avisos.              | Antes das lojas         |
 
 `GEMINI_API_KEY` é opcional: a sessão e o checklist funcionam sem IA; a chave habilita uma pergunta
-extra quando o leitor consente (3.15). `CATALOG_CONTACT_EMAIL` também é opcional.
+extra quando o leitor consente (3.15). `CATALOG_CONTACT_EMAIL` também é opcional, mas **recomendado**: com um e-mail de contato o Open
+Library permite 3 buscas por segundo em vez de 1, e o Descobrir carrega cerca de 3× mais rápido na
+primeira vez (ADR-031). É enviado só no cabeçalho User-Agent para o Open Library.
 
 ---
 
@@ -243,7 +253,7 @@ ativar Analytics nem migrar o banco.
       `npx eas-cli@latest credentials` → Android → "Google Service Account Key for FCM V1".
 3. **iOS**: vincule a chave APNs ao projeto Expo e ao bundle `com.joaoaraujo.bubo`, com
    provisioning de push. Precisa da conta Apple do dono e de macOS/Xcode ou build EAS (item 7).
-4. Faça uma nova build (3.3). No app: Você → engrenagem → "Ativar notificações". No Android 13+
+4. Faça uma nova build (3.3). No app: Você → Preferências → "Ativar notificações". No Android 13+
    o sistema pergunta se pode notificar.
 
 Antes de gerar o APK, rode `npm run push:check`: ele valida os nomes/configurações locais sem
@@ -272,8 +282,8 @@ só de JavaScript não inclui os arquivos nativos. Não precisam de Firebase nem
    app `com.joaoaraujo.bubo` quanto na extensão `com.joaoaraujo.bubo.widgets`.
    O plugin gera os entitlements e o target `BuboWidgetsExtension`, inclusive metadados para
    o EAS preparar as credenciais. Não substitua os PNGs do mascote nem a paleta gerada.
-3. No app: **Você → Bubo na sua tela**. Confira as prévias dos quatro widgets (Sequência,
-   Sequência da semana, Calendário de leitura, Continuar leitura); escolha a meta semanal e a
+3. No app: **Você → Widgets**. Confira as prévias dos cinco widgets (Sequência,
+   Sequência da semana, Calendário de leitura, Continuar leitura e Liga semanal); escolha a meta semanal e a
    privacidade do título. No Android, “Adicionar à tela inicial” abre a confirmação do launcher
    quando suportado. Alternativa: tela inicial → Widgets → Bubo.
 4. No iPhone, adicione Bubo pelo seletor da tela inicial; a Sequência também está em
@@ -282,7 +292,14 @@ só de JavaScript não inclui os arquivos nativos. Não precisam de Firebase nem
    redimensionar, dados vencidos, fontes grandes e acessibilidade.
 
 Neste ambiente foram verificados o código, testes, geração dos projetos e bundle Android.
-**APK Android compilado e assinatura/quatro receptores de widgets verificados em 2026-10-03.**
+**Build final de 2026-10-03, 20h20 (São Paulo):** `npm run build:android` passou com 441 testes,
+APK ARM64/ARMv7, assinatura de teste, cinco receptores de widgets (incluindo Liga semanal),
+permissão de notificações e JavaScript embarcado verificados. A interface com API de produção
+foi conferida no emulador usando build debug e Metro; a build final ARM ainda precisa ser
+instalada e aceita em Android físico. Registro e SHA-256: [docs/build-mobile.md](docs/build-mobile.md).
+
+**Evidência histórica de 2026-10-03:** APK Android anterior compilado, com assinatura e quatro
+receptores de widgets verificados. O código atual tem cinco modelos, incluindo Liga semanal.
 Swift/iOS ainda não foi compilado; instalação e aceite dos widgets em aparelhos continuam
 pendentes. Guia gratuito e evidências: [docs/build-mobile.md](docs/build-mobile.md).
 Não há widget Android específico de tela bloqueada nem Live Activity nesta entrega.
@@ -320,7 +337,8 @@ Depois, siga o roteiro de telas em [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 Para você não procurar o que ainda não foi feito:
 
 - Comunidade: rascunho de resenha e feed público de resenhas (decisão de produto).
-- Curva de retenção e Bubo Score (precisam de um modelo de memória documentado).
+- Curva preditiva de retenção e Bubo Score (aguardam um modelo calibrado; as autoavaliações
+  observadas por intervalo já estão implementadas na fonte, ADR-030).
 - Login com Google/Apple, exigir verificação de email antes das lojas, exportação de dados (LGPD).
 - Alerta de "curva crítica", paisagem sonora, tema sépia e exportação (Anki/Notion).
 - Verificação de relatos contra o texto completo dos livros e retenção calibrada por revisões.

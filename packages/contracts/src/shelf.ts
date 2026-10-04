@@ -15,7 +15,7 @@ import { sessionAssessmentSchema, sessionRecallSchema } from './session-assessme
 const localDateSchema = z.string().refine(isIsoDate, 'Must be a calendar date (YYYY-MM-DD).');
 const pageSchema = z.number().int().min(0).max(MAX_BOOK_PAGES);
 
-const addStatusSchema = z.enum(['reading', 'want_to_read']).default('want_to_read');
+const addStatusSchema = z.enum(['reading', 'want_to_read', 'finished']).default('want_to_read');
 
 /** POST /v1/shelf — a catalog pick (the server resolves the metadata, never the client). */
 export const addCatalogBookRequestSchema = z.object({
@@ -102,6 +102,8 @@ export const statsResponseSchema = z.object({
   xpTotal: z.number().int().nonnegative(),
   streakDays: z.number().int().nonnegative(),
   sessionsCount: z.number().int().nonnegative(),
+  /** Most recent reading-session local date on or before `today`; reviews do not count. */
+  lastReadingDate: localDateSchema.nullable().default(null),
   focusedMinutesThisWeek: z.number().int().nonnegative(),
   /** Focused minutes on `today` (the daily focus goal, Task 09). */
   focusedMinutesToday: z.number().int().nonnegative(),

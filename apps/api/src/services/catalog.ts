@@ -6,6 +6,7 @@ import {
   hardenCoverUrl,
   isCatalogId,
   MAX_BOOK_PAGES,
+  MIN_CATALOG_QUERY_LENGTH,
   normalizeIsbn,
   openLibraryCoverById,
   parsePublishedYear,
@@ -37,17 +38,25 @@ export type CatalogServiceOptions = {
   covers?: CoverCache;
   timeoutMs?: number;
   logger?: Logger;
+  /** Keeps cache warming alive after a fast response (Workers waitUntil, or the local runtime). */
+  background?: (task: Promise<unknown>) => void;
 };
 
 const GOOGLE = 'https://www.googleapis.com/books/v1';
 const OPEN_LIBRARY = 'https://openlibrary.org';
 const CACHE_VERSION = 'v4';
+/** Give the other source/fallback a chance to enrich a useful first answer without a long stall. */
+export const SEARCH_MERGE_WAIT_MS = 1200;
+/** An existing R2 object can be reused immediately; a slow new cover never holds up adding a book. */
+export const COVER_REUSE_WAIT_MS = 100;
 const TTL = {
   search: 24 * 60 * 60,
   partialSearch: 10 * 60,
   book: 7 * 24 * 60 * 60,
   notFound: 60 * 60,
 } as const;
+/** A typed query and its normalized spelling share one response and ordered cache writes. */
+const searches = new WeakMap<CatalogCache, Map<string, Promise<CatalogSearchResponse>>>();
 
 // ---------------------------------------------------------------- upstream shapes (lenient)
 
@@ -75,12 +84,16 @@ const openLibraryDocSchema = z.object({
   title: z.string().optional(),
   subtitle: z.string().optional(),
   author_name: z.array(z.string()).optional(),
+  author_key: z.array(z.string()).optional(),
   first_publish_year: z.number().optional(),
   cover_i: z.number().int().positive().optional(),
   number_of_pages_median: z.number().optional(),
   publisher: z.array(z.string()).optional(),
   language: z.array(z.string()).optional(),
   edition_count: z.number().int().nonnegative().optional(),
+  subject: z.array(z.string()).optional(),
+  readinglog_count: z.number().nonnegative().optional(),
+  ratings_average: z.number().min(0).max(5).optional(),
   /** Best-matching edition for the query and lang (e.g. the Portuguese "Duna" of "Dune"). */
   editions: z
     .object({
@@ -248,6 +261,39 @@ export function mapGoogleVolume(raw: unknown): CatalogBook | null {
   };
 }
 
+/** An Open Library work with the taste signals the recommender needs (ADR-031). */
+export type OpenLibraryWork = {
+  workKey: string;
+  book: CatalogBook;
+  /** Work title and the selected edition's title (e.g. "Dune" and "Duna"). */
+  titles: string[];
+  subjects: string[];
+  readers: number;
+  rating: number | null;
+  /** ISBN-13s of the selected edition only. */
+  editionIsbns: string[];
+  /** Open Library author ids (`OL26320A`), exact for author queries. */
+  authorKeys: string[];
+};
+
+export function mapOpenLibraryWork(raw: unknown): OpenLibraryWork | null {
+  const parsed = openLibraryDocSchema.safeParse(raw);
+  const book = mapOpenLibraryDoc(raw);
+  if (!parsed.success || !book) return null;
+  const doc = parsed.data;
+  const edition = doc.editions?.docs[0];
+  return {
+    workKey: doc.key.slice('/works/'.length),
+    book,
+    titles: unique([doc.title, edition?.title].filter((title): title is string => Boolean(title))),
+    subjects: (doc.subject ?? []).slice(0, 80),
+    readers: Math.round(doc.readinglog_count ?? 0),
+    rating: doc.ratings_average ?? null,
+    editionIsbns: (edition?.isbn ?? []).map(toIsbn13).filter((isbn): isbn is string => !!isbn),
+    authorKeys: (doc.author_key ?? []).filter((id) => /^OL\d{1,12}A$/.test(id)).slice(0, 6),
+  };
+}
+
 export function mapOpenLibraryDoc(raw: unknown): CatalogBook | null {
   const parsed = openLibraryDocSchema.safeParse(raw);
   if (!parsed.success) return null;
@@ -408,7 +454,7 @@ export class CatalogService {
   private readonly transport: CatalogTransport;
 
   constructor(private readonly options: CatalogServiceOptions) {
-    this.transport = new CatalogTransport({ ...options, timeoutMs: options.timeoutMs ?? 4000 });
+    this.transport = new CatalogTransport({ ...options, timeoutMs: options.timeoutMs ?? 6000 });
   }
 
   private getJson(url: string, source: CatalogSource): Promise<Fetched> {
@@ -417,10 +463,35 @@ export class CatalogService {
 
   async cacheCover(book: CatalogBook): Promise<CatalogBook> {
     if (!this.options.covers) return book;
-    const url = await this.options.covers.ingest(book.coverUrls);
-    return url
-      ? { ...book, cachedCoverUrl: url, coverUrls: unique([url, ...book.coverUrls]).slice(0, 4) }
-      : book;
+    const task = this.options.covers.ingest(book.coverUrls).then(async (url) => {
+      if (!url) return book;
+      const covered = this.coveredBook(book, url);
+      await this.writeBook(book.catalogId, { ...covered, match: undefined });
+      return covered;
+    });
+    if (!this.options.background) return task;
+    this.options.background(task.catch(() => undefined));
+    return this.withinCoverWindow(task, () => book);
+  }
+
+  private async withinCoverWindow<T>(task: Promise<T>, fallbackValue: () => T): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const fallback = new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallbackValue()), COVER_REUSE_WAIT_MS);
+    });
+    try {
+      return await Promise.race([task, fallback]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
+  private coveredBook(book: CatalogBook, url: string): CatalogBook {
+    return {
+      ...book,
+      cachedCoverUrl: url,
+      coverUrls: unique([url, ...book.coverUrls]).slice(0, 4),
+    };
   }
 
   private googleUrl(path: string, params: Record<string, string>): string {
@@ -430,6 +501,11 @@ export class CatalogService {
   }
 
   private async searchGoogle(q: string, limit: number): Promise<SourceResult> {
+    // Keyless Google is best-effort (its shared quota is often zero): while it is backing off, it
+    // is skipped rather than reported as a failure that would label every search "partial".
+    if (!this.options.googleApiKey && (await this.transport.backingOff('google'))) {
+      return { status: 'skipped', books: [] };
+    }
     const result = await this.getJson(
       this.googleUrl('/volumes', {
         q,
@@ -480,6 +556,46 @@ export class CatalogService {
     return { status: 'ok', books, popularity };
   }
 
+  /**
+   * Open Library work search with Portuguese edition selection (`lang=pt`), for Discover. Raw
+   * Solr syntax: callers build `q` only from folded text, ids and fixed field names.
+   */
+  async openLibraryWorks(params: {
+    q: string;
+    limit: number;
+    sort?: 'readinglog' | 'rating';
+  }): Promise<{ status: 'ok' | 'error'; works: OpenLibraryWork[] }> {
+    const query = new URLSearchParams({
+      q: params.q,
+      limit: String(Math.min(params.limit, 100)),
+      lang: 'pt',
+      fields:
+        'key,title,subtitle,author_name,author_key,cover_i,language,edition_count,subject,readinglog_count,ratings_average,editions,editions.key,editions.title,editions.language,editions.cover_i,editions.isbn,editions.publisher,editions.publish_date,editions.number_of_pages',
+    });
+    if (params.sort) query.set('sort', params.sort);
+    const result = await this.getJson(
+      `${OPEN_LIBRARY}/search.json?${query.toString()}`,
+      'openlibrary',
+    );
+    if (!result.ok) return { status: 'error', works: [] };
+    const list = openLibrarySearchSchema.safeParse(result.data);
+    if (!list.success) return { status: 'error', works: [] };
+    const works = list.data.docs
+      .slice(0, 100)
+      .map(mapOpenLibraryWork)
+      .filter((work): work is OpenLibraryWork => work !== null);
+    return { status: 'ok', works };
+  }
+
+  /** Cover-cache metadata for books built outside search (Discover). */
+  withCachedCovers(books: CatalogBook[]): Promise<CatalogBook[]> {
+    return this.cachedCovers({
+      query: '',
+      results: books,
+      sources: { google: 'skipped', openlibrary: 'ok' },
+    }).then((response) => response.results);
+  }
+
   /** Free-text search. ISBN-like input must pass its checksum before reaching any source. */
   async search(rawQuery: string, limit: number): Promise<CatalogSearchResponse> {
     const q = rawQuery.normalize('NFKC').trim().replace(/\s+/g, ' ');
@@ -488,21 +604,116 @@ export class CatalogService {
     }
     const isbn13 = toIsbn13(q);
     if (isbn13) return this.cachedCovers({ ...(await this.isbnSearch(isbn13)), query: q });
+    // Open Library answers 422 under 3 characters and keyless Google may be out of quota: such
+    // short text (older builds search from 2) is an honest empty result, never a 503.
+    if (
+      foldText(q.replace(/^(?:title|author|intitle|inauthor):/i, '')).length <
+      MIN_CATALOG_QUERY_LENGTH
+    ) {
+      return {
+        query: q,
+        results: [],
+        sources: { google: 'skipped', openlibrary: 'skipped', brasilapi: 'skipped' },
+      };
+    }
     const cacheKey = `search:${CACHE_VERSION}:${q.toLowerCase()}:${limit}`;
     const cached = await this.readSearch(cacheKey);
     if (cached) return this.cachedCovers({ ...cached, query: q });
-    const [google, openLibrary] = await Promise.all([
-      this.searchWithFallback(q, limit, 'google'),
-      this.searchWithFallback(q, limit, 'openlibrary'),
-    ]);
+    const inFlight =
+      searches.get(this.options.cache) ?? new Map<string, Promise<CatalogSearchResponse>>();
+    searches.set(this.options.cache, inFlight);
+    const pending = inFlight.get(cacheKey);
+    if (pending) return this.cachedCovers({ ...(await pending), query: q });
+    const task = this.freshSearch(q, limit, cacheKey);
+    inFlight.set(cacheKey, task);
+    try {
+      return await this.cachedCovers({ ...(await task), query: q });
+    } finally {
+      if (inFlight.get(cacheKey) === task) inFlight.delete(cacheKey);
+    }
+  }
+
+  private async freshSearch(q: string, limit: number, cacheKey: string) {
+    const { google, openLibrary, remaining } = await this.searchSources(q, limit);
+    const response = this.searchResponse(q, limit, google, openLibrary);
+    await this.storeSearch(cacheKey, response, Boolean(remaining));
+    if (remaining) {
+      const warming = remaining.then(async ([fullGoogle, fullOpenLibrary]) => {
+        const full = this.searchResponse(q, limit, fullGoogle, fullOpenLibrary);
+        await this.storeSearch(cacheKey, full);
+      });
+      this.options.background?.(warming.catch(() => undefined));
+    }
+    return response;
+  }
+
+  private async searchSources(q: string, limit: number) {
+    // Without a runtime scheduler, keep the complete awaitable behavior for standalone callers.
+    if (!this.options.background) {
+      const [google, openLibrary] = await Promise.all([
+        this.searchWithFallback(q, limit, 'google'),
+        this.searchWithFallback(q, limit, 'openlibrary'),
+      ]);
+      return { google, openLibrary, remaining: undefined };
+    }
+    type Source = 'google' | 'openlibrary';
+    const latest: Record<Source, SourceResult> = {
+      google: { status: 'error', books: [] },
+      openlibrary: { status: 'error', books: [] },
+    };
+    const settled = new Set<Source>();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let release: (() => void) | undefined;
+    const useful = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const progress = (source: Source, result: SourceResult) => {
+      latest[source] = result;
+      if (result.books.length && timer === undefined) {
+        timer = setTimeout(() => release?.(), SEARCH_MERGE_WAIT_MS);
+      }
+    };
+    const run = (source: Source) =>
+      this.searchWithFallback(q, limit, source, (result) => progress(source, result)).then(
+        (result) => {
+          progress(source, result);
+          settled.add(source);
+          return result;
+        },
+      );
+    const complete = Promise.all([run('google'), run('openlibrary')]);
+    try {
+      const finished = await Promise.race([complete.then(() => true), useful.then(() => false)]);
+      const snapshot = (source: Source): SourceResult => ({
+        ...latest[source],
+        books: [...latest[source].books],
+        popularity: latest[source].popularity ? new Map(latest[source].popularity) : undefined,
+        status: settled.has(source) ? latest[source].status : 'error',
+      });
+      return {
+        google: snapshot('google'),
+        openLibrary: snapshot('openlibrary'),
+        remaining: finished ? undefined : complete,
+      };
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
+  private searchResponse(
+    q: string,
+    limit: number,
+    google: SourceResult,
+    openLibrary: SourceResult,
+  ): CatalogSearchResponse {
     if (
-      (google.status !== 'ok' || openLibrary.status !== 'ok') &&
+      (google.status === 'error' || openLibrary.status === 'error') &&
       !google.books.length &&
       !openLibrary.books.length
     ) {
       throw new AppError('SERVICE_UNAVAILABLE', 'The book catalog is unavailable right now.');
     }
-    const response: CatalogSearchResponse = {
+    return {
       query: q,
       results: rankResults(
         mergeResults([google.books, openLibrary.books], Infinity),
@@ -516,12 +727,14 @@ export class CatalogService {
         })),
       sources: { google: google.status, openlibrary: openLibrary.status, brasilapi: 'skipped' },
     };
+  }
 
+  private async storeSearch(cacheKey: string, response: CatalogSearchResponse, warming = false) {
     const partial = Object.values(response.sources).some((status) => status === 'error');
     await this.options.cache.set(
       cacheKey,
       response,
-      !response.results.length ? 60 : partial ? TTL.partialSearch : TTL.search,
+      warming || !response.results.length ? 60 : partial ? TTL.partialSearch : TTL.search,
     );
     // Google search includes volume metadata. Open Library editions need their own detail read.
     await Promise.all(
@@ -529,25 +742,21 @@ export class CatalogService {
         .filter((book) => book.catalogId.startsWith('gb:'))
         .map((book) => this.writeBook(book.catalogId, { ...book, match: undefined })),
     );
-    return this.cachedCovers(response);
   }
 
   private async cachedCovers(response: CatalogSearchResponse): Promise<CatalogSearchResponse> {
-    if (!this.options.covers) return response;
+    if (!this.options.covers || !response.results.length) return response;
     const covers = this.options.covers;
-    const results = await Promise.all(
-      response.results.map(async (book) => {
-        const url = await covers.cached(book.coverUrls);
-        return url
-          ? {
-              ...book,
-              cachedCoverUrl: url,
-              coverUrls: unique([url, ...book.coverUrls]).slice(0, 4),
-            }
-          : book;
+    const results = [...response.results];
+    const task = Promise.all(
+      response.results.map(async (book, index) => {
+        const url = await covers.cached(book.coverUrls).catch(() => null);
+        if (url) results[index] = this.coveredBook(book, url);
       }),
-    );
-    return { ...response, results };
+    ).then(() => ({ ...response, results }));
+    this.options.background?.(task.catch(() => undefined));
+    // One budget for the whole batch. Keep ready covers even when another metadata read stalls.
+    return this.withinCoverWindow(task, () => ({ ...response, results: [...results] }));
   }
 
   private async readSearch(key: string): Promise<CatalogSearchResponse | null> {
@@ -620,6 +829,7 @@ export class CatalogService {
     q: string,
     limit: number,
     source: 'google' | 'openlibrary',
+    onResult?: (result: SourceResult) => void,
   ): Promise<SourceResult> {
     const search = (value: string) =>
       source === 'google' ? this.searchGoogle(value, limit) : this.searchOpenLibrary(value, limit);
@@ -628,9 +838,12 @@ export class CatalogService {
         ? q.replace(/^title:/i, 'intitle:').replace(/^author:/i, 'inauthor:')
         : q.replace(/^intitle:/i, 'title:').replace(/^inauthor:/i, 'author:');
     const first = await search(primary);
+    onResult?.(first);
+    // Alternatives cost another paced upstream call: only when the first answer is thin.
     if (
       first.status !== 'ok' ||
       /^subject:/i.test(q) ||
+      first.books.length >= 8 ||
       first.books.some((book) => strongMatch(book, q))
     )
       return first;
@@ -644,6 +857,7 @@ export class CatalogService {
       first.books.push(...next.books);
       if (next.popularity)
         first.popularity = new Map([...(first.popularity ?? []), ...next.popularity]);
+      onResult?.(first);
       if (next.status !== 'ok') return { ...first, status: 'error' };
       if (next.books.some((book) => strongMatch(book, q))) break;
     }

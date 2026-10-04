@@ -49,11 +49,12 @@ No retailer scraping or undocumented direct CBL access. Coverage is not guarante
 
 ## Failure isolation, caching and limits
 
-- Each upstream request has a 4 s deadline, including body parsing, and shared in-flight work.
+- Each upstream request has a 6 s deadline (4 s before ADR-031), including body parsing, and shared in-flight work.
   Maximum three Google / two Open Library text queries. ISBN: two Google queries, two Open Library editions, up to
   three author details and one BrasilAPI request. Successful author responses cache too.
-- Per-isolate pacing: 1 s between Open Library/BrasilAPI calls, 200 ms for Google. A queue wait
-  above 2 s fails partially. HTTP 429/403 backoff respects `Retry-After` within 60–3600 s
+- Per-isolate pacing: 1 s between Open Library/BrasilAPI calls (350 ms for Open Library with
+  `CATALOG_CONTACT_EMAIL`), 200 ms for Google. A queue wait above 5 s fails partially (was 2 s;
+  see ADR-031). Keyless Google while backing off is reported `skipped`. HTTP 429/403 backoff respects `Retry-After` within 60–3600 s
   (600 s default). No numeric BrasilAPI quota is assumed.
 - Open Library documents 1 request/s unidentified, 3/s with contact identification; Bubo keeps
   1/s. These controls are **per isolate**, not a distributed quota guarantee. Scaling requires

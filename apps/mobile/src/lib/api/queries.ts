@@ -20,11 +20,16 @@ import {
   type OnboardingRequest,
   type ReviewRequest,
   type UpdateShelfEntryRequest,
+  type CatalogBookResponse,
+  type CatalogSearchResponse,
+  type CatalogDiscoverResponse,
+  type ShelfResponse,
 } from '@bubo/contracts';
-import { toIsbn13, toLocalIsoDate } from '@bubo/domain';
+import { type Genre, MIN_CATALOG_QUERY_LENGTH, toIsbn13, toLocalIsoDate } from '@bubo/domain';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, ApiError } from './client';
+import { cacheAcceptedShelfEntry } from './shelf-cache';
 
 /** Query keys live in one place so invalidation stays predictable. */
 export const queryKeys = {
@@ -57,6 +62,8 @@ export const queryKeys = {
   catalogBook: (userId: string, catalogId: string) =>
     ['catalog', userId, 'book', catalogId] as const,
   catalogIsbn: (userId: string, isbn: string) => ['catalog', userId, 'isbn', isbn] as const,
+  catalogDiscover: (userId: string, genre: string) =>
+    ['catalog', userId, 'discover-v1', genre] as const,
   preferences: (userId: string) => ['preferences', userId] as const,
   notifications: (userId: string) => ['notifications', userId] as const,
 };
@@ -72,11 +79,30 @@ export function useCatalogSearch(userId: string | undefined, q: string) {
   return useQuery({
     queryKey: queryKeys.catalogSearch(userId ?? 'anonymous', query),
     queryFn: ({ signal }) => api.searchCatalog(query, signal),
-    enabled: Boolean(userId) && query.length >= 2,
+    enabled: Boolean(userId) && query.length >= MIN_CATALOG_QUERY_LENGTH,
     staleTime: (state) =>
       !state.state.data?.results.length || Object.values(state.state.data.sources).includes('error')
         ? 60_000
         : 30 * 60_000,
+    retry: (count, error) => count < 2 && error instanceof ApiError && error.retryable,
+  });
+}
+
+/**
+ * Discover sections (ADR-031). Recommendations change only when the shelf does, so they stay fresh
+ * for 30 minutes and the persisted copy opens instantly while a refresh runs in background.
+ */
+export function useCatalogDiscover(
+  userId: string | undefined,
+  genre: Genre | null,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.catalogDiscover(userId ?? 'anonymous', genre ?? 'for_you'),
+    queryFn: ({ signal }) => api.getCatalogDiscover(genre, signal),
+    enabled: Boolean(userId) && enabled,
+    staleTime: (state) =>
+      state.state.data?.sources.openlibrary === 'error' ? 60_000 : 30 * 60_000,
     retry: (count, error) => count < 2 && error instanceof ApiError && error.retryable,
   });
 }
@@ -93,11 +119,39 @@ export function useIsbnLookup(userId: string | undefined, isbn: string | null) {
 }
 
 export function useCatalogBook(userId: string | undefined, catalogId: string) {
-  return useQuery({
+  const client = useQueryClient();
+  return useQuery<CatalogBookResponse>({
     queryKey: queryKeys.catalogBook(userId ?? 'anonymous', catalogId),
     queryFn: ({ signal }) => api.getCatalogBook(catalogId, signal),
     enabled: userId !== undefined && catalogId !== '',
     staleTime: 10 * 60_000,
+    placeholderData: () => {
+      if (!userId) return undefined;
+      const searches = client.getQueriesData<CatalogSearchResponse>({
+        queryKey: ['catalog', userId, 'search-v2'],
+      });
+      const discoveries = client.getQueriesData<CatalogDiscoverResponse>({
+        queryKey: ['catalog', userId, 'discover-v1'],
+      });
+      const book =
+        searches
+          .flatMap(([, data]) => data?.results ?? [])
+          .find((item) => item.catalogId === catalogId) ??
+        discoveries
+          .flatMap(
+            ([, data]) =>
+              data?.sections.flatMap((section) => section.items.map((item) => item.book)) ?? [],
+          )
+          .find((item) => item.catalogId === catalogId);
+      if (!book) return undefined;
+      const shelf = client.getQueryData<ShelfResponse>(queryKeys.shelf(userId));
+      const entry = shelf?.entries.find(
+        (item) =>
+          item.book.catalogId === catalogId ||
+          (book.isbn13 !== null && item.book.isbn13 === book.isbn13),
+      );
+      return { book, shelfEntryId: entry?.id ?? null } satisfies CatalogBookResponse;
+    },
   });
 }
 
@@ -208,6 +262,8 @@ function useInvalidateReading(userId: string) {
       queryClient.invalidateQueries({ queryKey: ['recall', userId] }),
       // "Já está na estante" on catalog screens.
       queryClient.invalidateQueries({ queryKey: ['catalog', userId, 'book'] }),
+      // Recommendations are built from the shelf (and hide what is already on it).
+      queryClient.invalidateQueries({ queryKey: ['catalog', userId, 'discover-v1'] }),
     ]);
 }
 
@@ -237,18 +293,26 @@ export function useRefreshAfterReview(userId: string) {
 }
 
 export function useAddBook(userId: string) {
+  const client = useQueryClient();
   const invalidate = useInvalidateReading(userId);
   return useMutation({
     mutationFn: (body: AddBookRequest) => api.addBook(body),
-    onSuccess: invalidate,
+    onSuccess: (entry) => {
+      cacheAcceptedShelfEntry(client, userId, entry);
+      void invalidate();
+    },
   });
 }
 
 export function useUpdateShelfEntry(userId: string, entryId: string) {
+  const client = useQueryClient();
   const invalidate = useInvalidateReading(userId);
   return useMutation({
     mutationFn: (body: UpdateShelfEntryRequest) => api.updateShelfEntry(entryId, body),
-    onSuccess: invalidate,
+    onSuccess: (entry) => {
+      cacheAcceptedShelfEntry(client, userId, entry);
+      void invalidate();
+    },
   });
 }
 

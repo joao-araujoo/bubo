@@ -30,6 +30,9 @@ export async function getStats(
     .select({
       xp: sql<number>`coalesce(sum(${readingSessions.xpEarned}), 0)::int`,
       count: sql<number>`count(*)::int`,
+      lastReadingDate: sql<
+        string | null
+      >`(max(${readingSessions.localDate}) filter (where ${readingSessions.localDate} <= ${today}))::text`,
     })
     .from(readingSessions)
     .where(eq(readingSessions.userId, userId));
@@ -92,6 +95,7 @@ export async function getStats(
     xpTotal: Number(sessionTotals?.xp ?? 0) + Number(reviewTotals?.xp ?? 0),
     streakDays: streak.streakDays,
     sessionsCount: Number(sessionTotals?.count ?? 0),
+    lastReadingDate: sessionTotals?.lastReadingDate ?? null,
     focusedMinutesThisWeek: Math.floor(Number(weekMinutes?.seconds ?? 0) / 60),
     focusedMinutesToday: Math.floor(Number(todayMinutes?.seconds ?? 0) / 60),
     weekActiveDates: [...activeDates].filter((d) => d >= weekStart && d <= weekEnd).sort(),

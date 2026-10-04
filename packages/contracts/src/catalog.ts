@@ -1,4 +1,4 @@
-import { CATALOG_ID_PATTERN, MAX_BOOK_PAGES } from '@bubo/domain';
+import { CATALOG_ID_PATTERN, GENRES, MAX_BOOK_PAGES } from '@bubo/domain';
 import { z } from 'zod';
 
 export const catalogIdSchema = z.string().regex(CATALOG_ID_PATTERN, 'Invalid catalog id.');
@@ -53,3 +53,37 @@ export const catalogBookResponseSchema = z.object({
   shelfEntryId: z.string().nullable(),
 });
 export type CatalogBookResponse = z.infer<typeof catalogBookResponseSchema>;
+
+/** GET /v1/catalog/discover — query. Without a genre: the reader's personal sections. */
+export const catalogDiscoverQuerySchema = z.object({ genre: z.enum(GENRES).optional() });
+export type CatalogDiscoverQuery = z.infer<typeof catalogDiscoverQuerySchema>;
+
+export const discoverItemSchema = z.object({
+  book: catalogBookSchema,
+  /** Why this book is here, in Portuguese ("Mesma autoria de Duna"). */
+  reason: z.string().max(160).nullable(),
+  /** Distinct Bubo readers (community section only; always ≥ 2). */
+  readers: z.number().int().min(2).nullable(),
+});
+export type DiscoverItem = z.infer<typeof discoverItemSchema>;
+
+export const discoverSectionSchema = z.object({
+  id: z.string().min(1).max(120),
+  kind: z.enum(['for_you', 'because', 'community', 'popular', 'genre']),
+  title: z.string().max(160),
+  subtitle: z.string().max(200).nullable(),
+  items: z.array(discoverItemSchema).max(30),
+});
+export type DiscoverSection = z.infer<typeof discoverSectionSchema>;
+
+/** GET /v1/catalog/discover */
+export const catalogDiscoverResponseSchema = z.object({
+  sections: z.array(discoverSectionSchema),
+  /** Shelf books and interests the recommendations were built from. */
+  basedOn: z.object({
+    books: z.number().int().nonnegative(),
+    interests: z.number().int().nonnegative(),
+  }),
+  sources: z.object({ openlibrary: catalogSourceStatusSchema }),
+});
+export type CatalogDiscoverResponse = z.infer<typeof catalogDiscoverResponseSchema>;

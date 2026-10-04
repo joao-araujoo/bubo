@@ -54,9 +54,11 @@ export function createApp(deps: AppDeps = {}) {
   const now = deps.now ?? (() => new Date());
   const database = withDatabase(deps.databaseProvider ?? createDatabase);
   const auth = withAuth(deps.emailSender);
+  const catalogCache =
+    deps.catalogCache ?? createLayeredCache(createMemoryCache(), findEdgeCache());
   const catalog = createCatalogProvider({
     fetch: deps.catalogFetch ?? ((input, init) => fetch(input, init)),
-    cache: deps.catalogCache ?? createLayeredCache(createMemoryCache(), findEdgeCache()),
+    cache: catalogCache,
   });
 
   app.use('*', requestContext({ sink: deps.logSink }));
@@ -125,7 +127,7 @@ export function createApp(deps: AppDeps = {}) {
       geminiFetch: deps.geminiFetch ?? ((input, init) => fetch(input, init)),
     }),
   );
-  app.route(API_PREFIX, catalogRoutes({ catalog, now }));
+  app.route(API_PREFIX, catalogRoutes({ catalog, cache: catalogCache, now }));
   app.route(API_PREFIX, recallRoutes({ now }));
   app.route(
     API_PREFIX,

@@ -158,6 +158,7 @@ describe('GET /v1/openapi.json', () => {
       '/v1/recall/cards/{id}',
       '/v1/recall/cards/{id}/review',
       '/v1/catalog/search',
+      '/v1/catalog/discover',
       '/v1/catalog/books/{catalogId}',
       '/v1/catalog/isbn/{isbn}',
       '/v1/clubs',

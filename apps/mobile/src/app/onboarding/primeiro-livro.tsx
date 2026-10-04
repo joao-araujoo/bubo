@@ -1,4 +1,5 @@
 import { type CatalogBook, type OnboardingRequest } from '@bubo/contracts';
+import { MIN_CATALOG_QUERY_LENGTH } from '@bubo/domain';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -156,7 +157,8 @@ export default function FirstBookStep() {
   const [text, setText] = useState('');
   const q = useDebouncedValue(text.trim());
   const results = useCatalogSearch(userId, q);
-  const books = q.length >= 2 ? (results.data?.results ?? []).slice(0, 6) : [];
+  const books =
+    q.length >= MIN_CATALOG_QUERY_LENGTH ? (results.data?.results ?? []).slice(0, 6) : [];
   const [picked, setPicked] = useState<CatalogBook | null>(null);
   const [manual, setManual] = useState(draft.firstBook !== null && !draft.firstBook.catalogId);
   const [pendingAction, setPendingAction] = useState<'book' | 'skip' | null>(null);
@@ -290,16 +292,16 @@ export default function FirstBookStep() {
               setText(value);
               if (picked && value.trim() !== picked.title) setPicked(null);
             }}
-            loading={q.length >= 2 && results.isFetching}
+            loading={q.length >= MIN_CATALOG_QUERY_LENGTH && results.isFetching}
             placeholder="Buscar título ou autor…"
           />
-          {q.length >= 2 && results.isPending ? (
+          {q.length >= MIN_CATALOG_QUERY_LENGTH && results.isPending ? (
             <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Buscando livros" />
           ) : null}
-          {results.isError && q.length >= 2 ? (
+          {results.isError && q.length >= MIN_CATALOG_QUERY_LENGTH ? (
             <InlineMessage tone="error" message={catalogErrorMessage(results.error)} />
           ) : null}
-          {q.length >= 2 && results.isSuccess && books.length === 0 ? (
+          {q.length >= MIN_CATALOG_QUERY_LENGTH && results.isSuccess && books.length === 0 ? (
             <InlineMessage
               tone="info"
               message="Nenhum livro encontrado. Tente o nome do autor ou adicione manualmente."

@@ -6,6 +6,29 @@
 /** How the reader graded one recall attempt (SM-2 grade → the three review buttons). */
 export type ReviewOutcome = 'remembered' | 'almost' | 'forgot';
 
+/** Observed delays since the card was created or last reviewed, never SM-2 intervals. */
+export const DELAYED_RECALL_WINDOWS = [
+  'oneToSixDays',
+  'sevenToTwentyNineDays',
+  'thirtyPlusDays',
+] as const;
+export type DelayedRecallWindow = (typeof DELAYED_RECALL_WINDOWS)[number];
+
+export const DELAYED_RECALL_THRESHOLDS_SECONDS = {
+  minimum: 86_400,
+  week: 7 * 86_400,
+  month: 30 * 86_400,
+} as const;
+
+/** Reviews less than 24 hours apart provide no delayed-recall observation here. */
+export function delayedRecallWindow(elapsedSeconds: number): DelayedRecallWindow | null {
+  const limits = DELAYED_RECALL_THRESHOLDS_SECONDS;
+  if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < limits.minimum) return null;
+  if (elapsedSeconds < limits.week) return 'oneToSixDays';
+  if (elapsedSeconds < limits.month) return 'sevenToTwentyNineDays';
+  return 'thirtyPlusDays';
+}
+
 /** Lembrei = 4–5, Quase = 3, Esqueci = 0–2 (same split as `GET /v1/me/memory`). */
 export function reviewOutcome(grade: number): ReviewOutcome {
   if (grade >= 4) return 'remembered';

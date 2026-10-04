@@ -7,14 +7,12 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import {
   BookCover,
-  BuboTip,
   Button,
   Card,
   EmptyState,
   FormScreen,
   Icon,
   InlineMessage,
-  Pill,
   SegmentedTabs,
   Stepper,
   Text,
@@ -169,27 +167,19 @@ export default function NewPollScreen() {
         </View>
       </Card>
 
-      <BuboTip pose="idea" title="Estímulo reflexivo" titleIcon="psychology">
-        Crie perguntas que dividam opiniões e façam os membros debaterem o significado profundo da
-        obra!
-      </BuboTip>
-
       <View style={{ gap: theme.spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
           <Text variant="label" style={{ flex: 1 }}>
-            Pergunta ou provocação filosófica
+            Pergunta
             <Text variant="label" color="accentText">
               {' *'}
             </Text>
           </Text>
-          <Text variant="bodySm" color="accentText" style={{ fontSize: 12 }}>
-            Foco reflexivo
-          </Text>
         </View>
         <TextField
-          label="Pergunta ou provocação filosófica"
+          label="Pergunta"
           hideLabel
-          placeholder="A presciência de Paul é um dom libertador ou uma condenação fatalista?"
+          placeholder="O que você quer perguntar ao clube?"
           value={question}
           onChangeText={setQuestion}
           maxLength={POLL_QUESTION_MAX}
@@ -233,7 +223,7 @@ export default function NewPollScreen() {
               <TextField
                 label={`Opção ${index + 1}`}
                 hideLabel
-                placeholder={index === 0 ? 'Uma prisão fatalista' : 'Um dom libertador'}
+                placeholder={`Resposta ${index + 1}`}
                 value={option}
                 onChangeText={(value) => setOption(index, value)}
                 maxLength={POLL_OPTION_MAX}
@@ -317,9 +307,8 @@ export default function NewPollScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
           <Icon name="shield" size={20} color="accentText" />
           <Text variant="bodyStrong" style={{ flex: 1 }}>
-            Blindagem anti-spoiler da enquete
+            Proteção anti-spoiler
           </Text>
-          <Pill label="Proteção inteligente" />
         </View>
         <Stepper
           label="Página de bloqueio"

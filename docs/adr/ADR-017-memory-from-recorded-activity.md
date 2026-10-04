@@ -38,6 +38,10 @@ remains pending.
 
 ## Not done (deliberately)
 
+2026-10-03: [ADR-030](ADR-030-observed-delayed-recall.md) adds observed self-assessments grouped
+by actual delays (1–6/7–29/30+ days), with counts. A compact caption replaces the explanatory
+card in Minha memória. No predictive curve or Score is inferred from these proportions.
+
 - Retention curve, per-book retention percentage and the Bubo Score: need a documented model
   (for example FSRS-style stability from review history) and its own ADR before any number is
   shown.

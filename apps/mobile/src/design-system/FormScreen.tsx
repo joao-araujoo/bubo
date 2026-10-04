@@ -14,6 +14,8 @@ import { Text } from './Text';
 
 type Props = {
   children: ReactNode;
+  /** Virtualized list bodies manage their own scrolling. */
+  scroll?: boolean;
   /** Sticky bottom actions (primary CTA). */
   footer?: ReactNode;
   /** Shows a back button when navigation history exists. */
@@ -162,6 +164,7 @@ export function FormScreen({
   eyebrowDot = false,
   leading = 'back',
   floating,
+  scroll = true,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -255,20 +258,24 @@ export function FormScreen({
         </View>
       </View>
       <OfflineBanner />
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: theme.sizes.gutter,
-          paddingTop: theme.spacing.lg,
-          // Room for the floating action so it never covers the last card.
-          paddingBottom: floating ? 104 : theme.spacing.xxl,
-          gap: theme.spacing.lg,
-        }}
-      >
-        <FadeIn style={{ gap: theme.spacing.lg }}>{children}</FadeIn>
-      </ScrollView>
+      {scroll ? (
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: theme.sizes.gutter,
+            paddingTop: theme.spacing.lg,
+            // Room for the floating action so it never covers the last card.
+            paddingBottom: floating ? 104 : theme.spacing.xxl,
+            gap: theme.spacing.lg,
+          }}
+        >
+          <FadeIn style={{ gap: theme.spacing.lg }}>{children}</FadeIn>
+        </ScrollView>
+      ) : (
+        <View style={{ flex: 1 }}>{children}</View>
+      )}
       {floating ? (
         <View
           pointerEvents="box-none"

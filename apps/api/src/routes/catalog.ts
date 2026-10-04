@@ -1,4 +1,9 @@
-import { API_ROUTES, catalogIdSchema, catalogSearchQuerySchema } from '@bubo/contracts';
+import {
+  API_ROUTES,
+  catalogDiscoverQuerySchema,
+  catalogIdSchema,
+  catalogSearchQuerySchema,
+} from '@bubo/contracts';
 import { toIsbn13 } from '@bubo/domain';
 import { type Context, Hono } from 'hono';
 
@@ -8,6 +13,7 @@ import { createRateLimiter } from '../lib/rate-limit';
 import { type CatalogCache } from '../services/catalog-cache';
 import { CatalogService, type FetchLike } from '../services/catalog';
 import { CoverCache } from '../services/cover-cache';
+import { DiscoverService } from '../services/discover';
 import { MediaStorage } from '../services/media';
 import { findCatalogEntryId } from '../services/shelf';
 
@@ -26,6 +32,15 @@ export function createCatalogProvider(deps: {
       googleApiKey: config.ok ? config.env.GOOGLE_BOOKS_API_KEY : undefined,
       logger: c.get('logger'),
       contact: config.ok ? config.env.CATALOG_CONTACT_EMAIL : undefined,
+      background: (task) => {
+        const settled = task.catch(() => undefined);
+        try {
+          c.executionCtx.waitUntil(settled);
+        } catch {
+          // Node dev/tests have no Workers execution context; their event loop owns the task.
+          void settled;
+        }
+      },
       covers:
         config.ok && config.env.MEDIA_PUBLIC_URL && c.env.MEDIA
           ? new CoverCache({
@@ -40,7 +55,11 @@ export function createCatalogProvider(deps: {
 }
 
 /** Catalog search, details and ISBN lookup (session-protected: they spend shared quotas). */
-export function catalogRoutes(deps: { catalog: CatalogProvider; now: () => Date }) {
+export function catalogRoutes(deps: {
+  catalog: CatalogProvider;
+  cache: CatalogCache;
+  now: () => Date;
+}) {
   const routes = new Hono<AppEnv>();
   const limiter = createRateLimiter({
     limit: 60,
@@ -67,6 +86,25 @@ export function catalogRoutes(deps: { catalog: CatalogProvider; now: () => Date 
       });
     }
     const result = await deps.catalog(c).search(query.data.q, query.data.limit);
+    c.header('Cache-Control', 'private, max-age=300');
+    return c.json(result);
+  });
+
+  routes.get(API_ROUTES.catalogDiscover, async (c) => {
+    const query = catalogDiscoverQuerySchema.safeParse({
+      genre: c.req.query('genre') || undefined,
+    });
+    if (!query.success) {
+      throw new AppError('VALIDATION_FAILED', 'Invalid genre.', {
+        issues: [{ path: 'genre', message: 'Unknown genre.' }],
+      });
+    }
+    const discover = new DiscoverService({
+      db: c.get('db'),
+      catalog: deps.catalog(c),
+      cache: deps.cache,
+    });
+    const result = await discover.discover(c.get('session').user.id, query.data.genre);
     c.header('Cache-Control', 'private, max-age=300');
     return c.json(result);
   });

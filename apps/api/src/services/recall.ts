@@ -257,6 +257,35 @@ export async function reviewCard(
       };
     }
 
+    // Only one transaction may grade this card's current schedule. The next reader of the
+    // row must observe its new due date rather than awarding XP for the same due attempt.
+    await tx
+      .select({ id: recallCards.id })
+      .from(recallCards)
+      .where(and(eq(recallCards.id, cardId), eq(recallCards.userId, userId)))
+      .for('update');
+
+    // A retry may have committed while this transaction waited for the card lock.
+    const [acceptedWhileWaiting] = await tx
+      .select()
+      .from(reviewLogs)
+      .where(eq(reviewLogs.id, input.id))
+      .limit(1);
+    if (acceptedWhileWaiting) {
+      if (acceptedWhileWaiting.userId !== userId || acceptedWhileWaiting.cardId !== cardId) {
+        throw new AppError('CONFLICT', 'Review id already used.');
+      }
+      const { card, bookTitle } = await findCard(tx, userId, cardId);
+      return {
+        result: {
+          card: toCard(card, bookTitle),
+          xpEarned: acceptedWhileWaiting.xpEarned,
+          stats: await getStats(tx, userId, acceptedWhileWaiting.localDate),
+        },
+        created: false,
+      };
+    }
+
     const { card, bookTitle } = await findCard(tx, userId, cardId);
     if (card.dueDate > input.localDate) {
       throw new AppError('CONFLICT', 'This card is not due yet.');

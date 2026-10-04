@@ -22,6 +22,7 @@ import {
   editionLabel,
   scannerPick,
 } from '../features/catalog/catalog';
+import { type AddShelfStatus } from '../features/catalog/ShelfStatusPicker';
 import { useAddFromCatalog, useShelfLookup } from '../features/catalog/useAddFromCatalog';
 import { ApiError } from '../lib/api/client';
 import { useIsbnLookup } from '../lib/api/queries';
@@ -156,12 +157,13 @@ type SheetProps = {
   loading: boolean;
   error: unknown;
   pick: boolean;
+  status: AddShelfStatus;
   onRetry: () => void;
   onRescan: () => void;
 };
 
 /** White result sheet: "Livro identificado", cover, facts and the actions. */
-function ResultSheet({ isbn, book, loading, error, pick, onRetry, onRescan }: SheetProps) {
+function ResultSheet({ isbn, book, loading, error, pick, status, onRetry, onRescan }: SheetProps) {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -236,7 +238,8 @@ function ResultSheet({ isbn, book, loading, error, pick, onRetry, onRescan }: Sh
           onPress={() => {
             if (book || notFound) {
               if (pick) router.back();
-              else router.replace('/adicionar-livro?manual=1');
+              else
+                router.replace({ pathname: '/adicionar-livro', params: { manual: '1', status } });
             } else onRescan();
           }}
         />
@@ -259,7 +262,7 @@ function ResultSheet({ isbn, book, loading, error, pick, onRetry, onRescan }: Sh
                   haptics.success();
                   scannerPick.set(book);
                   router.back();
-                } else void addToShelf(book, 'want_to_read');
+                } else void addToShelf(book, status);
               }}
             />
           )
@@ -315,8 +318,15 @@ export default function IsbnScannerScreen() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode, status: requestedStatus } = useLocalSearchParams<{
+    mode?: string;
+    status?: string;
+  }>();
   const pick = mode === 'pick';
+  const status: AddShelfStatus =
+    requestedStatus === 'reading' || requestedStatus === 'finished'
+      ? requestedStatus
+      : 'want_to_read';
   const auth = useAuthState();
   const userId = auth.status === 'ready' || auth.status === 'needs_onboarding' ? auth.userId : '';
   const [permission, requestPermission] = useCameraPermissions();
@@ -487,6 +497,7 @@ export default function IsbnScannerScreen() {
           loading={lookup.isPending}
           error={lookup.error}
           pick={pick}
+          status={status}
           onRetry={() => void lookup.refetch()}
           onRescan={rescan}
         />

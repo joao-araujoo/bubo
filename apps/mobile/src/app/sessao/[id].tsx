@@ -4,8 +4,15 @@ import {
   type SessionRecall,
   type SessionResult,
   type ShelfEntry,
+  type ReadingSession,
 } from '@bubo/contracts';
-import { MIN_SESSION_SECONDS, focusElapsedMs, pauseFocusClock, toLocalIsoDate } from '@bubo/domain';
+import {
+  MIN_SESSION_SECONDS,
+  focusElapsedMs,
+  newReadingGoal,
+  pauseFocusClock,
+  toLocalIsoDate,
+} from '@bubo/domain';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -25,14 +32,18 @@ import {
   Toggle,
 } from '../../design-system';
 import { formatDuration, useFocusTimer } from '../../features/session/useFocusTimer';
+import { BeforeReadingCard } from '../../features/session/BeforeReadingCard';
 import {
   clearSessionDraft,
+  createSessionDraftPersistence,
   readSessionDraft,
   writeSessionDraft,
   type SessionDraft,
+  type SessionDraftPersist,
+  type SessionDraftUpdate,
 } from '../../features/session/draft-storage';
 import { ApiError } from '../../lib/api/client';
-import { useAssessSession, useRecordSession, useShelfEntry } from '../../lib/api/queries';
+import { useAssessSession, useRecordSession, useShelf, useShelfEntry } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
@@ -63,6 +74,8 @@ function useConfirmLeave(active: boolean) {
 
 function TimerStep({
   entry,
+  sessions,
+  historyState,
   draft,
   persist,
   busy,
@@ -70,8 +83,10 @@ function TimerStep({
   onDiscard,
 }: {
   entry: ShelfEntry;
+  sessions: readonly ReadingSession[];
+  historyState: 'ready' | 'loading' | 'unavailable';
   draft: SessionDraft;
-  persist: (draft: SessionDraft) => Promise<void>;
+  persist: SessionDraftPersist;
   busy: boolean;
   error: string | null;
   onDiscard: () => void;
@@ -87,47 +102,62 @@ function TimerStep({
       footer={
         <>
           {error ? <InlineMessage tone="error" message={error} /> : null}
-          {timer.status === 'running' ? (
+          {/* One row: discard (icon), play/pause and finish, so the timer keeps the screen. */}
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
             <Button
-              label="Pausar"
-              icon="pause"
+              label="Descartar sessão"
+              icon="delete-outline"
               variant="secondary"
-              fullWidth
+              iconOnly
               disabled={busy}
-              onPress={() => void timer.pause().catch(() => undefined)}
+              onPress={onDiscard}
             />
-          ) : (
+            {timer.status === 'running' ? (
+              <Button
+                label="Pausar"
+                icon="pause"
+                variant="secondary"
+                compact
+                style={{ flex: 1 }}
+                disabled={busy}
+                onPress={() => void timer.pause().catch(() => undefined)}
+              />
+            ) : (
+              <Button
+                label={timer.status === 'idle' ? 'Começar' : 'Retomar'}
+                accessibilityLabel={timer.status === 'idle' ? 'Começar a ler' : 'Retomar'}
+                icon="play-arrow"
+                compact
+                style={{ flex: 1 }}
+                disabled={timer.reachedCap || busy}
+                onPress={() => void timer.start().catch(() => undefined)}
+              />
+            )}
             <Button
-              label={timer.status === 'idle' ? 'Começar a ler' : 'Retomar'}
-              icon="play-arrow"
-              fullWidth
-              disabled={timer.reachedCap || busy}
-              onPress={() => void timer.start().catch(() => undefined)}
+              label="Recordação"
+              accessibilityLabel="Ir para a recordação"
+              icon="flag"
+              variant="success"
+              compact
+              style={{ flex: 1.2 }}
+              disabled={!canFinish || busy}
+              accessibilityHint={
+                canFinish ? undefined : 'Disponível a partir de 1 minuto de leitura'
+              }
+              onPress={() => {
+                haptics.commit();
+                void timer.finish().catch(() => undefined);
+              }}
             />
-          )}
-          <Button
-            label="Ir para a recordação"
-            icon="flag"
-            variant="success"
-            fullWidth
-            disabled={!canFinish || busy}
-            accessibilityHint={canFinish ? undefined : 'Disponível a partir de 1 minuto de leitura'}
-            onPress={() => {
-              haptics.commit();
-              void timer.finish().catch(() => undefined);
-            }}
-          />
-          <Button
-            label="Descartar sessão"
-            variant="secondary"
-            size="md"
-            disabled={busy}
-            onPress={onDiscard}
-          />
+          </View>
         </>
       }
     >
-      <Chip label="Modo leitura profunda" eyebrow align="center" />
+      <Chip
+        label={draft.goalSeconds === 300 ? 'Só 5 minutos para começar' : 'Modo leitura profunda'}
+        eyebrow
+        align="center"
+      />
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
         <BookCover
           title={entry.book.title}
@@ -149,6 +179,36 @@ function TimerStep({
           </Text>
         </View>
       </Card>
+      {timer.status === 'idle' ? (
+        <BeforeReadingCard
+          shelfEntryId={entry.id}
+          currentPage={entry.currentPage}
+          sessions={sessions}
+          historyState={historyState}
+          busy={busy}
+          onStart={() => void timer.start().catch(() => undefined)}
+        />
+      ) : null}
+      {draft.goalNoticeShown ? (
+        <InlineMessage
+          tone="success"
+          message="Você leu por 5 minutos. Pode continuar ou ir para a recordação quando quiser."
+        />
+      ) : timer.goalNoticeError ? (
+        <>
+          <InlineMessage
+            tone="error"
+            message="Não foi possível guardar o aviso da meta neste aparelho. Você pode continuar lendo ou tentar novamente."
+          />
+          <Button
+            label="Tentar guardar aviso"
+            variant="secondary"
+            size="md"
+            disabled={busy}
+            onPress={() => void timer.acknowledgeGoal()}
+          />
+        </>
+      ) : null}
       <View
         style={{ alignItems: 'center', gap: theme.spacing.md, marginVertical: theme.spacing.xl }}
       >
@@ -207,7 +267,7 @@ function FinishStep({
   entry: ShelfEntry;
   userId: string;
   draft: SessionDraft;
-  persist: (draft: SessionDraft) => Promise<void>;
+  persist: SessionDraftPersist;
   onDiscard: () => void;
   onSaved: (result: SessionResult, cleanupWarning?: string) => void;
 }) {
@@ -310,7 +370,7 @@ function FinishStep({
       const result = await save.mutateAsync(submission);
       let cleanupWarning: string | undefined;
       try {
-        await clearSessionDraft(userId);
+        await clearSessionDraft(userId, draft.id);
       } catch {
         cleanupWarning =
           'A sessão foi salva, mas não foi possível apagar o rascunho deste aparelho. Se ele reaparecer, confirme o mesmo envio: não contará duas vezes.';
@@ -344,36 +404,44 @@ function FinishStep({
     <FormScreen
       back={false}
       footer={
-        <>
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <Button
+            label="Descartar registro local"
+            icon="delete-outline"
+            variant="secondary"
+            iconOnly
+            disabled={sending || evaluating}
+            onPress={() => {
+              if (!checking.current && !submitting.current) onDiscard();
+            }}
+          />
           {!draft.submission ? (
             <Button
-              label={assessment ? 'Conferir novamente' : 'Conferir minha recordação'}
+              label={assessment ? 'Reconferir' : 'Conferir'}
+              accessibilityLabel={assessment ? 'Conferir novamente' : 'Conferir minha recordação'}
               icon="fact-check"
               variant="secondary"
-              fullWidth
+              compact
+              style={{ flex: 1 }}
               loading={evaluating}
               disabled={sending}
               onPress={() => void assess()}
             />
           ) : null}
           <Button
-            label={draft.submission ? 'Confirmar envio guardado' : 'Concluir e salvar sessão'}
+            label={draft.submission ? 'Confirmar envio' : 'Salvar sessão'}
+            accessibilityLabel={
+              draft.submission ? 'Confirmar envio guardado' : 'Concluir e salvar sessão'
+            }
             icon="check"
-            fullWidth
+            compact
+            style={{ flex: 1.2 }}
             loading={sending}
             disabled={!canSave || evaluating}
             accessibilityHint={canSave ? undefined : 'Complete e confira a recordação primeiro'}
             onPress={() => void submit()}
           />
-          <Button
-            label="Descartar registro local"
-            variant="secondary"
-            disabled={sending || evaluating}
-            onPress={() => {
-              if (!checking.current && !submitting.current) onDiscard();
-            }}
-          />
-        </>
+        </View>
       }
     >
       <View style={{ gap: theme.spacing.xs }}>
@@ -382,7 +450,7 @@ function FinishStep({
         </Text>
         <Text variant="body" color="textMuted">
           Você leu com foco por {formatDuration(draft.accumulatedMs / 1000)}. Antes de concluir,
-          recupere uma ideia, um detalhe e uma ligação ou dúvida, sem consultar o livro.
+          responda sem consultar o livro.
         </Text>
       </View>
       {save.isError ? <InlineMessage tone="error" message={errorMessage} /> : null}
@@ -390,7 +458,7 @@ function FinishStep({
       {draft.submission ? (
         <InlineMessage
           tone="info"
-          message="Este envio está guardado. Tentar novamente usa os mesmos dados para evitar duplicações."
+          message="Envio guardado. Tente novamente para confirmar a sessão."
         />
       ) : null}
       {draft.reflection ? (
@@ -398,8 +466,7 @@ function FinishStep({
           <Text variant="titleSm">Sua anotação anterior</Text>
           <Text variant="bodySm">{draft.reflection}</Text>
           <Text variant="bodySm" color="textMuted">
-            O rascunho foi preservado por inteiro. Use os três campos abaixo para organizar sua
-            recordação neste novo formato.
+            Organize sua anotação nos três campos abaixo.
           </Text>
         </Card>
       ) : null}
@@ -432,7 +499,6 @@ function FinishStep({
         maxLength={SESSION_RECALL_FIELD_MAX_LENGTH}
         multiline
         textAlignVertical="top"
-        hint="Pode ser breve. Não precisa escrever bonito."
       />
       <TextField
         label="2. Que detalhe ajuda a lembrar disso?"
@@ -456,12 +522,11 @@ function FinishStep({
         maxLength={SESSION_RECALL_FIELD_MAX_LENGTH}
         multiline
         textAlignVertical="top"
-        hint="Uma dúvida sincera também vale."
       />
       {!draft.submission ? (
         <Card>
           <Toggle
-            title="Quero uma pergunta extra com IA"
+            title="Pergunta extra com IA"
             description="Opcional: envia somente estas respostas ao Gemini. Conforme o serviço configurado, o provedor pode usar o texto para melhorar seus modelos. Evite informações pessoais ou sensíveis."
             value={coach}
             onValueChange={
@@ -488,8 +553,7 @@ function FinishStep({
             />
           ))}
           <Text variant="bodySm" color="textMuted">
-            Checklist de escrita: {assessment.assessment.score}/100. Confere o preenchimento do
-            exercício; não mede sua inteligência, retenção ou a correção do livro.
+            Esta conferência avalia a escrita, não a retenção nem os fatos do livro.
           </Text>
           {assessment.coach.question ? (
             <InlineMessage tone="info" message={`Para pensar: ${assessment.coach.question}`} />
@@ -503,7 +567,7 @@ function FinishStep({
       ) : (
         <InlineMessage
           tone="info"
-          message="Sua sessão será salva depois que os três campos passarem pela conferência. As respostas ficam guardadas para você tentar recuperá-las na revisão."
+          message="Preencha os três campos e confira sua recordação antes de salvar."
         />
       )}
     </FormScreen>
@@ -581,15 +645,6 @@ function ResultStep({
           </Card>
         ))}
       </View>
-      {result.session.assessment ? (
-        <Card style={{ gap: theme.spacing.xs }}>
-          <Text variant="titleSm">Você transformou leitura em recordação.</Text>
-          <Text variant="bodySm" color="textMuted">
-            Sua ideia, seu detalhe e sua ligação viraram uma revisão para amanhã. Recuperá-los
-            depois, sem espiar, ajuda a acompanhar o que ficou.
-          </Text>
-        </Card>
-      ) : null}
     </FormScreen>
   );
 }
@@ -597,24 +652,44 @@ function ResultStep({
 /** Focused reading session: timer → mandatory recall → server acceptance → result. */
 export default function ReadingSessionScreen() {
   const theme = useTheme();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, goal } = useLocalSearchParams<{ id: string; goal?: string }>();
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : undefined;
-  const detail = useShelfEntry(userId, typeof id === 'string' ? id : '');
-  if (detail.isPending || !userId) {
+  const entryId = typeof id === 'string' ? id : '';
+  const detail = useShelfEntry(userId, entryId);
+  const shelf = useShelf(userId);
+  const retryableError = detail.error instanceof ApiError && detail.error.retryable;
+  const canUseShelfCache =
+    !shelf.isError || (shelf.error instanceof ApiError && shelf.error.retryable);
+  const cachedEntry = canUseShelfCache
+    ? shelf.data?.entries.find((item) => item.id === entryId)
+    : undefined;
+  const canUseReadingData = !detail.isError || retryableError;
+  const entry = canUseReadingData ? (detail.data?.entry ?? cachedEntry) : undefined;
+  if (!userId || (detail.isPending && !entry)) {
     return (
       <FormScreen>
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando livro" />
       </FormScreen>
     );
   }
-  if (detail.isError) {
+  if (detail.isError && detail.error instanceof ApiError && detail.error.code === 'NOT_FOUND')
+    return <MissingSessionBook key={`${userId}:${entryId}`} userId={userId} entryId={entryId} />;
+  if (!entry) {
     return (
       <FormScreen>
         <EmptyState
           mascot="error"
-          title="Livro não encontrado"
-          description="Ele pode ter sido removido da sua estante."
+          title="Não foi possível abrir o livro"
+          description={
+            retryableError
+              ? 'Tente novamente quando a conexão voltar. Sua sessão guardada continua neste aparelho.'
+              : 'Não foi possível acessar este livro agora. Sua sessão guardada continua neste aparelho.'
+          }
+        />
+        <Button
+          label="Tentar novamente"
+          onPress={() => void Promise.all([detail.refetch(), shelf.refetch()])}
         />
       </FormScreen>
     );
@@ -622,14 +697,127 @@ export default function ReadingSessionScreen() {
 
   return (
     <DurableSession
-      key={`${userId}:${detail.data.entry.id}`}
+      key={`${userId}:${entry.id}`}
       userId={userId}
-      entry={detail.data.entry}
+      entry={entry}
+      sessions={detail.data?.sessions ?? []}
+      historyState={detail.data ? 'ready' : detail.isPending ? 'loading' : 'unavailable'}
+      goal={goal}
     />
   );
 }
 
-function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }) {
+function MissingSessionBook({ userId, entryId }: { userId: string; entryId: string }) {
+  const router = useRouter();
+  const [stored, setStored] = useState<SessionDraft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    readSessionDraft(userId)
+      .then((draft) => {
+        if (!active) return;
+        setStored(draft?.shelfEntryId === entryId ? draft : null);
+        setError(null);
+      })
+      .catch(() => {
+        if (active) setError('Não foi possível recuperar o registro local. Tente novamente.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId, entryId, attempt]);
+
+  function discardMissingDraft() {
+    if (!stored || busy) return;
+    const expectedId = stored.id;
+    Alert.alert(
+      'Descartar registro local?',
+      'O tempo ainda não salvo será perdido. Isso descarta apenas este registro do aparelho.',
+      [
+        { text: 'Manter', style: 'cancel' },
+        {
+          text: 'Descartar',
+          style: 'destructive',
+          onPress: () => {
+            setBusy(true);
+            void clearSessionDraft(userId, expectedId)
+              .then(() => {
+                haptics.selection();
+                router.replace('/');
+              })
+              .catch(() =>
+                setError('Não foi possível descartar o registro local. Tente novamente.'),
+              )
+              .finally(() => setBusy(false));
+          },
+        },
+      ],
+    );
+  }
+
+  return (
+    <FormScreen title="Sua leitura">
+      <EmptyState
+        mascot="error"
+        title="Livro não encontrado"
+        description="Ele pode ter sido removido da sua estante."
+      />
+      {loading ? <ActivityIndicator accessibilityLabel="Recuperando registro local" /> : null}
+      {error ? (
+        <>
+          <InlineMessage tone="error" message={error} />
+          <Button
+            label="Tentar recuperar registro"
+            variant="secondary"
+            disabled={busy || loading}
+            onPress={() => {
+              setLoading(true);
+              setAttempt((current) => current + 1);
+            }}
+          />
+        </>
+      ) : null}
+      {stored ? (
+        <>
+          <Text variant="bodySm" color="textMuted">
+            Há uma sessão deste livro guardada neste aparelho. Você pode descartar apenas esse
+            registro local.
+          </Text>
+          <Button
+            label="Descartar registro local"
+            icon="delete-outline"
+            variant="secondary"
+            loading={busy}
+            disabled={loading}
+            onPress={discardMissingDraft}
+          />
+        </>
+      ) : null}
+    </FormScreen>
+  );
+}
+
+function DurableSession({
+  userId,
+  entry,
+  sessions,
+  historyState,
+  goal,
+}: {
+  userId: string;
+  entry: ShelfEntry;
+  sessions: readonly ReadingSession[];
+  historyState: 'ready' | 'loading' | 'unavailable';
+  goal: string | undefined;
+}) {
+  const theme = useTheme();
   const router = useRouter();
   const [draft, setDraft] = useState<SessionDraft | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -640,6 +828,8 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
   const [cleanupWarning, setCleanupWarning] = useState<string | undefined>();
   const pendingWrites = useRef(0);
   const initialPage = useRef(String(entry.currentPage));
+  const initialGoal = useRef(newReadingGoal(goal));
+  const persistence = useRef<ReturnType<typeof createSessionDraftPersistence> | null>(null);
 
   function fresh(): SessionDraft {
     return {
@@ -652,6 +842,7 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
       endedAt: null,
       page: String(entry.currentPage),
       reflection: '',
+      ...initialGoal.current,
       submission: null,
     };
   }
@@ -666,20 +857,21 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
           await writeSessionDraft(userId, stored);
         }
         if (!active) return;
-        setDraft(
-          stored ?? {
-            version: 1,
-            id: Crypto.randomUUID(),
-            shelfEntryId: entry.id,
-            startedAt: null,
-            accumulatedMs: 0,
-            runningSince: null,
-            endedAt: null,
-            page: initialPage.current,
-            reflection: '',
-            submission: null,
-          },
-        );
+        const recovered = stored ?? {
+          version: 1,
+          id: Crypto.randomUUID(),
+          shelfEntryId: entry.id,
+          startedAt: null,
+          accumulatedMs: 0,
+          runningSince: null,
+          endedAt: null,
+          page: initialPage.current,
+          reflection: '',
+          ...initialGoal.current,
+          submission: null,
+        };
+        persistence.current = createSessionDraftPersistence(userId, recovered, setDraft);
+        setDraft(recovered);
         setRecover(stored !== null);
         setLoaded(true);
       })
@@ -694,12 +886,12 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
     };
   }, [userId, entry.id]);
 
-  async function persist(next: SessionDraft) {
+  async function persist(update: SessionDraftUpdate) {
     pendingWrites.current += 1;
     setBusy(true);
     try {
-      await writeSessionDraft(userId, next);
-      setDraft(next);
+      if (!persistence.current) throw new Error('Session draft unavailable');
+      await persistence.current.persist(update);
       setError(null);
     } catch (e) {
       setError('Não foi possível guardar a sessão neste aparelho. Tente novamente.');
@@ -713,7 +905,7 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
   function discard() {
     Alert.alert(
       'Descartar registro local?',
-      'O tempo não enviado será perdido. Uma sessão já recebida pela API continua no histórico.',
+      'O tempo ainda não salvo será perdido. Sessões já salvas continuam no histórico.',
       [
         { text: 'Manter', style: 'cancel' },
         {
@@ -721,9 +913,15 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
           style: 'destructive',
           onPress: () => {
             setBusy(true);
-            void clearSessionDraft(userId)
+            const next = fresh();
+            const removal = persistence.current
+              ? persistence.current.discard(next)
+              : clearSessionDraft(userId).then(() => {
+                  persistence.current = createSessionDraftPersistence(userId, next, setDraft);
+                  setDraft(next);
+                });
+            void removal
               .then(() => {
-                setDraft(fresh());
                 setRecover(false);
                 setError(null);
               })
@@ -763,38 +961,54 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
         {draft.startedAt !== null && Date.now() - draft.startedAt > 48 * 60 * 60 * 1000 ? (
           <InlineMessage
             tone="info"
-            message="Este registro tem mais de 48 horas. A API só aceita novas sessões dentro desse prazo. Você pode consultar sua reflexão; um envio já recebido pode ser confirmado novamente."
+            message="O prazo de 48 horas para salvar esta sessão passou. Sua anotação continua aqui; envios já salvos podem ser confirmados novamente."
           />
         ) : null}
         {error ? <InlineMessage tone="error" message={error} /> : null}
-        <Button
-          label={sameBook ? 'Continuar' : 'Abrir a leitura em andamento'}
-          disabled={busy}
-          onPress={() => {
-            if (!sameBook) {
-              router.replace({ pathname: '/sessao/[id]', params: { id: draft.shelfEntryId } });
-              return;
-            }
-            // Stop counting while the reader decides; resuming is always explicit.
-            void persist({ ...draft, ...pauseFocusClock(draft, Date.now()) })
-              .then(() => setRecover(false))
-              .catch(() => undefined);
-          }}
-        />
-        {sameBook && !draft.endedAt ? (
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
           <Button
-            label="Encerrar"
-            variant="success"
-            disabled={busy || focusElapsedMs(draft, Date.now()) < MIN_SESSION_SECONDS * 1000}
+            label="Descartar"
+            icon="delete-outline"
+            variant="secondary"
+            iconOnly
+            disabled={busy}
+            onPress={discard}
+          />
+          <Button
+            label={sameBook ? 'Continuar' : 'Abrir leitura'}
+            accessibilityLabel={sameBook ? 'Continuar' : 'Abrir a leitura em andamento'}
+            icon={sameBook ? 'play-arrow' : 'menu-book'}
+            compact
+            style={{ flex: 1 }}
+            disabled={busy}
             onPress={() => {
-              const stamp = Date.now();
-              void persist({ ...draft, ...pauseFocusClock(draft, stamp), endedAt: stamp })
+              if (!sameBook) {
+                router.replace({ pathname: '/sessao/[id]', params: { id: draft.shelfEntryId } });
+                return;
+              }
+              // Stop counting while the reader decides; resuming is always explicit.
+              void persist({ ...draft, ...pauseFocusClock(draft, Date.now()) })
                 .then(() => setRecover(false))
                 .catch(() => undefined);
             }}
           />
-        ) : null}
-        <Button label="Descartar" variant="secondary" disabled={busy} onPress={discard} />
+          {sameBook && !draft.endedAt ? (
+            <Button
+              label="Encerrar"
+              icon="flag"
+              variant="success"
+              compact
+              style={{ flex: 1 }}
+              disabled={busy || focusElapsedMs(draft, Date.now()) < MIN_SESSION_SECONDS * 1000}
+              onPress={() => {
+                const stamp = Date.now();
+                void persist({ ...draft, ...pauseFocusClock(draft, stamp), endedAt: stamp })
+                  .then(() => setRecover(false))
+                  .catch(() => undefined);
+              }}
+            />
+          ) : null}
+        </View>
       </FormScreen>
     );
   }
@@ -814,7 +1028,10 @@ function DurableSession({ userId, entry }: { userId: string; entry: ShelfEntry }
     );
   return (
     <TimerStep
+      key={draft.id}
       entry={entry}
+      sessions={sessions}
+      historyState={historyState}
       draft={draft}
       persist={persist}
       busy={busy}

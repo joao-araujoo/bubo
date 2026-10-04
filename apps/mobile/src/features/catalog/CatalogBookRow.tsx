@@ -22,10 +22,11 @@ type Props = {
   action?: Action;
   /** Replaces the action, e.g. "Na estante". */
   badge?: string;
+  priority?: 'low' | 'normal' | 'high';
 };
 
 /** Stitch "Comunidade está lendo" row: cover, title, author, two-line synopsis, facts and CTA. */
-export function CatalogBookRow({ book, onOpen, action, badge }: Props) {
+export function CatalogBookRow({ book, onOpen, action, badge, priority = 'normal' }: Props) {
   const theme = useTheme();
   const author = authorLine(book);
   const facts = [
@@ -37,7 +38,13 @@ export function CatalogBookRow({ book, onOpen, action, badge }: Props) {
 
   const body = (
     <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-      <BookCover title={book.title} author={author} coverUrls={book.coverUrls} width={76} />
+      <BookCover
+        title={book.title}
+        author={author}
+        coverUrls={book.coverUrls}
+        width={76}
+        priority={priority}
+      />
       <View style={{ flex: 1, gap: theme.spacing.xxs }}>
         <Text variant="titleSm" numberOfLines={2}>
           {book.title}
@@ -79,13 +86,13 @@ export function CatalogBookRow({ book, onOpen, action, badge }: Props) {
       )}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: 'column',
+          alignItems: 'stretch',
           justifyContent: 'space-between',
           gap: theme.spacing.sm,
         }}
       >
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, flex: 1 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
           {facts.map((fact) => (
             <Chip key={fact} label={fact} tone="primary" />
           ))}

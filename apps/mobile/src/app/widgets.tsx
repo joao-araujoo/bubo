@@ -4,7 +4,6 @@ import { ActivityIndicator, Platform, View } from 'react-native';
 
 import {
   BookCover,
-  BuboTip,
   Button,
   Card,
   FormScreen,
@@ -87,22 +86,11 @@ export default function WidgetsScreen() {
     ) : null;
 
   return (
-    <FormScreen title="Bubo na sua tela" eyebrow="Widgets">
-      <BuboTip pose="welcome" title="Sua sequência sempre à vista">
-        <Text variant="bodySm">
-          O Bubo mostra sua sequência, comemora quando você lê e dá um empurrãozinho quando o dia
-          está acabando. À noite, ele dorme.
-        </Text>
-        <Text variant="bodySm">
-          Proteção de sequência: a cada 7 dias seguidos com leitura ou revisão você ganha uma
-          proteção (até 2). Se um dia passar sem atividade, ela cobre esse dia sozinha e aparece em
-          azul no calendário.
-        </Text>
-      </BuboTip>
+    <FormScreen title="Widgets">
       {!widgetsAvailable ? (
         <InlineMessage
           tone="info"
-          message="Você pode conferir as prévias aqui. Para adicionar os widgets à tela do celular, instale uma versão do Bubo com widgets incluídos."
+          message="Widgets indisponíveis nesta versão. Você pode ver as prévias abaixo."
         />
       ) : null}
       {notice ? <InlineMessage tone="info" message={notice} /> : null}
@@ -115,7 +103,7 @@ export default function WidgetsScreen() {
       {shelf.isError || stats.isError || due.isError ? (
         <InlineMessage
           tone="info"
-          message="Não foi possível atualizar todos os dados. Os widgets só exibem informações recentes. Abra o Bubo quando tiver conexão."
+          message="Não foi possível atualizar os dados. Tente novamente com conexão."
         />
       ) : null}
 
@@ -124,9 +112,9 @@ export default function WidgetsScreen() {
         <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' }}>
           <StreakWidgetPreview snapshot={snapshot} now={now} />
           <View style={{ flex: 1, gap: theme.spacing.xs }}>
-            <Text variant="titleSm">Pequeno e direto</Text>
+            <Text variant="titleSm">Dias seguidos</Text>
             <Text variant="bodySm" color="textMuted">
-              Dias seguidos com leitura ou revisão. A chama acende quando você lê ou revisa hoje.
+              Leitura e revisão contam para sua sequência.
             </Text>
           </View>
         </View>
@@ -137,7 +125,7 @@ export default function WidgetsScreen() {
       <Card>
         <WeekWidgetPreview snapshot={snapshot} now={now} />
         <Text variant="bodySm" color="textMuted">
-          Cada dia da semana com leitura ou revisão ganha um check; dias protegidos ficam azuis.
+          Dias protegidos aparecem em azul.
         </Text>
         {addButton('rhythm')}
       </Card>
@@ -145,10 +133,6 @@ export default function WidgetsScreen() {
       <SectionTitle icon="calendar-month" title="Calendário de leitura" />
       <Card>
         <CalendarWidgetPreview snapshot={snapshot} now={now} />
-        <Text variant="bodySm" color="textMuted">
-          Seus dias ativos do mês. Dias seguidos aparecem ligados, hoje fica marcado e dias cobertos
-          pela proteção ganham um floco azul.
-        </Text>
         {addButton('calendar')}
       </Card>
 
@@ -159,9 +143,6 @@ export default function WidgetsScreen() {
           now={now}
           cover={current ? <BookCover {...current.book} width={62} /> : undefined}
         />
-        <Text variant="bodySm" color="textMuted">
-          Seu livro, sua página e um toque para voltar à sessão.
-        </Text>
         {addButton('reading')}
       </Card>
 
@@ -169,8 +150,7 @@ export default function WidgetsScreen() {
       <Card>
         <LeagueWidgetPreview snapshot={snapshot} now={now} />
         <Text variant="bodySm" color="textMuted">
-          Sua posição entre amigos que compartilham as leituras, pelo XP real da semana. Toque para
-          ver a liga completa.
+          Entre amigos que compartilham a leitura.
         </Text>
         {addButton('league')}
       </Card>
@@ -179,9 +159,6 @@ export default function WidgetsScreen() {
         <>
           <SectionTitle icon="schedule" title="O Bubo ao longo do dia" />
           <Card>
-            <Text variant="bodySm" color="textMuted">
-              Com os seus dados de hoje, o Bubo vai mudar assim:
-            </Text>
             <MoodTimeline snapshot={snapshot} />
           </Card>
         </>
@@ -191,7 +168,7 @@ export default function WidgetsScreen() {
       <Card>
         <Toggle
           title="Atualizar meus widgets"
-          description="Ao desativar, os dados são removidos dos widgets deste aparelho."
+          description="Desativar remove os dados dos widgets deste aparelho."
           value={device.preferences.widgetsEnabled}
           onValueChange={(widgetsEnabled) => device.update({ widgetsEnabled })}
         />
@@ -207,12 +184,9 @@ export default function WidgetsScreen() {
               device.update({ widgetWeeklyGoal: goal });
           }}
         />
-        <Text variant="bodySm" color="textMuted">
-          Quando você lê nessa quantidade de dias, o Bubo comemora a meta da semana.
-        </Text>
         <Toggle
           title="Ocultar título na tela bloqueada"
-          description="Na tela bloqueada do iPhone, o widget mostra a página em vez do título do livro. Ativado por padrão."
+          description="No iPhone, mostra só a página do livro na tela bloqueada."
           value={device.preferences.hideBookOnLockScreen}
           onValueChange={(hideBookOnLockScreen) => device.update({ hideBookOnLockScreen })}
         />
@@ -221,12 +195,11 @@ export default function WidgetsScreen() {
         <Text variant="titleSm">Como adicionar</Text>
         <Text variant="bodySm">
           {Platform.OS === 'ios'
-            ? 'Toque e segure a tela inicial → Editar → Adicionar Widget → Bubo. Escolha Sequência, Sequência da semana, Calendário de leitura, Continuar leitura ou Liga semanal. Na tela bloqueada, toque e segure → Personalizar → Adicionar Widgets → Bubo.'
+            ? 'Toque e segure a tela inicial → Editar → Adicionar Widget → Bubo. Na tela bloqueada: Personalizar → Adicionar Widgets → Bubo.'
             : 'Toque e segure um espaço vazio na tela inicial → Widgets → Bubo. Arraste o modelo escolhido e ajuste o tamanho.'}
         </Text>
         <Text variant="bodySm" color="textMuted">
-          Os dados atualizam quando você usa o Bubo. Sem dados recentes, o widget pede para abrir o
-          app. Ao sair da conta, as informações são removidas.
+          Abra o Bubo para atualizar os dados. Sair da conta remove as informações dos widgets.
         </Text>
       </Card>
     </FormScreen>

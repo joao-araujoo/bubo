@@ -438,46 +438,27 @@ export default function YouScreen() {
       <ActionRow
         icon="insights"
         title="Minha memória"
-        subtitle="Revisões por período e por livro"
         onPress={() => router.push('/estatisticas')}
       />
-      <ActionRow
-        icon="people"
-        title="Amigos de leitura"
-        subtitle="Pedidos, amigos e privacidade"
-        onPress={() => router.push('/amigos')}
-      />
+      <ActionRow icon="people" title="Amigos de leitura" onPress={() => router.push('/amigos')} />
       <ActionRow
         icon="psychology"
-        title="Preferências cognitivas"
-        subtitle="Revisões, metas, lembretes e aparência"
+        title="Preferências"
         onPress={() => router.push('/configuracoes')}
       />
       <ActionRow
         icon="notifications"
         title="Notificações"
-        subtitle="Lembretes e avisos da comunidade"
         onPress={() => router.push('/notificacoes')}
       />
-      <ActionRow
-        icon="widgets"
-        title="Bubo na sua tela"
-        subtitle="Widgets de leitura, ritmo e revisões"
-        onPress={() => router.push('/widgets')}
-      />
+      <ActionRow icon="widgets" title="Widgets" onPress={() => router.push('/widgets')} />
       <ActionRow
         icon="block"
         title="Leitores bloqueados"
-        subtitle="Quem você bloqueou nos clubes"
         onPress={() => router.push('/bloqueados')}
       />
       {auth.status === 'ready' && auth.me.isModerator ? (
-        <ActionRow
-          icon="gavel"
-          title="Moderação geral"
-          subtitle="Denúncias abertas de todos os clubes"
-          onPress={() => router.push('/moderacao')}
-        />
+        <ActionRow icon="gavel" title="Moderação geral" onPress={() => router.push('/moderacao')} />
       ) : null}
       <Button
         label="Sair da conta"

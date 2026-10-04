@@ -8,7 +8,6 @@ import {
 import {
   MAX_BOOK_PAGES,
   MEMORY_PATH_MAX_PAST,
-  type ReadingStatus,
   buildMemoryPath,
   readingProgress,
   toLocalIsoDate,
@@ -31,11 +30,11 @@ import {
   SectionHeader,
   Text,
   TextField,
-  ToggleChip,
 } from '../../design-system';
 import { formatDuration } from '../../features/session/useFocusTimer';
-import { STATUS_META, STATUS_ORDER, shortDate } from '../../features/shelf/labels';
+import { STATUS_META, shortDate } from '../../features/shelf/labels';
 import { MemoryPath } from '../../features/shelf/MemoryPath';
+import { ShelfStatusPicker } from '../../features/shelf/ShelfStatusPicker';
 import { BookClubReviews } from '../../features/community/BookClubReviews';
 import { ApiError } from '../../lib/api/client';
 import { dueLabel } from '../../features/recall/grades';
@@ -124,40 +123,6 @@ function ProgressEditor({ entry, userId }: { entry: ShelfEntry; userId: string }
         loading={update.isPending}
         onPress={save}
       />
-    </Card>
-  );
-}
-
-function StatusPicker({ entry, userId }: { entry: ShelfEntry; userId: string }) {
-  const theme = useTheme();
-  const update = useUpdateShelfEntry(userId, entry.id);
-  const change = (status: ReadingStatus) => {
-    if (status === entry.status || update.isPending) return;
-    update.mutate(
-      { status },
-      { onSuccess: () => haptics.success(), onError: () => haptics.error() },
-    );
-  };
-  return (
-    <Card>
-      <SectionHeader title="Status" icon="flag" />
-      <View
-        accessibilityRole="radiogroup"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}
-      >
-        {STATUS_ORDER.map((status) => (
-          <ToggleChip
-            key={status}
-            label={STATUS_META[status].label}
-            icon={STATUS_META[status].icon}
-            selected={entry.status === status}
-            onPress={() => change(status)}
-          />
-        ))}
-      </View>
-      {update.isError ? (
-        <InlineMessage tone="error" message="Não foi possível mudar o status agora." />
-      ) : null}
     </Card>
   );
 }
@@ -351,13 +316,31 @@ export default function BookScreen() {
       </FormScreen>
     );
   }
-  if (detail.isError) {
+  if (
+    detail.isError &&
+    (!detail.data || !(detail.error instanceof ApiError && detail.error.retryable))
+  ) {
+    const missing = detail.error instanceof ApiError && detail.error.code === 'NOT_FOUND';
     return (
-      <FormScreen>
+      <FormScreen title="Meu livro">
         <EmptyState
-          mascot="notFound"
-          title="Livro não encontrado"
-          description="Ele pode ter sido removido da sua estante."
+          mascot={missing ? 'notFound' : 'emptyShelf'}
+          title={missing ? 'Livro não encontrado' : 'Não foi possível carregar o livro'}
+          description={
+            missing
+              ? 'Ele pode ter sido removido da sua estante.'
+              : 'Tente novamente para acessar os detalhes do livro.'
+          }
+          action={
+            missing ? undefined : (
+              <Button
+                label="Tentar novamente"
+                icon="refresh"
+                loading={detail.isFetching}
+                onPress={() => void detail.refetch()}
+              />
+            )
+          }
         />
       </FormScreen>
     );
@@ -437,6 +420,26 @@ export default function BookScreen() {
           </View>
         ) : null}
       </Card>
+      <Card>
+        <SectionHeader title="Na minha estante" icon="flag" />
+        <ShelfStatusPicker entry={entry} userId={userId} />
+      </Card>
+      {detail.isError ? (
+        <Card>
+          <InlineMessage
+            tone="error"
+            message="Não conseguimos atualizar os detalhes agora. Tente novamente."
+          />
+          <Button
+            label="Atualizar livro"
+            variant="secondary"
+            icon="refresh"
+            size="md"
+            loading={detail.isFetching}
+            onPress={() => void detail.refetch()}
+          />
+        </Card>
+      ) : null}
       <MemoryPath
         steps={buildMemoryPath({
           today,
@@ -447,8 +450,7 @@ export default function BookScreen() {
         today={today}
         truncated={sessions.length + reviews.length > MEMORY_PATH_MAX_PAST}
       />
-      <StatusPicker entry={entry} userId={userId} />
-      {/* Remount on status change (e.g. "Terminado" moves the page to the end). */}
+      {/* Remount on status change (e.g. "Lido" moves the page to the end). */}
       <ProgressEditor key={entry.status} entry={entry} userId={userId} />
       <SessionHistory sessions={sessions} />
       {entry.book.catalogId ? <BookClubReviews userId={userId} bookId={entry.book.id} /> : null}

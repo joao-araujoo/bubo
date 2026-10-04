@@ -29,6 +29,13 @@ type Props = {
   fullWidth?: boolean;
   /** Reduced label, icon and padding for buttons in dense horizontal groups. */
   compact?: boolean;
+  /**
+   * Shows only the icon (requires `icon`). `label` stays the accessibility label, so screen
+   * readers still announce the action.
+   */
+  iconOnly?: boolean;
+  /** Full action name for screen readers when the visible `label` is shortened. */
+  accessibilityLabel?: string;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -75,6 +82,8 @@ export function Button({
   loading = false,
   fullWidth = false,
   compact = false,
+  iconOnly = false,
+  accessibilityLabel,
   accessibilityHint,
   style,
 }: Props) {
@@ -82,11 +91,12 @@ export function Button({
   const palette = variantColors(theme.colors, variant);
   const inactive = disabled || loading;
   const height = size === 'lg' ? theme.sizes.ctaHeight : theme.sizes.touchTarget;
+  const bare = iconOnly && icon !== undefined;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
@@ -106,7 +116,12 @@ export function Button({
             styles.face,
             {
               minHeight: height,
-              paddingHorizontal: compact ? theme.spacing.xs : theme.spacing.lg,
+              minWidth: bare ? height : undefined,
+              paddingHorizontal: bare
+                ? theme.spacing.sm
+                : compact
+                  ? theme.spacing.xs
+                  : theme.spacing.lg,
               paddingVertical: compact ? theme.spacing.xs : theme.spacing.md,
             },
           ]}
@@ -115,16 +130,23 @@ export function Button({
             <ActivityIndicator color={theme.colors[palette.text]} />
           ) : (
             <View style={[styles.content, { gap: compact ? theme.spacing.xs : theme.spacing.sm }]}>
-              {icon ? <Icon name={icon} size={compact ? 18 : 20} color={palette.text} /> : null}
-              <Text
-                variant={compact ? 'label' : 'labelLg'}
-                color={palette.text}
-                align="center"
-                numberOfLines={compact ? 1 : undefined}
-                style={{ flexShrink: 1 }}
-              >
-                {label}
-              </Text>
+              {icon ? (
+                <Icon name={icon} size={bare ? 22 : compact ? 18 : 20} color={palette.text} />
+              ) : null}
+              {bare ? null : (
+                <Text
+                  variant={compact ? 'label' : 'labelLg'}
+                  color={palette.text}
+                  align="center"
+                  numberOfLines={compact ? 1 : undefined}
+                  // Dense rows shrink the label slightly instead of truncating it.
+                  adjustsFontSizeToFit={compact}
+                  minimumFontScale={0.8}
+                  style={{ flexShrink: 1 }}
+                >
+                  {label}
+                </Text>
+              )}
               {trailing}
             </View>
           )}

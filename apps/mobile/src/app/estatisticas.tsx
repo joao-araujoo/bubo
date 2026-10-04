@@ -1,15 +1,20 @@
-import { type MemoryDay, WEEKDAY_LABELS_PT, summarizeMemoryDays } from '@bubo/domain';
+import { type DelayedRecallStats } from '@bubo/contracts';
+import {
+  type DelayedRecallWindow,
+  type MemoryDay,
+  WEEKDAY_LABELS_PT,
+  summarizeMemoryDays,
+} from '@bubo/domain';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import {
-  BuboMascot,
   Button,
   Card,
-  Chip,
   EmptyState,
   FormScreen,
+  ProgressBar,
   SectionHeader,
   SegmentedTabs,
   Text,
@@ -150,6 +155,50 @@ function DailyChart({ days, busiestDay }: { days: MemoryDay[]; busiestDay: numbe
   );
 }
 
+const DELAY_LABELS: Record<DelayedRecallWindow, string> = {
+  oneToSixDays: '1–6 dias',
+  sevenToTwentyNineDays: '7–29 dias',
+  thirtyPlusDays: '30+ dias',
+};
+
+function DelayedRecall({ stats }: { stats: DelayedRecallStats }) {
+  const theme = useTheme();
+  if (!stats.windows.some((row) => row.total > 0)) return null;
+
+  return (
+    <Card>
+      <SectionHeader title="Lembrei após um intervalo" icon="psychology" />
+      {stats.windows.map((row) => {
+        const label = DELAY_LABELS[row.window];
+        const percent = row.total === 0 ? null : Math.round((row.remembered / row.total) * 100);
+        return (
+          <View key={row.window} style={{ gap: theme.spacing.xs }}>
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              <Text variant="bodySm" style={{ flex: 1 }}>
+                {label}
+              </Text>
+              <Text variant="bodySm" color="textMuted" style={{ flex: 1, textAlign: 'right' }}>
+                {percent === null ? 'Sem revisões' : `${row.remembered}/${row.total} · ${percent}%`}
+              </Text>
+            </View>
+            {percent !== null ? (
+              <ProgressBar
+                percent={percent}
+                tone="success"
+                size="sm"
+                accessibilityLabel={`Intervalo de ${label}: ${row.remembered} de ${row.total} revisões autoavaliadas como Lembrei`}
+              />
+            ) : null}
+          </View>
+        );
+      })}
+      <Text variant="caption" color="textMuted">
+        Suas autoavaliações após um intervalo
+      </Text>
+    </Card>
+  );
+}
+
 /** Real review self-assessments and reading activity, never a retention score. */
 export default function MemoryScreen() {
   const router = useRouter();
@@ -165,7 +214,6 @@ export default function MemoryScreen() {
   return (
     <FormScreen
       title="Minha memória"
-      eyebrow={`Últimos ${period} dias`}
       footer={
         hasData ? (
           <Button
@@ -212,7 +260,7 @@ export default function MemoryScreen() {
           <EmptyState
             mascot="emptyReview"
             title="Seu histórico começa com uma revisão"
-            description={`Nenhuma revisão registrada nos últimos ${period} dias. Quando você revisar um card, sua avaliação aparece aqui.`}
+            description={`Nenhuma revisão nos últimos ${period} dias.`}
             action={
               <Button
                 label="Ir para Revisar"
@@ -226,45 +274,23 @@ export default function MemoryScreen() {
       ) : (
         <>
           <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-              <BuboMascot state="reviewDue" size={80} />
-              <View style={{ flex: 1, gap: theme.spacing.xs }}>
-                <Chip label="Seu período de revisões" tone="primary" eyebrow />
-                <Text variant="bodyStrong">
-                  Você revisou em {summary.activeDays} {summary.activeDays === 1 ? 'dia' : 'dias'}{' '}
-                  dos últimos {period}.
-                </Text>
-              </View>
-            </View>
             <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
               <StatTile
                 value={String(summary.total)}
                 label={summary.total === 1 ? 'Revisão' : 'Revisões'}
               />
-              <StatTile
-                value={`${summary.rememberedPercent ?? 0}%`}
-                label="Marcadas como Lembrei"
-              />
+              <StatTile value={`${summary.rememberedPercent ?? 0}%`} label="Lembrei" />
               <StatTile value={`${summary.activeDays}/${period}`} label="Dias com revisão" />
             </View>
           </Card>
           <DailyChart days={days} busiestDay={summary.busiestDay} />
-          <Card tone="muted">
-            <SectionHeader title="Como ler estes números" icon="info-outline" />
-            <Text variant="bodySm" color="textMuted">
-              Lembrei, Quase e Esqueci mostram como você avaliou cada tentativa de lembrar. São suas
-              autoavaliações, não uma medida de retenção.
-            </Text>
-          </Card>
+          {stats.data?.delayedRecall ? <DelayedRecall stats={stats.data.delayedRecall} /> : null}
         </>
       )}
       {stats.isSuccess && stats.data ? (
         <>
           <Card>
             <SectionHeader title="Leitura e foco" icon="bar-chart" />
-            <Text variant="bodySm" color="textMuted">
-              Nos últimos {period} dias
-            </Text>
             <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
               <StatTile
                 value={String(stats.data.focus.focusedMinutes)}
@@ -273,7 +299,7 @@ export default function MemoryScreen() {
               <StatTile value={String(stats.data.focus.readingDays)} label="Dias com leitura" />
             </View>
             <Text variant="bodySm" color="textMuted">
-              Sua memória hoje: {stats.data.cardsTotal} cards em {stats.data.booksWithCards} livros.
+              {stats.data.cardsTotal} cards · {stats.data.booksWithCards} livros
             </Text>
           </Card>
           {hasData ? (
@@ -289,12 +315,9 @@ export default function MemoryScreen() {
               ).map(([key, label]) => (
                 <Text key={key} variant="bodySm">
                   {label}: {stats.data.dayParts[key].total} revisões ·{' '}
-                  {stats.data.dayParts[key].remembered} marcadas como Lembrei
+                  {stats.data.dayParts[key].remembered} Lembrei
                 </Text>
               ))}
-              <Text variant="bodySm" color="textMuted">
-                Horários locais das suas tentativas, sem classificar o melhor horário para aprender.
-              </Text>
             </Card>
           ) : null}
           {stats.data.books.length > 0 ? (
@@ -304,7 +327,7 @@ export default function MemoryScreen() {
                 <View key={book.shelfEntryId} style={{ gap: theme.spacing.xs }}>
                   <Text variant="bodyStrong">{book.title}</Text>
                   <Text variant="bodySm" color="textMuted">
-                    {book.total} revisões · {book.remembered} marcadas como Lembrei
+                    {book.total} revisões · {book.remembered} Lembrei
                   </Text>
                   <Button
                     label={`Abrir ${book.title}`}

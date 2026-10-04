@@ -5,13 +5,13 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 
 ## Current remote state (keep this updated after every remote change)
 
-Last updated 2026-10-03 (ADR-029 streak protection and weekly league deployed; no migration). Owner-facing checklist in Portuguese:
+Last updated 2026-10-03 (ADR-031 Discover recommendations and catalog burst fix deployed; no migration). Owner-facing checklist in Portuguese:
 [../CONFIGURAR.md](../CONFIGURAR.md).
 
 - **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
-  `dab385b1-6dbe-4022-8ac1-36186c678ae3`, 2026-10-03 ADR-029: `/v1/me/stats.streakFreeze` and
-  `GET /v1/me/league`; verify 425 tests, health/ready 200, league 401 without session, route in
-  OpenAPI; migrations through `0015`) with an hourly cron trigger (`0 * * * *`,
+  `f312daaa-2afd-430f-a447-7f08422792fa`, 2026-10-03 ADR-031: `GET /v1/catalog/discover`,
+  catalog queue 5 s / 6 s deadline, short queries answered empty, keyless Google `skipped`;
+  verify 461 tests; migrations through `0015`) with an hourly cron trigger (`0 * * * *`,
   review reminders). The account's `workers.dev` subdomain `bubo-api` was
   registered automatically by the first deploy; renaming it changes every Worker URL on the account.
 - **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),
@@ -30,6 +30,19 @@ Last updated 2026-10-03 (ADR-029 streak protection and weekly league deployed; n
 - **Expo Go vs production:** production trusts only `bubo://`; Expo Go (`exp://`) works only with a
   development API. Testing against production needs a native build; the free local Android
   route is `npm run build:android` (see [build-mobile.md](build-mobile.md)).
+- **Discover + catalog fix (2026-10-03; ADR-031):** three publishes the same evening
+  (`3185f320…`, `cbcfb82f…`, `268a1b7b…`, final `f312daaa…`), each after `verify` and a read-only
+  migration check (0 pending). The production smokes found two more causes that local tests had
+  not: Open Library rejects queries under 3 characters (422 → 503) and author names with initials
+  did not match. Final production smoke 18/18: health/ready, anonymous 401, 2-letter search 200
+  empty, 5 concurrent searches 200, three shelf additions, Discover 200 (`openlibrary: ok`, all
+  Portuguese, shelf books excluded, reasons such as "Mesma autoria de Duna"), cached repeat, genre
+  200, invalid genre 422, account deletion, revoked session 401, sign-in 401. One earlier QA
+  account (`qa-discover-…@example.com`) lost its random password when a smoke script aborted; it
+  was found by a read-only query (exactly one row) and deleted by exact id with cascade (0 users,
+  shelf rows and sessions left). Later smokes clean up in `finally`. No secrets were changed;
+  `CATALOG_CONTACT_EMAIL` and `GOOGLE_BOOKS_API_KEY` remain unset. Existing APKs benefit from the
+  API fixes; the new Discover screen, 3-letter search and cover loading need a new APK.
 - **Smoke tests (2026-09-27):** core flow (health, ready, sign-up, memory, catalog, ISBN, add,
   session → card, shelf detail, OpenAPI, achievements, reset → 503, account deletion) and the
   Comunidade flow with two accounts both passed; every test account was deleted.
@@ -47,6 +60,20 @@ Last updated 2026-10-03 (ADR-029 streak protection and weekly league deployed; n
   text, mark all read, 401 without session — 22/22, both accounts deleted.
 - **Push:** the Worker calls the Expo push service; no EAS project id or Firebase credentials are
   configured yet, so no device receives pushes (the inbox works).
+- **Observed recall and review concurrency (2026-10-03; ADR-030):** `npm run verify` passed
+  with 441 tests; read-only migration check returned zero pending and no database changes.
+  Published `3707c06b-9559-4b8a-b4d9-8f9e3dc54bd0`, retaining R2, the hourly cron and the
+  three existing secrets. `GET /v1/me/memory` now groups self-assessments by actual elapsed
+  time; review writes lock the owner's card and recheck the client UUID after waiting.
+  Production smoke passed 23 checks: health/ready/OpenAPI, anonymous 401, signup/onboarding,
+  four memory periods and invalid period, concurrent same UUID (201/200), another UUID (409),
+  one review and one XP award, no observation below 24 hours, card/book cascade deletion.
+  No migration or provider credentials were added; no emails or pushes were sent and no
+  device tokens were registered.
+  Both isolated temporary accounts were deleted: the first smoke needed a production secure-cookie
+  adjustment and narrowly scoped cleanup; the successful QA account was deleted through the API.
+  Three cleanup checks confirmed deletion, session revocation and rejected sign-in, followed by a
+  read-only database check confirming no continuation accounts remain. Local credentials removed.
 - **Recall + push lifecycle (2026-10-03; ADR-027/028):** verify passed (407 tests), migrations
   `0014` and `0015` applied and a subsequent read-only check found zero pending. Deployed the
   initial version `fcdd1815-0c24-4091-bfb3-cbf40c703714`, preserving the hourly cron, R2 binding and three existing secrets.
@@ -62,7 +89,7 @@ Last updated 2026-10-03 (ADR-029 streak protection and weekly league deployed; n
 - **Recall short-answer follow-up (2026-10-03):** fixed false rejection of Portuguese one-letter
   words (`a/e/o`) in specific three-word answers, while rejecting article-only padding. An
   empty exercise now scores zero and waits for three answers before checking repetition.
-  Verify passed with 409 tests and the current version above was published. Production smoke
+  Verify passed with 409 tests and the follow-up API was published. Production smoke
   expanded to 30/30, including those three regressions; its second temporary account was
   deleted and both session/sign-in revocation were confirmed. No new migration or mobile
   contract was needed; evaluation runs only in the API.
@@ -71,6 +98,19 @@ Last updated 2026-10-03 (ADR-029 streak protection and weekly league deployed; n
   `packageRelease` failed; rerunning Gradle with preserved caches succeeded. No cause was
   reproduced and no device was connected. iOS compilation and Android/iPhone acceptance
   remain pending. See [build-mobile.md](build-mobile.md).
+- **Current Android artifact (2026-10-03; ADR-030):** regenerated after the final concise-copy
+  changes, including welcome/sign-in. `npm run build:android` passed its full verify (441 tests)
+  and Gradle release build. Test signature, embedded JS, `POST_NOTIFICATIONS` and all five widget
+  receivers (including `LeagueWidget`) verified. ARM64/ARMv7; built at 20:20 America/Sao_Paulo;
+  SHA-256 `bd9acdda36c44c178a0c594a709dcb3686f42773e8c993e3aaff9031a9c7d0ac`.
+  No physical device install or iOS compilation in this continuation. Current JS was checked
+  separately on the existing Android emulator debug installation via Metro, not by installing
+  this ARM release artifact on its x86_64 image.
+  Emulator QA covered real sign-in, Home's removed footer, Você, Preferências, five widget previews
+  and empty memory views at 7/30/90/365 days; no React Native error or fatal exception observed.
+  No reading activity or preferences were saved. The emulator and temporary Metro were stopped.
+  Populated delayed-recall cases are covered by API/domain tests; launcher widgets, large fonts,
+  TalkBack and physical-device acceptance were not repeated in this slice.
 - **Widgets API (2026-10-01):** `/v1/me/stats` adds reading-only `weekReadingDates`. No new
   migration; check found zero pending and migration command made no changes. `npm run deploy:api`
   passed verify (316 tests) and published `1f7b4dcc-3eb1-465b-96e9-e42f5902cbd7`, retaining the existing hourly cron.

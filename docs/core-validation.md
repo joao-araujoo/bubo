@@ -22,6 +22,14 @@ sem calibrar um modelo longitudinal.
 
 ## O que está coberto por testes
 
+**2026-10-03, ADR-030:** Minha memória também mostra autoavaliações por intervalo efetivo de
+1–6, 7–29 e 30+ dias. A primeira tentativa parte da criação do card; as seguintes, da revisão
+anterior, incluindo Quase/Esqueci. Tentativas com menos de 24 horas não compõem esses números,
+mas continuam sendo a referência da tentativa seguinte. Porcentagens vêm acompanhadas das
+contagens; sem observações, não há resultado inferido. É uma descrição das tentativas registradas,
+sem previsão de retenção ou Bubo Score. Modelo, vieses e próximos critérios em
+[ADR-030](adr/ADR-030-observed-delayed-recall.md).
+
 - Ausência de resposta, preenchimento repetitivo e exercício incompleto impedem novas sessões.
 - Escrita curta, acentos, bullets, perguntas e grafia informal têm casos de aceitação.
 - A API recalcula o checklist no envio final: uma conferência anterior não autoriza outro texto.

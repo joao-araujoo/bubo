@@ -86,7 +86,7 @@ export async function findEntry(db: Executor, userId: string, entryId: string) {
   return row;
 }
 
-type AddStatus = 'reading' | 'want_to_read';
+type AddStatus = 'reading' | 'want_to_read' | 'finished';
 
 /** Rejects a second copy of the same book (same row, same ISBN or same title, case-insensitive). */
 async function assertNotShelved(
@@ -119,15 +119,28 @@ async function assertNotShelved(
 }
 
 async function insertEntry(tx: Executor, userId: string, book: BookRow, status: AddStatus) {
+  const state = applyStatusChange(
+    {
+      status: 'want_to_read',
+      currentPage: 0,
+      totalPages: book.totalPages,
+      startedAt: null,
+      finishedAt: null,
+    },
+    status,
+    new Date(),
+  );
   const [entry] = await tx
     .insert(shelfEntries)
     .values({
       id: crypto.randomUUID(),
       userId,
       bookId: book.id,
-      status,
-      currentPage: 0,
-      startedAt: status === 'reading' ? sql`now()` : null,
+      status: state.status,
+      currentPage: state.currentPage,
+      // An already-read addition records the declaration now, never a historical start date.
+      startedAt: status === 'finished' ? null : state.startedAt,
+      finishedAt: state.finishedAt,
     })
     .returning();
   if (!entry) throw new AppError('INTERNAL_ERROR', 'Could not add the book.');

@@ -19,9 +19,14 @@ const draftSchema = z.object({
   reflection: z.string().max(MAX_REFLECTION_LENGTH),
   // Optional to preserve drafts created before the mandatory recall exercise.
   recall: sessionRecallSchema.optional(),
+  // A new route option never changes a recovered draft's goal or timer.
+  goalSeconds: z.literal(300).optional(),
+  goalNoticeShown: z.boolean().optional(),
   submission: createSessionRequestSchema.nullable(),
 });
 export type SessionDraft = z.infer<typeof draftSchema>;
+export type SessionDraftUpdate = SessionDraft | ((current: SessionDraft) => SessionDraft);
+export type SessionDraftPersist = (update: SessionDraftUpdate) => Promise<void>;
 const key = (userId: string) => `bubo.session-draft.v1.${userId}`;
 
 // Serialize writes and removal so an older autosave cannot resurrect a discarded draft.
@@ -46,6 +51,54 @@ export function writeSessionDraft(userId: string, draft: SessionDraft) {
   return enqueue(() => AsyncStorage.setItem(key(userId), serialized));
 }
 
-export function clearSessionDraft(userId: string) {
-  return enqueue(() => AsyncStorage.removeItem(key(userId)));
+export function clearSessionDraft(userId: string, expectedDraftId?: string) {
+  return enqueue(async () => {
+    if (expectedDraftId) {
+      const raw = await AsyncStorage.getItem(key(userId));
+      if (raw && draftSchema.parse(JSON.parse(raw) as unknown).id !== expectedDraftId)
+        throw new Error('Session draft changed');
+    }
+    await AsyncStorage.removeItem(key(userId));
+  });
+}
+
+/** Resolve timer/notice changes in order; failed writes never become the current state. */
+export function createSessionDraftPersistence(
+  userId: string,
+  initial: SessionDraft,
+  onPersisted: (draft: SessionDraft) => void,
+) {
+  let current = initial;
+  let operations: Promise<void> = Promise.resolve();
+
+  function persist(update: SessionDraftUpdate) {
+    const expectedId = current.id;
+    const operation = operations
+      .catch(() => undefined)
+      .then(async () => {
+        if (current.id !== expectedId) throw new Error('Session draft changed');
+        const next = typeof update === 'function' ? update(current) : update;
+        if (next.id !== current.id || next.shelfEntryId !== current.shelfEntryId)
+          throw new Error('Session draft changed');
+        await writeSessionDraft(userId, next);
+        current = next;
+        onPersisted(next);
+      });
+    operations = operation;
+    return operation;
+  }
+
+  function discard(next: SessionDraft) {
+    const operation = operations
+      .catch(() => undefined)
+      .then(async () => {
+        await clearSessionDraft(userId, current.id);
+        current = next;
+        onPersisted(next);
+      });
+    operations = operation;
+    return operation;
+  }
+
+  return { persist, discard };
 }

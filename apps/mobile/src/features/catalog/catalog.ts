@@ -1,26 +1,7 @@
 import { type CatalogBook } from '@bubo/contracts';
-import { type Genre } from '@bubo/domain';
 import { useEffect, useState } from 'react';
 
 import { ApiError } from '../../lib/api/client';
-
-/**
- * Catalog queries per onboarding genre. Google Books and Open Library both understand
- * `subject:` (Google matches its English BISAC categories), so these stay in English on purpose.
- */
-export const GENRE_QUERIES: Record<Genre, string> = {
-  science_fiction: 'subject:"science fiction"',
-  philosophy: 'subject:philosophy',
-  fantasy: 'subject:fantasy',
-  psychology: 'subject:psychology',
-  history: 'subject:history',
-  business: 'subject:business',
-  technology: 'subject:technology',
-  biography: 'subject:biography',
-  science: 'subject:science',
-  mystery: 'subject:mystery',
-  self_care: 'subject:"self-help"',
-};
 
 /** Value that only settles after `delayMs` without changes (typing → one request). */
 export function useDebouncedValue<T>(value: T, delayMs = 350): T {

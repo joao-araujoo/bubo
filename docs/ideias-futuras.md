@@ -1,21 +1,34 @@
 # Ideias futuras — leitura, memória e identidade
 
-Registradas pelo proprietário em 2026-09-30. Todos os itens abaixo são backlog, não recursos
-implementados. A ordem sugere dependências, sem prometer datas ou substituir as Tasks 06–09
-do [roadmap](roadmap.md). Cada checkbox representa uma entrega com os critérios descritos.
+Registradas pelo proprietário em 2026-09-30. Este checklist distingue backlog, código entregue
+e aceite externo: o estado de implementação aparece no item; aceite em aparelho/configuração
+pendente permanece explícito. A ordem sugere dependências, sem prometer datas ou substituir as
+Tasks 06–09 do [roadmap](roadmap.md). O recorte 01–03/06 foi entregue em código em 2026-10-04
+([ADR-032](adr/ADR-032-reading-return-and-adaptive-home.md)): `verify` verde, 495 testes. Os checks
+dessa entrega não substituem o aceite em aparelho, ainda pendente.
 
 ## 1. Confiança e facilidade para voltar a ler
 
-- [ ] **01 — Sessão de leitura recuperável.** Persistir sessão ativa, UUID e estado do
+- [x] **01 — Sessão de leitura recuperável (código consolidado e verificado; aceite em aparelho
+      pendente).** Persistir sessão ativa, UUID e estado do
       cronômetro; sobreviver a fechamento, encerramento pelo sistema e reinício do aparelho.
       Ao retornar, oferecer Continuar, Encerrar ou Descartar. Testar pausas, relógio alterado,
-      offline e retry sem duplicar sessão; descartar não gera atividade.
-- [ ] **02 — Antes de voltar.** Antes de Continuar leitura, apresentar página onde parou,
+      offline e retry sem duplicar sessão; descartar não gera atividade. Rascunho de livro removido
+      recebe descarte local explícito após ausência confirmada; falha de rede mantém retry.
+- [x] **02 — Antes de voltar (código implementado e verificado; aceite em aparelho
+      pendente).** Antes de Continuar leitura, apresentar página onde parou,
       última reflexão e pergunta curta opcional para reativar a memória. Sempre permitir
-      pular e começar imediatamente; ausência de reflexão não bloqueia leitura.
-- [ ] **03 — 5 minutos bastam.** Ação “Ler só 5 minutos” inicia uma sessão normal. Aos cinco
+      pular e começar imediatamente; ausência de reflexão não bloqueia leitura. A pergunta fixa
+      “O que você lembra do trecho anterior?” é opcional e respondida mentalmente; nada é enviado
+      ou armazenado. A última recordação/reflexão disponível vem das 20 sessões recentes reais
+      deste livro/conta, em três linhas com expansão. Carregamento/falha temporária do histórico
+      não bloqueia começar com a entrada real em cache; autenticação/ausência confirmada prevalecem.
+- [x] **03 — 5 minutos bastam (código implementado e verificado; aceite em aparelho
+      pendente).** Ação “Ler só 5 minutos” inicia uma sessão normal. Aos cinco
       minutos, aviso leve de meta cumprida, com liberdade de encerrar ou continuar, sem punição
-      ou desafio obrigatório. Depende da recuperação confiável da sessão (01).
+      ou desafio obrigatório. Meta de 300 segundos e aviso persistem no rascunho; retomar um
+      rascunho existente não altera sua meta e atingir cinco minutos não finaliza automaticamente.
+      Depende da recuperação confiável da sessão (01).
 - [ ] **04 — Ritmo semanal.** Escolher 3, 4 ou 5 momentos por semana e mostrar, por exemplo,
       3 de 4 concluídos. Definir momento válido, início da semana, fuso e mudança de meta;
       derivar de sessões reais, sem exigir abrir o app todos os dias.
@@ -23,10 +36,16 @@ do [roadmap](roadmap.md). Cada checkbox representa uma entrega com os critérios
       acumula leituras e comemora. Reiniciar a cena semanalmente, sem apagar histórico.
       Usar exclusivamente poses oficiais próximas; poses ausentes ficam needs-confirmation.
       Compartilhar estado com widgets e respeitar redução de movimento. Depende de 04.
-- [ ] **06 — Hoje adaptativo.** Uma ação principal clara conforme contexto: revisão vencida,
+- [x] **06 — Hoje adaptativo (código implementado e verificado; aceite em aparelho
+      pendente).** Uma ação principal clara conforme contexto: revisão vencida,
       retorno após afastamento com cinco minutos, continuidade após sessão, ou leitura quando
       não há cards pendentes. Definir prioridades determinísticas e testar conflitos; não
-      ocupar espaço com Revisar vazio nem tornar lembranças repetitivas.
+      ocupar espaço com Revisar vazio nem tornar lembranças repetitivas. Prioridade: rascunho →
+      carregamento/erro com retry → revisões oferecidas → retorno após 7+ dias locais sem leitura
+      → continuar após ler hoje → leitura normal → escolher livro. Ausência de histórico não
+      significa afastamento; revisão/visita não conta como leitura. Ler hoje impede convite de
+      retorno mesmo se uma última data antiga estiver em conflito. Sob revisão, livro atual é
+      contexto secundário; recuperação oferece apenas o livro do rascunho.
 
 ## 2. Citações e memória pessoal do livro
 

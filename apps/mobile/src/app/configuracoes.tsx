@@ -10,7 +10,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, ScrollView, View } from 'react-native';
 
 import {
-  BuboTip,
   Button,
   Card,
   EmptyState,
@@ -20,14 +19,13 @@ import {
   type IconTileTone,
   InlineMessage,
   OptionTiles,
-  Pill,
   Stepper,
   TabChip,
   Text,
   Toggle,
 } from '../design-system';
 import { estimatedMinutes } from '../features/recall/grades';
-import { useAchievements, usePreferences, useSavePreferences } from '../lib/api/queries';
+import { usePreferences, useSavePreferences } from '../lib/api/queries';
 import { useAuthState } from '../lib/auth/session';
 import { useDevicePreferences } from '../lib/device-preferences';
 import { haptics } from '../lib/haptics';
@@ -52,14 +50,12 @@ function Section({
   tone = 'primary',
   title,
   subtitle,
-  trailing,
   children,
 }: {
   icon: Parameters<typeof IconTile>[0]['icon'];
   tone?: IconTileTone;
   title: string;
-  subtitle: string;
-  trailing?: ReactNode;
+  subtitle?: string;
   children: ReactNode;
 }) {
   const theme = useTheme();
@@ -71,11 +67,12 @@ function Section({
           <Text variant="titleSm" accessibilityRole="header">
             {title}
           </Text>
-          <Text variant="bodySm" color="textMuted">
-            {subtitle}
-          </Text>
+          {subtitle ? (
+            <Text variant="bodySm" color="textMuted">
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
-        {trailing}
       </View>
       <View style={{ height: 1, backgroundColor: theme.colors.borderSoft }} />
       {children}
@@ -96,15 +93,15 @@ const PUSH_COPY: Record<
   PushState | 'off',
   { tone: 'success' | 'neutral' | 'warning'; text: string }
 > = {
-  registered: { tone: 'success', text: 'Este aparelho está registrado para notificações.' },
-  off: { tone: 'neutral', text: 'Notificações ainda não ativadas neste aparelho.' },
+  registered: { tone: 'success', text: 'Notificações ativadas neste aparelho.' },
+  off: { tone: 'neutral', text: 'Notificações desativadas neste aparelho.' },
   denied: {
     tone: 'warning',
     text: 'As notificações do Bubo estão bloqueadas nas configurações do aparelho.',
   },
   unavailable: {
     tone: 'neutral',
-    text: 'O push ainda não está disponível nesta versão ou neste aparelho. Os avisos continuam na tela Notificações.',
+    text: 'Notificações no celular indisponíveis. Seus avisos continuam na tela Notificações.',
   },
 };
 
@@ -119,7 +116,6 @@ export default function SettingsScreen() {
   const userId = auth.status === 'ready' ? auth.userId : undefined;
   const saved = usePreferences(userId);
   const save = useSavePreferences(userId ?? '');
-  const achievements = useAchievements(userId);
   const { preference, setPreference } = useThemePreference();
   const device = useDevicePreferences();
   const [draft, setDraft] = useState<ReaderPreferences | null>(null);
@@ -146,13 +142,13 @@ export default function SettingsScreen() {
 
   if (saved.isPending || (saved.data && !draft))
     return (
-      <FormScreen title="Preferências cognitivas" eyebrow="Calibrador de memória">
+      <FormScreen title="Preferências">
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando" />
       </FormScreen>
     );
   if (saved.isError || !draft)
     return (
-      <FormScreen title="Preferências cognitivas" eyebrow="Calibrador de memória">
+      <FormScreen title="Preferências">
         <EmptyState
           mascot="offline"
           title="Não foi possível carregar suas preferências"
@@ -188,27 +184,22 @@ export default function SettingsScreen() {
       onSuccess: (next) => {
         haptics.success();
         setDraft(next);
-        setNotice('Preferências salvas. O Bubo já segue o seu novo ritmo.');
+        setNotice('Preferências salvas.');
       },
       onError: () => haptics.error(),
     });
   }
 
-  const level = achievements.data?.level;
   return (
     <FormScreen
-      title="Preferências cognitivas"
-      eyebrow="Calibrador de memória"
-      headerRight={
-        level ? <Pill tone="primary" icon="auto-awesome" label={`Nível ${level.level}`} /> : null
-      }
+      title="Preferências"
       footer={
         <>
           {save.isError ? (
             <InlineMessage tone="error" message="Não foi possível salvar. Tente de novo." />
           ) : null}
           <Button
-            label={dirty ? 'Salvar minhas preferências' : 'Tudo salvo'}
+            label={dirty ? 'Salvar' : 'Tudo salvo'}
             icon={dirty ? 'save' : 'check'}
             fullWidth
             disabled={!dirty}
@@ -218,22 +209,11 @@ export default function SettingsScreen() {
         </>
       }
     >
-      <BuboTip pose="thinking" title="Ritmo biológico" titleIcon="psychology">
-        <Text variant="bodySm">
-          Ajuste o Bubo ao seu jeito de estudar. Cada escolha muda de verdade quando suas revisões
-          voltam, quantas aparecem por dia e quando eu te lembro.
-        </Text>
-      </BuboTip>
       {notice ? <InlineMessage tone="success" message={notice} /> : null}
 
-      <Section
-        icon="psychology"
-        title="Revisão espaçada"
-        subtitle="Baseada no algoritmo SM-2"
-        trailing={<Pill tone="success" label="Ativo" />}
-      >
+      <Section icon="psychology" title="Revisões">
         <FieldLabel
-          label="Rigor do intervalo"
+          label="Ritmo das revisões"
           trailing={
             draft.reviewIntensity === 'balanced' ? (
               <Text variant="label" color="accentText">
@@ -243,13 +223,13 @@ export default function SettingsScreen() {
           }
         />
         <OptionTiles
-          accessibilityLabel="Rigor do intervalo"
+          accessibilityLabel="Ritmo das revisões"
           value={draft.reviewIntensity}
           onChange={(reviewIntensity) => set({ reviewIntensity })}
           options={[
-            { value: 'gentle', label: 'Suave', caption: 'Intervalos maiores' },
-            { value: 'balanced', label: 'Equilibrado', caption: 'Padrão do Bubo' },
-            { value: 'intensive', label: 'Intensivo', caption: 'Revê mais cedo' },
+            { value: 'gentle', label: 'Suave', caption: 'Mais espaçadas' },
+            { value: 'balanced', label: 'Equilibrado', caption: 'Padrão' },
+            { value: 'intensive', label: 'Intensivo', caption: 'Mais frequentes' },
           ]}
         />
         <Stepper
@@ -272,23 +252,13 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
           <Icon name="schedule" size={16} color="textMuted" />
           <Text variant="bodySm" color="textMuted" style={{ flex: 1 }}>
-            {`Até ~${estimatedMinutes(draft.dailyReviewLimit)} min por dia. O que passar do limite volta amanhã, na ordem certa.`}
+            {`~${estimatedMinutes(draft.dailyReviewLimit)} min por dia. Cards acima do limite ficam para amanhã.`}
           </Text>
         </View>
       </Section>
 
-      <Section icon="menu-book" tone="gold" title="Leitura & foco" subtitle="Suas metas reais">
-        <FieldLabel
-          label="Meta diária de foco"
-          trailing={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Icon name="local-fire-department" size={16} color="orange" />
-              <Text variant="label" color="warningText">
-                Missão de hoje
-              </Text>
-            </View>
-          }
-        />
+      <Section icon="menu-book" tone="gold" title="Leitura e foco">
+        <FieldLabel label="Meta diária de foco" />
         <OptionTiles
           accessibilityLabel="Meta diária de foco"
           value={draft.dailyFocusMinutes}
@@ -301,7 +271,6 @@ export default function SettingsScreen() {
         <Toggle
           icon="flag"
           title="Meta anual de livros"
-          description="Livros marcados como lidos neste ano, no seu perfil."
           value={draft.annualBookGoal !== null}
           onValueChange={(on) => set({ annualBookGoal: on ? 12 : null })}
         />
@@ -320,8 +289,8 @@ export default function SettingsScreen() {
         ) : null}
       </Section>
 
-      <Section icon="palette" tone="blue" title="Aparência & toque" subtitle="Só neste aparelho">
-        <FieldLabel label="Paleta do leitor" />
+      <Section icon="palette" tone="blue" title="Aparência e toque" subtitle="Só neste aparelho">
+        <FieldLabel label="Tema" />
         <OptionTiles
           accessibilityLabel="Tema"
           value={preference}
@@ -347,7 +316,6 @@ export default function SettingsScreen() {
         <Toggle
           icon="vibration"
           title="Vibração ao tocar"
-          description="Pequenos toques ao concluir, selecionar e errar."
           value={device.preferences.haptics}
           onValueChange={(on) => device.update({ haptics: on })}
         />
@@ -356,7 +324,7 @@ export default function SettingsScreen() {
       <Section
         icon="notifications-active"
         tone="orange"
-        title="Lembretes & notificações"
+        title="Notificações"
         subtitle={`Horário de ${zone.replace(/_/g, ' ')}`}
       >
         {push ? (
@@ -401,7 +369,7 @@ export default function SettingsScreen() {
         <Toggle
           icon="alarm"
           title="Lembrete de revisão"
-          description="Um piu divertido por dia, no seu horário, só com revisões disponíveis. Sem cobranças."
+          description="Uma vez ao dia, quando houver revisões."
           value={draft.reviewReminder}
           onValueChange={(on) => {
             set({ reviewReminder: on });
@@ -430,32 +398,26 @@ export default function SettingsScreen() {
         <Toggle
           icon="forum"
           title="Respostas e ciclos dos clubes"
-          description="Quando respondem à sua discussão ou resenha e quando um ciclo começa."
+          description="Respostas aos seus posts e início de ciclos."
           value={draft.notifyCommunity}
           onValueChange={(on) => set({ notifyCommunity: on })}
         />
         <Toggle
           icon="people"
           title="Amigos de leitura"
-          description="Pedidos de amizade e pedidos aceitos."
+          description="Pedidos de amizade e confirmações."
           value={draft.notifyFriends}
           onValueChange={(on) => set({ notifyFriends: on })}
         />
         <Text variant="bodySm" color="textMuted">
-          Desligar tira só o aviso no celular: tudo continua na tela Notificações. Avisos nunca
-          mostram trechos, notas ou reflexões.
+          Os avisos continuam no app e nunca mostram trechos, notas ou reflexões.
         </Text>
       </Section>
 
-      <Section
-        icon="shield"
-        tone="success"
-        title="Escudo anti-spoiler"
-        subtitle="Proteção para quem lê junto"
-      >
+      <Section icon="shield" tone="success" title="Anti-spoiler">
         <Toggle
-          title="Blindagem automática"
-          description="Debates, enquetes e resenhas além da sua página chegam cobertos. Sempre ligada: é uma regra dos clubes."
+          title="Proteção automática"
+          description="Conteúdos além da sua página ficam cobertos. Sempre ativa nos clubes."
           value
           locked
         />

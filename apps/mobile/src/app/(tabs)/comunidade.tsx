@@ -72,7 +72,6 @@ function Header({
         <BuboLogo variant="symbol" height={28} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Pill caps label="Clubes" />
         <Text variant="title" accessibilityRole="header" numberOfLines={1}>
           Comunidade
         </Text>
@@ -126,7 +125,7 @@ function ProtectedCard({
         <Pill tone="neutral" caps label={`Pág. ${page}`} />
       </View>
       <Text variant="bodySm" color="textMuted" style={{ fontStyle: 'italic' }}>
-        {`Este debate fala da página ${page} de ${bookTitle}. O Bubo revela o conteúdo assim que você registrar a leitura até lá.`}
+        {`${bookTitle} · disponível ao chegar à página ${page}.`}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Text variant="label" color="accentText" style={{ flex: 1, fontSize: 13 }}>
@@ -214,8 +213,8 @@ export default function CommunityScreen() {
             value={segment}
             onChange={setSegment}
             options={[
-              { id: 'feed', label: 'Feed Geral' },
-              { id: 'mine', label: 'Seus Clubes', count: clubs.data ? mine.length : undefined },
+              { id: 'feed', label: 'Novidades' },
+              { id: 'mine', label: 'Meus clubes', count: clubs.data ? mine.length : undefined },
               { id: 'discover', label: 'Descobrir' },
             ]}
           />
@@ -230,8 +229,7 @@ export default function CommunityScreen() {
         ) : mine.length === 0 ? (
           <>
             <BuboTip state="emptyCommunity" title="Clubes sem spoiler">
-              Cada debate diz a página de que fala. O que estiver à frente da sua leitura fica
-              coberto até você chegar lá.
+              Conteúdos além da sua página ficam cobertos.
             </BuboTip>
             <Button
               label="Descobrir clubes"
@@ -263,26 +261,18 @@ export default function CommunityScreen() {
                 <ClubChip key={club.id} club={club} onPress={() => openClub(club.id)} />
               ))}
             </ScrollView>
-            <BuboTip
-              state="reviewDue"
-              title="Radar dos clubes"
-              titleIcon="auto-awesome"
-              trailing={
-                feed.data.newLast24h > 0 ? (
-                  <Pill tone="success" label={`${feed.data.newLast24h} novos`} />
-                ) : undefined
-              }
-            >
-              {feed.data.newLast24h > 0
-                ? `${feed.data.newLast24h === 1 ? '1 debate ou enquete novo' : `${feed.data.newLast24h} debates e enquetes novos`} nas últimas 24 horas nos seus clubes. O que passa da sua página continua coberto.`
-                : 'Nada novo nas últimas 24 horas. Que tal abrir o próximo debate do seu clube?'}
-            </BuboTip>
+            {feed.data.newLast24h > 0 ? (
+              <Pill
+                tone="success"
+                label={`${feed.data.newLast24h} ${feed.data.newLast24h === 1 ? 'novidade' : 'novidades'} em 24h`}
+              />
+            ) : null}
             {feed.data.items.length === 0 ? (
               <EmptyState
                 compact
                 mascot="emptyCommunity"
                 title="Seus clubes estão quietos"
-                description="Abra um debate ou uma enquete: a conversa começa com uma pergunta."
+                description="Abra um clube para começar uma conversa."
               />
             ) : (
               feed.data.items.map((item) =>
@@ -353,7 +343,7 @@ export default function CommunityScreen() {
           <EmptyState
             mascot="emptyCommunity"
             title="Você ainda não está em nenhum clube"
-            description="Descubra um clube do livro que você está lendo ou funde o seu."
+            description="Encontre um clube ou crie o seu."
             action={
               <Button
                 label="Descobrir clubes"
@@ -399,11 +389,10 @@ export default function CommunityScreen() {
             ))}
           </ScrollView>
           {affinity.length > 0 ? (
-            <BuboTip state="recallPrompt" title="Afinidade do Bubo" titleIcon="auto-awesome">
-              {affinity.length === 1
-                ? `1 clube lê um livro que já está na sua estante. Os debates se ajustam à sua página.`
-                : `${affinity.length} clubes leem livros que já estão na sua estante. Os debates se ajustam à sua página.`}
-            </BuboTip>
+            <Pill
+              tone="primary"
+              label={`${affinity.length} ${affinity.length === 1 ? 'clube da sua estante' : 'clubes da sua estante'}`}
+            />
           ) : null}
           {clubs.isPending ? (
             loading
@@ -480,12 +469,6 @@ export default function CommunityScreen() {
             >
               <Icon name="add" size={22} color="accentText" />
             </View>
-            <Text variant="bodyStrong" align="center">
-              Não encontrou o que queria debater?
-            </Text>
-            <Text variant="bodySm" color="textMuted" align="center">
-              Crie seu próprio clube, defina o ritmo de páginas e seja o Guardião Fundador.
-            </Text>
             <Button
               label="Fundar novo clube"
               variant="secondary"

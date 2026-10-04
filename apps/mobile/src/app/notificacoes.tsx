@@ -303,8 +303,6 @@ export default function NotificationsScreen() {
   return (
     <FormScreen
       align="left"
-      eyebrow="Alertas cognitivos & comunidade"
-      eyebrowDot
       title="Notificações"
       headerRight={
         unread > 0 ? (

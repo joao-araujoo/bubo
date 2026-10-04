@@ -1,39 +1,66 @@
+import { selectTodayAction, toLocalIsoDate, type TodayData, type TodayDraft } from '@bubo/domain';
 import { useMemo } from 'react';
 
 import { Screen } from '../../design-system';
 import { HomeHeader } from '../../features/home/HomeHeader';
-import { ReadingNowSection } from '../../features/home/ReadingNowSection';
-import { RecoveryCard } from '../../features/session/RecoveryCard';
-import {
-  ActiveRecallSection,
-  CognitiveWeekSection,
-  DailyMissionSection,
-  HowBuboWorksSection,
-} from '../../features/home/sections';
+import { NextStepSection } from '../../features/home/NextStepSection';
+import { CognitiveWeekSection, DailyMissionSection } from '../../features/home/sections';
+import { useRecoveryDraft } from '../../features/session/RecoveryCard';
 import { useDueCards, usePreferences, useShelf, useStats } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { FadeIn } from '../../lib/motion';
 
-/** Hoje — the north-star screen. Every number here comes from real sessions. */
+function queryData<T>({ data, isError }: { data: T | undefined; isError: boolean }): TodayData<T> {
+  if (isError) return { state: 'error' };
+  return data === undefined ? { state: 'loading' } : { state: 'ready', value: data };
+}
+
+/** Hoje — the north-star screen. The next action and every number use real account data. */
 export default function TodayScreen() {
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : undefined;
+  const saved = useRecoveryDraft(userId);
   const stats = useStats(userId);
   const shelf = useShelf(userId);
   const due = useDueCards(userId);
   const preferences = usePreferences(userId);
   const weekDates = stats.data?.weekActiveDates;
-  const activeDates = useMemo(() => new Set<string>(weekDates ?? []), [weekDates]);
+  const activeDates = useMemo(() => (weekDates ? new Set<string>(weekDates) : null), [weekDates]);
   if (auth.status !== 'ready') return null;
 
   const reading = shelf.data?.entries.find((entry) => entry.status === 'reading') ?? null;
+  const draft: TodayData<TodayDraft | null> =
+    saved.result.state === 'ready'
+      ? {
+          state: 'ready',
+          value: saved.result.value
+            ? {
+                shelfEntryId: saved.result.value.shelfEntryId,
+                needsSave: saved.result.value.endedAt !== null,
+              }
+            : null,
+        }
+      : saved.result;
+  const action = selectTodayAction({
+    today: toLocalIsoDate(new Date()),
+    draft,
+    readingEntryId: queryData({
+      data: shelf.data ? (reading?.id ?? null) : undefined,
+      isError: shelf.isError,
+    }),
+    reading: queryData(stats),
+    reviewCount: queryData({ data: due.data?.cards.length, isError: due.isError }),
+  });
   const sections = [
-    <RecoveryCard key={`recovery-${auth.userId}`} userId={auth.userId} />,
-    <ReadingNowSection key="reading" userId={auth.userId} />,
-    <ActiveRecallSection
-      key="recall"
-      dueCount={due.data?.cards.length ?? null}
-      totalCards={due.data?.totalCards ?? null}
+    <NextStepSection
+      key="next"
+      action={action}
+      reading={reading}
+      waitingForNetwork={[stats, shelf, due].some((query) => query.fetchStatus === 'paused')}
+      onRetry={() => {
+        if (action.kind === 'retry' && action.source === 'draft') saved.retry();
+        else void Promise.all([stats.refetch(), shelf.refetch(), due.refetch()]);
+      }}
     />,
     <CognitiveWeekSection
       key="week"
@@ -43,11 +70,9 @@ export default function TodayScreen() {
     <DailyMissionSection
       key="mission"
       readToday={stats.data?.readToday ?? null}
-      readingEntryId={reading?.id ?? null}
       focusedMinutesToday={stats.data?.focusedMinutesToday ?? null}
       goalMinutes={preferences.data?.dailyFocusMinutes ?? null}
     />,
-    <HowBuboWorksSection key="how" />,
   ];
   return (
     <Screen

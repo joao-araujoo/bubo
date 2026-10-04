@@ -52,6 +52,10 @@
 | [ADR-027](adr/ADR-027-session-recall-gate.md)               | Mandatory structured recall, versioned writing gate and optional Gemini coach |
 | [ADR-028](adr/ADR-028-push-delivery-lifecycle.md)           | Push receipts, session-bound devices, consent and native lifecycle            |
 | [ADR-029](adr/ADR-029-widget-redesign-freeze-league.md)     | Widget redesign (canvas + Plus Jakarta), streak protection, weekly league     |
+| [ADR-030](adr/ADR-030-observed-delayed-recall.md)           | Actual review delays, observed recall and serialized review writes            |
+| [ADR-031](adr/ADR-031-discover-recommendations.md)          | Discover: taste-graph recommendations, Portuguese shelves, catalog burst fix  |
+| [ADR-032](adr/ADR-032-reading-return-and-adaptive-home.md)  | Reading return, optional five-minute goal and adaptive Hoje                   |
+| [ADR-033](adr/ADR-033-responsive-search-and-shelf.md)       | Responsive catalog, cover loading, shelf filters and already-read books       |
 
 ## Building and shipping
 

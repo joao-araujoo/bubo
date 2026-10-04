@@ -1,5 +1,79 @@
 # Roadmap
 
+## Retomar leitura e Hoje adaptativo — 2026-10-04 (ADR-032)
+
+- Recorte das ideias **01–03 e 06** do [checklist](ideias-futuras.md): consolidar sessão
+  recuperável, preparar o retorno ao livro, oferecer cinco minutos e priorizar uma ação em Hoje.
+  Código entregue e `npm run verify` verde (495 testes); aceite em aparelho segue pendente.
+  O bundle JavaScript Android também foi exportado; esta etapa não gerou nem instalou um APK.
+- **Antes de voltar:** página atual e última recordação/reflexão real disponível nas 20 sessões
+  recentes, com resumo de três linhas e opção de expandir. Pergunta curta fixa, opcional e sem
+  IA/armazenamento; começar imediatamente continua disponível. Histórico carregando ou falha
+  temporária usa entrada real do cache desta conta, sem bloquear a leitura. Erros de autenticação
+  ou ausência confirmada prevalecem sobre cache. Rascunho existente mantém prioridade/UUID/campos.
+- **Ler só 5 minutos:** sessão normal com objetivo opcional de 300 segundos guardado no rascunho.
+  Ao atingir a meta, aviso leve; o leitor escolhe encerrar ou continuar. Não altera um rascunho
+  existente, não finaliza sozinho e não concede atividade/XP antes do aceite da API.
+- **Hoje:** sessão guardada → carregamento/erro com retry → cards oferecidos pelo limite diário
+  → retorno após 7+ dias locais sem leitura → continuar após ler hoje → leitura normal → escolher
+  livro. Ler hoje prevalece sobre uma data de última leitura antiga em conflito. Revisões vazias
+  ficam ocultas; semana e missão preservam os dados reais. Sob revisão, livro é contexto
+  secundário; sob recuperação, somente o livro do rascunho é oferecido.
+- `lastReadingDate` em `/v1/me/stats` vem das sessões aceitas desta conta. A comparação usa a
+  data local atual, sem confundir revisão/visita com leitura ou inferir afastamento sem histórico.
+  Datas futuras não geram convite de retorno; mudança de fuso não reescreve datas históricas.
+- Rascunho de livro removido ganha descarte local explícito após ausência confirmada. Falhas de
+  rede preservam o rascunho e oferecem nova tentativa. Não há migração ou configuração remota nova.
+- Limites: não entrega retenção preditiva/Score, verificação factual, Live Activity, setup de push
+  ou aceite de widgets/Swift. Veja [ADR-032](adr/ADR-032-reading-return-and-adaptive-home.md) e o
+  [roteiro](TESTAR-TELAS.md). Formato/lint/tipos/testes/assets/audit passaram; não houve execução
+  visual atual, aceite em aparelho, migração, deploy, alteração remota ou commit nesta continuação.
+
+## Botões da sessão em uma linha — 2026-10-03
+
+- A sessão de leitura empilhava três botões de largura total (cronômetro, recordação e
+  retomada). Agora cada trio fica numa linha: descartar só com ícone (lixeira) e os outros dois
+  compactos, com rótulos curtos ("Começar", "Recordação", "Conferir", "Salvar sessão") que
+  encolhem a fonte em vez de cortar. Leitores de tela continuam ouvindo os nomes completos.
+- `Button` ganhou `iconOnly` e `accessibilityLabel`; `compact` ajusta a fonte ao espaço.
+- Pendente: conferir no aparelho com fonte grande do sistema.
+
+## Descobrir livros: recomendações, português e busca estável — 2026-10-03 (ADR-031)
+
+- **Busca parava no APK:** reproduzido com provedores reais. O Google sem chave tem cota 0 e o
+  Open Library era limitado a 1 req/s com fila máxima de 2 s; tema + digitação geravam 503.
+  Fila agora aceita 5 s, 3 req/s com `CATALOG_CONTACT_EMAIL`, menos consultas alternativas e o
+  Google sem chave em backoff vira `skipped` (sem aviso falso de "resultados parciais").
+  Teste de regressão: 4 buscas simultâneas → 200 (antes `[200, 200, 200, 503]`).
+- **Capas:** sem capa tipográfica piscando antes da real (bloco neutro enquanto carrega),
+  miniaturas pedem imagem média, pré-carregamento das capas visíveis e prioridade nas primeiras.
+- **Recomendações (estilo Skoob):** `GET /v1/catalog/discover`. Grafo de gosto (estante,
+  autores, assuntos) com caminho mínimo de Dijkstra em `@bubo/domain/recommend.ts`; só obras com
+  edição em português, ordenadas pelos mais lidos do Open Library; motivo em cada livro.
+  Seções: Para você, Porque você leu X, Mais lidos no Bubo (≥ 2 leitores reais), Mais lidos em
+  português, e gêneros personalizados. Cache por estante (6 h).
+- Pendente: `CATALOG_CONTACT_EMAIL` pelo dono, aceite no aparelho, avaliações de clubes como sinal.
+
+## Continuação: memória observada e interface enxuta — 2026-10-03 (ADR-030)
+
+- Não havia Task 10 definida. A próxima pendência de código era o modelo de memória da Task 06;
+  esta entrega avança a evidência longitudinal sem declarar retenção calibrada ou Bubo Score.
+- Minha memória ganhou **Lembrei após um intervalo**: avaliações reais agrupadas em 1–6, 7–29
+  e 30+ dias desde a criação do card ou a tentativa anterior. Mostra contagens junto à porcentagem;
+  sem observações, a seção não aparece. O período continua 7/30/90/365 dias. Sem migração.
+- Revisões agora bloqueiam o card durante o salvamento e reconfirmam o UUID após aguardar:
+  envios simultâneos não duplicam a tentativa nem o XP. Cache mobile v8.
+- Removido o card explicativo no fim da Home. Enxugados Hoje, Estante, Revisar, Comunidade, Você,
+  Preferências, Widgets, Minha memória, sessão/resultado, Notificações, debate, resenha e enquete.
+  Boas-vindas e login também foram simplificados; removida a promessa de "retenção para sempre".
+  Instruções para ações, consentimento Gemini, anti-spoiler, erros e acessibilidade preservados.
+- Aceites em aparelhos, Swift e configurações de push/provedores continuam externos. A retenção
+  preditiva e o Score precisam de calibração; ver [ADR-030](adr/ADR-030-observed-delayed-recall.md).
+- Validação final: `verify` verde (441 testes), zero migrações pendentes, API publicada e 23
+  checks de produção; contas temporárias apagadas, revogação confirmada. APK ARM64/ARMv7 com
+  cinco widgets gerado após a limpeza final. Telas principais e períodos vazios conferidos em
+  debug + Metro no emulador Android, separado do aceite da nova build em aparelho.
+
 ## Widgets, proteção de sequência e liga semanal — 2026-10-03 (ADR-029)
 
 - Causa do “Sequência da semana” quebrado: o layout usava `<View>`, proibido em RemoteViews
@@ -11,7 +85,8 @@
 - Liga semanal de amigos (`GET /v1/me/league`, tela `liga`, widget novo) com XP real e
   consentimento de compartilhamento. Snapshot v3.
 - Validado num emulador Android 15: cinco widgets, todos os estados, deep links e fluxo real
-  sessão → API → app → widget. Pendentes: aparelho físico, compilação Swift, nova build nativa.
+  sessão → API → app → widget. Nova build ARM64/ARMv7 gerada nesta continuação (ADR-030).
+  Pendentes: aparelho físico e compilação Swift.
 
 ## Núcleo e push — 2026-10-03
 
@@ -130,6 +205,14 @@
 - ADR-015.
 
 ## ✅ Task 05 — Discover + catalog + ISBN (code complete; owner acceptance pending)
+
+- **Usability/performance (2026-10-04; ADR-033):** search can return real partial results while
+  slower providers finish in the background; cover metadata/ingestion no longer blocks additions.
+  Mobile search/shelf are virtualized, saves apply API-accepted state before refreshes, and
+  Estante has local search, status filters/counts, ordering and quick actions. Adding supports
+  **Já li** directly, including ISBN/manual entry, without creating reading activity. Local code
+  only; device acceptance and publication of this slice remain pending. Stories and monthly/annual
+  Replay are already planned in future ideas **21–23**, still backlog without scheduled dates.
 
 - Done: server-side catalog lookup (Open Library / Google Books / BrasilAPI ISBN, cached), Discover, first-book and
   add-book search, manual fallback, and ISBN scanner (`expo-camera`). See ADR-016.

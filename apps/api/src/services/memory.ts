@@ -1,6 +1,12 @@
 import { memoryStatsResponseSchema } from '@bubo/contracts';
 import { type Database, schema } from '@bubo/database';
-import { type DayPart, addDays, dayPartOf } from '@bubo/domain';
+import {
+  DELAYED_RECALL_THRESHOLDS_SECONDS,
+  DELAYED_RECALL_WINDOWS,
+  type DayPart,
+  addDays,
+  dayPartOf,
+} from '@bubo/domain';
 import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 
 import { bookCoverUrls } from './shelf';
@@ -69,6 +75,47 @@ export async function getMemoryStats(
     .where(inPeriod)
     .groupBy(sql`1`);
 
+  // Calculate each actual delay before filtering the displayed period: the preceding attempt may
+  // be outside it. A first attempt starts at card creation, never at its scheduled SM-2 interval.
+  // The database keeps the history and returns at most three aggregated rows to the Worker.
+  const reviewHistory = db
+    .select({
+      localDate: reviewLogs.localDate,
+      grade: reviewLogs.grade,
+      elapsedSeconds:
+        sql<number>`extract(epoch from (${reviewLogs.reviewedAt} - coalesce(lag(${reviewLogs.reviewedAt}) over (partition by ${reviewLogs.cardId} order by ${reviewLogs.reviewedAt}, ${reviewLogs.id}), ${recallCards.createdAt})))`.as(
+          'elapsed_seconds',
+        ),
+    })
+    .from(reviewLogs)
+    .innerJoin(recallCards, eq(recallCards.id, reviewLogs.cardId))
+    .innerJoin(shelfEntries, eq(shelfEntries.id, recallCards.shelfEntryId))
+    .where(
+      and(
+        eq(reviewLogs.userId, userId),
+        eq(recallCards.userId, userId),
+        eq(shelfEntries.userId, userId),
+      ),
+    )
+    .as('review_history');
+  const delayLimits = DELAYED_RECALL_THRESHOLDS_SECONDS;
+  const delayWindow = sql<string>`case when ${reviewHistory.elapsedSeconds} >= ${delayLimits.month} then 'thirtyPlusDays' when ${reviewHistory.elapsedSeconds} >= ${delayLimits.week} then 'sevenToTwentyNineDays' else 'oneToSixDays' end`;
+  const delayedRows = await db
+    .select({
+      window: delayWindow,
+      total: sql<number>`count(*)`.mapWith(Number),
+      remembered: sql<number>`count(*) filter (where ${reviewHistory.grade} >= 4)`.mapWith(Number),
+    })
+    .from(reviewHistory)
+    .where(
+      and(
+        gte(reviewHistory.localDate, from),
+        lte(reviewHistory.localDate, today),
+        gte(reviewHistory.elapsedSeconds, delayLimits.minimum),
+      ),
+    )
+    .groupBy(sql`1`);
+
   const [cards] = await db
     .select({
       total: sql<number>`count(*)`.mapWith(Number),
@@ -120,6 +167,13 @@ export async function getMemoryStats(
       remembered: row.remembered,
     })),
     dayParts,
+    delayedRecall: {
+      version: 'observed-v1',
+      windows: DELAYED_RECALL_WINDOWS.map((window) => {
+        const row = delayedRows.find((item) => item.window === window);
+        return { window, total: row?.total ?? 0, remembered: row?.remembered ?? 0 };
+      }),
+    },
     cardsTotal: cards?.total ?? 0,
     booksWithCards: cards?.books ?? 0,
     focus: {
