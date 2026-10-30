@@ -145,7 +145,10 @@ Last updated 2026-10-29 (Neon `0018_shelf_marks` applied; API with Redesign 2.0 
   SHA-256 `cae37662317e3c51fda8bf6177a64b8cc1adf827d0ec54d16466bb85a83e2be1`. No emulator or
   device here (no hypervisor): screens were previewed on react-native-web only. Migration `0018`
   and the practice/community routes were deployed right after (API `47ce4ca7…`, see "Current
-  remote state"), so this APK has everything it calls. Device acceptance pending.
+  remote state"), so this APK has everything it calls. Published on GitHub as release
+  [`v0.3.0`](https://github.com/joao-araujoo/bubo/releases/tag/v0.3.0) with the asset `bubo.apk`
+  (same SHA-256); the README button points at `releases/latest/download/bubo.apk`. A new APK
+  keeps that name and goes in a new release marked latest. Device acceptance pending.
 - **Previous Android artifact (2026-10-03; ADR-030):** regenerated after the final concise-copy
   changes, including welcome/sign-in. `npm run build:android` passed its full verify (441 tests)
   and Gradle release build. Test signature, embedded JS, `POST_NOTIFICATIONS` and all five widget
