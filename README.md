@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="apps/mobile/assets/brand/bubo-logo-horizontal.png" alt="Bubo" width="320" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/logo-escuro.png" />
+  <img src="apps/mobile/assets/brand/bubo-logo-horizontal.png" alt="Bubo" width="320" />
+</picture>
 
 ### Leia com presença. Lembre com confiança.
 
@@ -8,16 +11,9 @@ Um companheiro de leitura que transforma páginas lidas em ideias que ficam.
 
 <br />
 
-<a href="https://github.com/joao-araujoo/bubo/releases/latest/download/bubo.apk"><img src="https://img.shields.io/badge/Baixar_para_Android-APK-7C3AED?style=for-the-badge&logo=android&logoColor=white" alt="Baixar o Bubo para Android (APK)" height="40" /></a>
+<a href="https://github.com/joao-araujoo/bubo/releases/latest/download/bubo.apk"><img src="docs/assets/readme/baixar-android.png" alt="Baixar o Bubo para Android (APK)" width="282" /></a>
 
-<sub>Versão de teste · Android 7.0 ou mais novo · <a href="https://github.com/joao-araujoo/bubo/releases/latest">notas da versão</a></sub>
-
-<br />
-
-![Versão](https://img.shields.io/github/v/release/joao-araujoo/bubo?label=vers%C3%A3o&color=5B21B6&style=flat-square)
-![Status](https://img.shields.io/badge/status-em%20desenvolvimento-A78BFA?style=flat-square)
-![Plataforma](https://img.shields.io/badge/plataforma-Android-7C3AED?style=flat-square)
-![Idioma](https://img.shields.io/badge/idioma-PT--BR-C4B5FD?style=flat-square)
+<sub>Android 7.0 ou mais novo · em português · em desenvolvimento · <a href="https://github.com/joao-araujoo/bubo/releases/latest">notas da versão</a></sub>
 
 </div>
 
