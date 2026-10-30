@@ -199,7 +199,7 @@ export function ClubProfile({
         {curator}
       </BuboTip>
 
-      <SectionTitle icon="auto-stories" title="Obra do ciclo atual" />
+      <SectionTitle title="Obra do ciclo atual" />
       <Card>
         <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
           <BookCover
@@ -225,7 +225,7 @@ export function ClubProfile({
                     {`Pág. ${page}`}
                   </Text>
                   {club.weeklyGoalPages ? (
-                    <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                    <Text variant="meta" color="textMuted">
                       {`Meta: ${club.weeklyGoalPages} págs/sem`}
                     </Text>
                   ) : null}

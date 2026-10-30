@@ -7,6 +7,10 @@ Tasks 06–09 do [roadmap](roadmap.md). O recorte 01–03/06 foi entregue em có
 ([ADR-032](adr/ADR-032-reading-return-and-adaptive-home.md)): `verify` verde, 495 testes. Os checks
 dessa entrega não substituem o aceite em aparelho, ainda pendente.
 
+O recorte de Replay mensal/anual e Stories (**21–23**, ADR-034) foi implementado localmente em
+2026-10-04: `npm run verify` verde com 541 testes. Publicação, aceite visual/nativo e entrega
+efetiva ao Instagram permanecem separados; detalhes em [replay.md](replay.md).
+
 ## 1. Confiança e facilidade para voltar a ler
 
 - [x] **01 — Sessão de leitura recuperável (código consolidado e verificado; aceite em aparelho
@@ -103,18 +107,23 @@ dessa entrega não substituem o aceite em aparelho, ainda pendente.
 
 ## 5. Retrospectivas e expressão pessoal
 
-- [ ] **21 — Bubo Replay mensal.** Retrospectiva visual com livros lidos/iniciados,
-      minutos, dias, páginas, gênero predominante, citação favorita, livro mais revisitado,
-      melhor sequência, Pontes e reflexão marcante. Definir métricas, período/fuso e dados
-      mínimos; omitir dimensões indisponíveis. Depende de 07/17 para citações/Pontes.
-- [ ] **22 — Cards compartilháveis da retrospectiva.** Artes verticais para Stories,
-      escolhidas e pré-visualizadas pelo usuário: Meu mês em livros, Minha frase do mês,
-      O livro que mais ficou comigo, 732 minutos lendo, Minha estante de setembro. Valores
-      exemplificativos nunca entram como dados reais. Identidade Bubo sem aparência de anúncio.
-- [ ] **23 — Bubo Replay anual.** Evolução mensal de livros, tempo, sessões, gêneros,
-      autores, citações e memória. Destacar maior mês, livro mais revisitado, ideias que ligam
-      livros, horário favorito, maior sessão, livro que levou mais tempo e evolução do ritmo.
-      Compartilhável, com critérios transparentes e suporte a histórico parcial.
+- [x] **21 — Bubo Replay mensal (recorte de sessões implementado em código; validação final
+      concluída com 541 testes verdes e aceite em aparelho pendente, ADR-034).** Capítulos visuais e relatório com
+      livros com leitura, início/conclusão por evidência de sessão, foco, dias, páginas, sessões,
+      autoria e melhor sequência de leitura. Encerramento da sessão no fuso IANA escolhido, histórico parcial e zero
+      registro honestos. Gêneros, citações, Pontes e reflexões marcantes permanecem omitidos;
+      citações/Pontes dependem de 07/17. **Já li** manual não cria atividade de retrospectiva.
+- [x] **22 — Cards compartilháveis da retrospectiva (código; aceite nativo pendente,
+      ADR-034).** Capítulo atual exportável em PNG vertical 1080 × 1920 após prévia. Story do
+      livro com capa, título, autoria, status e nota opcional somente para a arte; estilos Papel,
+      Noite e Violeta, marca oficial pequena. Compartilhar/salvar é explícito; texto privado não
+      entra na imagem. Instagram direto depende de build nativa, app instalado e App ID da Meta;
+      compartilhamento do sistema/salvamento são alternativas. Minha frase do mês depende de 07/24.
+- [x] **23 — Bubo Replay anual (recorte de sessões implementado em código; validação final
+      concluída com 541 testes verdes e aceite em aparelho pendente, ADR-034).** Capítulos e relatório com evolução
+      mensal de livros, foco, páginas e sessões, livros/autorias reais, períodos/histórico parcial
+      e compartilhamento de capítulos. Dimensões sem fonte ainda não aparecem: gêneros, citações,
+      Pontes e memória afetiva. Detalhes e limites: [replay.md](replay.md).
 - [ ] **24 — Minha frase do mês.** Selecionar somente citação real salva naquele mês;
       permitir trocar antes de compartilhar arte com texto, livro e capa. Sem citação elegível,
       mostrar estado vazio. Depende de 07 e 22.

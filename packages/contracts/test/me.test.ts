@@ -73,8 +73,13 @@ describe('meResponseSchema', () => {
       profile: { readingHabit: null, goals: [], interests: [], onboardingCompletedAt: null },
       onboardingCompleted: false,
     };
-    // Older API responses without the flag default to a non-moderator.
-    expect(meResponseSchema.parse(me)).toEqual({ ...me, isModerator: false });
+    // Older API responses without the flags default to a non-moderator without login codes.
+    expect(meResponseSchema.parse(me)).toEqual({
+      ...me,
+      user: { ...me.user, twoFactorEnabled: false },
+      isModerator: false,
+      loginCodeAvailable: false,
+    });
   });
 });
 

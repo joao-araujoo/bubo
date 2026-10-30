@@ -1,6 +1,7 @@
 import {
   dueCardsResponseSchema,
   errorResponseSchema,
+  practiceCardsResponseSchema,
   recallCardSchema,
   reviewResultSchema,
   shelfEntryDetailSchema,
@@ -386,5 +387,88 @@ describe('book memory path data', () => {
 
     const stranger = await h.signUp();
     expect((await h.call(`/v1/shelf/${entry.id}`, { cookie: stranger.cookie })).status).toBe(404);
+  });
+});
+
+describe('practice decks (Revisar treinos)', () => {
+  const practice = async (cookie: string, today: string) =>
+    practiceCardsResponseSchema.parse(
+      await (await h.call(`/v1/recall/practice?today=${today}`, { cookie })).json(),
+    );
+  const createCard = async (cookie: string, shelfEntryId: string, prompt: string) =>
+    recallCardSchema.parse(
+      await (
+        await h.call('/v1/recall/cards', {
+          method: 'POST',
+          cookie,
+          json: { shelfEntryId, prompt, answer: `${prompt} resposta`, localDate: '2026-09-26' },
+        })
+      ).json(),
+    );
+  const grade = (cookie: string, cardId: string, value: number, localDate: string) =>
+    h.call(`/v1/recall/cards/${cardId}/review`, {
+      method: 'POST',
+      cookie,
+      json: { id: uuid(), grade: value, localDate },
+    });
+
+  it('lists lapsed cards and reviewed cards that are not due, without changing anything', async () => {
+    now = new Date('2026-09-26T15:00:00.000Z');
+    const { cookie, entry } = await readerWithBook();
+    const slipped = await createCard(cookie, entry.id, 'Quem é Meursault?');
+    const remembered = await createCard(cookie, entry.id, 'Onde fica Argel?');
+    const waiting = await createCard(cookie, entry.id, 'Qual é o fim?');
+
+    now = new Date('2026-09-27T15:00:00.000Z');
+    expect((await grade(cookie, slipped.id, 1, '2026-09-27')).status).toBe(201);
+    expect((await grade(cookie, remembered.id, 4, '2026-09-27')).status).toBe(201);
+    const before = await due(cookie, '2026-09-27');
+
+    const decks = await practice(cookie, '2026-09-27');
+    expect(decks.slipped.map((card) => card.id)).toEqual([slipped.id]);
+    expect(decks.lightning.map((card) => card.id).sort()).toEqual(
+      [slipped.id, remembered.id].sort(),
+    );
+    // Cards due today stay in the real review, never in practice.
+    expect(decks.lightning.some((card) => card.id === waiting.id)).toBe(false);
+
+    const after = await due(cookie, '2026-09-27');
+    expect(after).toEqual(before);
+    const stats = await (await h.call('/v1/me/stats?today=2026-09-27', { cookie })).json();
+    expect(stats).toMatchObject({ xpTotal: 2 + 5 });
+  });
+
+  it('drops a card once it is due again or remembered later', async () => {
+    now = new Date('2026-09-26T15:00:00.000Z');
+    const { cookie, entry } = await readerWithBook();
+    const card = await createCard(cookie, entry.id, 'Por que o julgamento?');
+    now = new Date('2026-09-27T15:00:00.000Z');
+    await grade(cookie, card.id, 0, '2026-09-27');
+
+    now = new Date('2026-09-28T15:00:00.000Z');
+    expect((await practice(cookie, '2026-09-28')).slipped).toEqual([]);
+    expect((await grade(cookie, card.id, 4, '2026-09-28')).status).toBe(201);
+    const decks = await practice(cookie, '2026-09-28');
+    expect(decks.slipped).toEqual([]);
+    expect(decks.lightning.map((item) => item.id)).toEqual([card.id]);
+  });
+
+  it('is scoped to the reader, needs a session and a valid day', async () => {
+    now = new Date('2026-09-26T15:00:00.000Z');
+    const { cookie, entry } = await readerWithBook();
+    const card = await createCard(cookie, entry.id, 'Uma pergunta só minha');
+    now = new Date('2026-09-27T15:00:00.000Z');
+    await grade(cookie, card.id, 1, '2026-09-27');
+
+    const stranger = await h.signUp();
+    expect(await practice(stranger.cookie, '2026-09-27')).toEqual({
+      today: '2026-09-27',
+      slipped: [],
+      lightning: [],
+    });
+    expect((await h.call('/v1/recall/practice?today=2026-09-27')).status).toBe(401);
+    const invalid = await h.call('/v1/recall/practice?today=ontem', { cookie });
+    expect(invalid.status).toBe(422);
+    expect(errorResponseSchema.parse(await invalid.json()).error.code).toBe('VALIDATION_FAILED');
   });
 });

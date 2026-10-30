@@ -1,0 +1,22 @@
+{
+  "name": "bubo-launch-film",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bubo launch film (9:16, 60 fps). Deterministic HTML/Canvas animation rendered with Chromium and ffmpeg. Isolated from the Bubo workspaces.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-assets.mjs",
+    "serve": "node scripts/serve.mjs",
+    "audio": "node scripts/audio.mjs",
+    "frames": "node scripts/frames.mjs",
+    "sheet": "node scripts/frames.mjs --sheet",
+    "render": "node scripts/render.mjs",
+    "check": "node scripts/determinism.mjs"
+  },
+  "dependencies": {
+    "@fontsource/literata": "5.3.0",
+    "ffmpeg-static": "5.3.0",
+    "puppeteer-core": "25.13.0"
+  }
+}

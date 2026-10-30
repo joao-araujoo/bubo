@@ -187,7 +187,7 @@ export default function AchievementsScreen() {
   const query = useAchievements(auth.status === 'ready' ? auth.userId : undefined);
 
   return (
-    <FormScreen title="Mural de conquistas" eyebrow="Gamificação Bubo">
+    <FormScreen title="Mural de conquistas">
       {query.isPending ? (
         <ActivityIndicator
           color={theme.colors.primary}

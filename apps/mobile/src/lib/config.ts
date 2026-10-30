@@ -4,7 +4,10 @@ import { parsePublicEnv } from '@bubo/config';
  * Public runtime config. `process.env.EXPO_PUBLIC_*` must be referenced statically so Expo can
  * inline it at build time. Only public values belong here — never secrets.
  */
-const parsed = parsePublicEnv({ EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL });
+const parsed = parsePublicEnv({
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+  EXPO_PUBLIC_SUPPORT_EMAIL: process.env.EXPO_PUBLIC_SUPPORT_EMAIL,
+});
 
 if (!parsed.ok && __DEV__) {
   // Fail loudly in development; production falls back to the default below.
@@ -18,4 +21,6 @@ export const publicConfig = {
     /\/+$/,
     '',
   ),
+  /** Public contact for Sobre and the legal documents; null until the owner sets it. */
+  supportEmail: parsed.ok ? (parsed.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? null) : null,
 } as const;

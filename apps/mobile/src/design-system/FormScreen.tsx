@@ -22,55 +22,50 @@ type Props = {
   back?: boolean;
   /** Onboarding progress, e.g. { current: 2, total: 6 }. */
   step?: { current: number; total: number };
-  /** Centered header title with an optional eyebrow above it (Stitch "Adicionar manualmente"). */
+  /** Screen title, left-aligned next to the back button (one header style for every stack screen). */
   title?: string;
-  eyebrow?: string;
-  /** Actions on the right of the header (any width). */
+  /** One line of real context under the title: the club, the book, the position in a queue. */
+  subtitle?: string;
+  /** Actions on the right of the header (HeaderButtons, at most two plus a status pill). */
   headerRight?: ReactNode;
+  /** Centred logo for the signed-out and onboarding screens (no title). */
   brand?: boolean;
-  /** `left`: Stitch club screens (eyebrow + title aligned left, square buttons). */
-  align?: 'center' | 'left';
-  /** Green status dot after the eyebrow (Stitch "CLUBE DE LEITURA ●"). */
-  eyebrowDot?: boolean;
   /** `close` shows ✕ (modal creation screens) instead of ←. */
   leading?: 'back' | 'close';
-  /** Floating action pill anchored bottom-right (Stitch "Novo Tópico"). */
+  /** Floating action pill anchored bottom-right (e.g. "Novo tópico"). */
   floating?: ReactNode;
 };
 
-/** Raised header button (back, close, search, menu). `square` = Stitch club-screen squircle. */
+/** Raised round header button (back, close, search, menu), always a 48 pt touch target. */
 export function HeaderButton({
   icon,
   label,
   onPress,
-  shape = 'round',
   iconColor = 'text',
   badge,
 }: {
   icon: ComponentProps<typeof Icon>['name'];
   label: string;
   onPress: () => void;
-  shape?: 'round' | 'square';
   iconColor?: keyof ColorTokens;
   /** Real count drawn on the corner (e.g. unread notifications); hidden when 0. */
   badge?: number;
 }) {
   const theme = useTheme();
-  const square = shape === 'square';
-  const size = square ? 42 : theme.sizes.touchTarget;
+  const size = theme.sizes.touchTarget;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={badge ? `${label}, ${badge} ${badge === 1 ? 'nova' : 'novas'}` : label}
       onPress={onPress}
-      hitSlop={square ? 6 : 4}
+      hitSlop={4}
     >
       {({ pressed }) => (
         <Raised
           faceColor={theme.colors.surface}
-          borderColor={square ? theme.colors.border : theme.colors.borderSoft}
-          rimColor={square ? theme.colors.secondaryRim : theme.colors.cardShadow}
-          radius={square ? theme.radii.md : theme.radii.pill}
+          borderColor={theme.colors.borderSoft}
+          rimColor={theme.colors.cardShadow}
+          radius={theme.radii.pill}
           depth={3}
           pressed={pressed}
           faceStyle={{
@@ -80,7 +75,7 @@ export function HeaderButton({
             justifyContent: 'center',
           }}
         >
-          <Icon name={icon} size={square ? 20 : 22} color={iconColor} />
+          <Icon name={icon} size={22} color={iconColor} />
           {badge ? (
             <View
               style={{
@@ -99,7 +94,7 @@ export function HeaderButton({
               }}
             >
               <Text
-                variant="label"
+                variant="labelSm"
                 color="onPrimary"
                 style={{ fontSize: 10, lineHeight: 13, includeFontPadding: false }}
               >
@@ -113,55 +108,20 @@ export function HeaderButton({
   );
 }
 
-/** Stitch eyebrow: tracked uppercase in deep purple, optional green status dot. */
-export function Eyebrow({
-  label,
-  dot = false,
-  align = 'left',
-}: {
-  label: string;
-  dot?: boolean;
-  align?: 'left' | 'center';
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: align === 'center' ? 'center' : 'flex-start',
-        gap: theme.spacing.xs,
-      }}
-    >
-      <Text variant="caption" color="accentDeep" numberOfLines={1} style={{ flexShrink: 1 }}>
-        {label}
-      </Text>
-      {dot ? (
-        <View
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: theme.radii.pill,
-            backgroundColor: theme.colors.success,
-          }}
-        />
-      ) : null}
-    </View>
-  );
-}
-
-/** Keyboard-safe screen for forms and onboarding: header (back + step), scroll body, sticky footer. */
+/**
+ * Keyboard-safe screen for every pushed or modal route: one header (back/close, left-aligned
+ * title with optional context line, right actions), scroll body and sticky footer. Signed-out and
+ * onboarding screens use the centred `brand` / `step` header instead of a title.
+ */
 export function FormScreen({
   children,
   footer,
   back = true,
   step,
   title,
-  eyebrow,
+  subtitle,
   headerRight,
   brand = false,
-  align = 'center',
-  eyebrowDot = false,
   leading = 'back',
   floating,
   scroll = true,
@@ -170,8 +130,14 @@ export function FormScreen({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const showBack = back && router.canGoBack();
-  const slot = { width: theme.sizes.touchTarget };
-  const left = align === 'left';
+  const titled = Boolean(title);
+  const backButton = showBack ? (
+    <HeaderButton
+      icon={leading === 'close' ? 'close' : 'arrow-back'}
+      label={leading === 'close' ? 'Fechar' : 'Voltar'}
+      onPress={() => router.back()}
+    />
+  ) : null;
 
   return (
     <KeyboardAvoidingView
@@ -183,79 +149,75 @@ export function FormScreen({
       <View
         style={{
           paddingTop: insets.top + theme.spacing.sm,
-          paddingBottom: title ? theme.spacing.sm : 0,
+          paddingBottom: titled ? theme.spacing.md : 0,
           paddingHorizontal: theme.sizes.gutter,
           flexDirection: 'row',
           alignItems: 'center',
           minHeight: theme.sizes.touchTarget,
           gap: theme.spacing.md,
-          borderBottomWidth: title ? 1 : 0,
+          borderBottomWidth: titled ? 1 : 0,
           borderBottomColor: theme.colors.borderSoft,
         }}
       >
-        <View style={left ? undefined : slot}>
-          {showBack ? (
-            <HeaderButton
-              icon={leading === 'close' ? 'close' : 'arrow-back'}
-              label={leading === 'close' ? 'Fechar' : 'Voltar'}
-              shape={left ? 'square' : 'round'}
-              onPress={() => router.back()}
-            />
-          ) : null}
-        </View>
-        <View style={{ flex: 1, alignItems: left ? 'flex-start' : 'center' }}>
-          {brand ? <BuboLogo height={32} /> : null}
-          {step ? (
+        {titled ? (
+          <>
+            {backButton}
+            <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+              <Text variant="title" accessibilityRole="header" numberOfLines={2}>
+                {title}
+              </Text>
+              {subtitle ? (
+                <Text variant="bodySm" color="textMuted" numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+            {headerRight ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                {headerRight}
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <View style={{ width: theme.sizes.touchTarget }}>{backButton}</View>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              {brand ? <BuboLogo height={32} /> : null}
+              {step ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignSelf: 'stretch',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ProgressBar
+                      percent={(step.current / step.total) * 100}
+                      fromPercent={((step.current - 1) / step.total) * 100}
+                      accessibilityLabel={`Progresso do cadastro: etapa ${step.current} de ${step.total}`}
+                    />
+                  </View>
+                  <Text variant="label" color="accentText">
+                    {step.current} de {step.total}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             <View
               style={{
+                minWidth: theme.sizes.touchTarget,
                 flexDirection: 'row',
-                alignSelf: 'stretch',
                 alignItems: 'center',
-                gap: theme.spacing.md,
+                justifyContent: 'flex-end',
+                gap: theme.spacing.sm,
               }}
             >
-              <View style={{ flex: 1 }}>
-                <ProgressBar
-                  percent={(step.current / step.total) * 100}
-                  fromPercent={((step.current - 1) / step.total) * 100}
-                  accessibilityLabel={`Progresso do cadastro: etapa ${step.current} de ${step.total}`}
-                />
-              </View>
-              <Text variant="label" color="accentText">
-                {step.current} de {step.total}
-              </Text>
+              {headerRight}
             </View>
-          ) : null}
-          {eyebrow ? (
-            <Eyebrow label={eyebrow} dot={eyebrowDot} align={left ? 'left' : 'center'} />
-          ) : null}
-          {title ? (
-            <Text
-              variant="titleSm"
-              accessibilityRole="header"
-              align={left ? 'left' : 'center'}
-              numberOfLines={left ? 2 : 1}
-              style={left ? { fontSize: 19, lineHeight: 24 } : undefined}
-            >
-              {title}
-            </Text>
-          ) : null}
-        </View>
-        <View
-          style={
-            left || headerRight
-              ? {
-                  minWidth: left ? 0 : theme.sizes.touchTarget,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: theme.spacing.sm,
-                }
-              : slot
-          }
-        >
-          {headerRight}
-        </View>
+          </>
+        )}
       </View>
       <OfflineBanner />
       {scroll ? (

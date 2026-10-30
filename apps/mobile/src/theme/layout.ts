@@ -26,7 +26,6 @@ export const sizes = {
   touchTarget: 48,
   /** Primary call-to-action height. */
   ctaHeight: 56,
-  tabBarHeight: 64,
   progressTrack: 12,
   borderWidth: 2,
   /** Pushdown "3D" rim of tactile buttons and cards. */

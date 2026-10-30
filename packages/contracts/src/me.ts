@@ -22,6 +22,8 @@ export const userSchema = z.object({
   emailVerified: z.boolean(),
   image: z.string().nullable(),
   createdAt: z.iso.datetime(),
+  /** E-mailed login code on untrusted devices (ADR-038). Older APIs/caches default to off. */
+  twoFactorEnabled: z.boolean().default(false),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -39,6 +41,8 @@ export const meResponseSchema = z.object({
   profile: readerProfileSchema,
   onboardingCompleted: z.boolean(),
   isModerator: z.boolean().default(false),
+  /** Whether this API can e-mail login codes (provider configured). False on older APIs. */
+  loginCodeAvailable: z.boolean().default(false),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 
@@ -86,12 +90,24 @@ export const bookSchema = z.object({
 });
 export type Book = z.infer<typeof bookSchema>;
 
+export const shelfRatingSchema = z.number().int().min(1).max(5);
+
 export const shelfEntrySchema = z.object({
   id: z.string(),
   status: readingStatusSchema,
   currentPage: z.number().int().nonnegative(),
   startedAt: z.iso.datetime().nullable(),
   finishedAt: z.iso.datetime().nullable(),
+  /** The reader's private 1–5 rating. Defaults to null for older APIs and cached entries. */
+  rating: shelfRatingSchema.nullable().default(null),
+  /** The reader's own marks (ADR-046); default false for older APIs and cached entries. */
+  favorite: z.boolean().default(false),
+  owned: z.boolean().default(false),
+  wishlist: z.boolean().default(false),
+  /** "Relendo": a mark on a reading/paused book, never a status of its own. */
+  rereading: z.boolean().default(false),
+  /** When the book was put on the shelf; null for older APIs. */
+  addedAt: z.iso.datetime().nullable().default(null),
   book: bookSchema,
 });
 export type ShelfEntry = z.infer<typeof shelfEntrySchema>;

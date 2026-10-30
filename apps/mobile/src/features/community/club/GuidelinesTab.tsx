@@ -169,7 +169,7 @@ export function GuidelinesTab({
               <Text variant="label" numberOfLines={2}>
                 {`${club.name} • ${club.book.title}`}
               </Text>
-              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+              <Text variant="meta" color="textMuted">
                 {total && page < total
                   ? `Tudo entre as págs. ${page + 1} e ${total} recebe véu protetor até você registrar a leitura.`
                   : 'Você chegou ao fim do livro: nenhum debate fica coberto para você.'}
@@ -180,10 +180,9 @@ export function GuidelinesTab({
       ) : null}
 
       <SectionTitle
-        icon="gavel"
         title="Regras da comunidade"
         trailing={
-          <Text variant="bodySm" color="accentText" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="accentText">
             4 mandamentos
           </Text>
         }
@@ -237,10 +236,10 @@ export function GuidelinesTab({
                   backgroundColor: theme.colors.successSoft,
                 }}
               >
-                <Text variant="label" color="successText" style={{ fontSize: 12 }}>
+                <Text variant="labelSm" color="successText">
                   ✓ Correto:
                 </Text>
-                <Text variant="bodySm" color="successText" style={{ fontSize: 12 }}>
+                <Text variant="meta" color="successText">
                   {`“${rule.good}”`}
                 </Text>
               </View>
@@ -255,10 +254,10 @@ export function GuidelinesTab({
                   backgroundColor: theme.colors.errorSoft,
                 }}
               >
-                <Text variant="label" color="errorText" style={{ fontSize: 12 }}>
+                <Text variant="labelSm" color="errorText">
                   ✕ Incorreto:
                 </Text>
-                <Text variant="bodySm" color="errorText" style={{ fontSize: 12 }}>
+                <Text variant="meta" color="errorText">
                   {`“${rule.bad}”`}
                 </Text>
               </View>
@@ -273,7 +272,7 @@ export function GuidelinesTab({
           <Text variant="bodyStrong" style={{ flex: 1 }}>
             Guardiões da leitura
           </Text>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted">
             1 moderador
           </Text>
         </View>
@@ -300,14 +299,14 @@ export function GuidelinesTab({
               </Text>
               <Pill caps tone="primarySolid" label="Criador" />
             </View>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               Guardião fundador do clube
             </Text>
           </View>
         </View>
       </Card>
 
-      <SectionTitle icon="help-outline" title="Dúvidas frequentes sobre moderação" />
+      <SectionTitle title="Dúvidas frequentes sobre moderação" />
       {FAQ.map((item) => (
         <Faq key={item.q} q={item.q} a={item.a} />
       ))}
@@ -327,11 +326,11 @@ export function GuidelinesTab({
           </Text>
           {joined ? (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text variant="label" color="onHeroMuted" style={{ flex: 1, fontSize: 12 }}>
+              <Text variant="labelSm" color="onHeroMuted" style={{ flex: 1 }}>
                 {`Membro desde ${joined}`}
               </Text>
               <Icon name="check-circle-outline" size={16} color="success" />
-              <Text variant="label" color="success" style={{ fontSize: 12, marginLeft: 4 }}>
+              <Text variant="labelSm" color="success" style={{ marginLeft: 4 }}>
                 Em conformidade
               </Text>
             </View>

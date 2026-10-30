@@ -48,7 +48,8 @@ function words(text: string): string[] {
   );
 }
 
-function hasSubstance(text: string): boolean {
+/** One answer passes the substance rule the checklist applies to each field. */
+export function isSubstantialRecallAnswer(text: string): boolean {
   const normalized = normalize(text);
   if (/^lorem ipsum\b/u.test(normalized)) return false;
   // A request to pass the evaluator is not a retrieval answer. Quotes embedded in an answer work.
@@ -70,7 +71,8 @@ function hasSubstance(text: string): boolean {
   return true;
 }
 
-function similar(left: string, right: string): boolean {
+/** Two answers repeat the same text once case, accents and punctuation are ignored. */
+export function recallAnswersRepeat(left: string, right: string): boolean {
   const a = words(left);
   const b = words(right);
   if (a.length === 0 || b.length === 0) return false;
@@ -95,14 +97,14 @@ export function assessRecallWriting(recall: RecallExercise): RecallWritingAssess
     },
   };
   const checks: RecallWritingAssessment['checks'] = KEYS.map((key) => {
-    const passed = hasSubstance(recall[key]);
+    const passed = isSubstantialRecallAnswer(recall[key]);
     return { key, passed, message: passed ? messages[key].pass : messages[key].fail };
   });
   const hasAllAnswers = KEYS.every((key) => words(recall[key]).length > 0);
   const different =
     hasAllAnswers &&
     !KEYS.some((key, index) =>
-      KEYS.slice(index + 1).some((other) => similar(recall[key], recall[other])),
+      KEYS.slice(index + 1).some((other) => recallAnswersRepeat(recall[key], recall[other])),
     );
   checks.push({
     key: 'originality',
@@ -125,6 +127,20 @@ export function assessRecallWriting(recall: RecallExercise): RecallWritingAssess
       ? 'Exercício preenchido! Amanhã, tente lembrar de novo antes de abrir sua nota. Este checklist não confirma a exatidão do livro.'
       : 'Vamos guardar uma lembrança sua do trecho. Pode ser simples, sem palavras difíceis. Este checklist não confirma a exatidão do livro.',
   };
+}
+
+/**
+ * Coaching hint of the recall card (ADR-044): a number or a capitalised name that does not open a
+ * sentence, such as a character, a place or a date. It never enters the checklist and never blocks
+ * an answer; it only lights a hint while the reader writes.
+ */
+export function mentionsSomethingConcrete(text: string): boolean {
+  const tokens = text.normalize('NFKC').trim().split(/\s+/u);
+  return tokens.some(
+    (token, index) =>
+      /\p{N}/u.test(token) ||
+      (index > 0 && !/[.!?…:]$/u.test(tokens[index - 1] ?? '') && /^["'“(]?\p{Lu}/u.test(token)),
+  );
 }
 
 /** Text persisted in the existing reflection/card flow, generated from the accepted exercise. */

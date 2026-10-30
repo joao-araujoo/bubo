@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>analyze</title>
+  </head>
+  <body>
+    <script type="module">
+      // Finds the eye whites (large near-white blobs) of selected poses and the logo alpha box.
+      async function load(src) {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        const c = new OffscreenCanvas(img.width, img.height);
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0);
+        return { w: img.width, h: img.height, d: g.getImageData(0, 0, img.width, img.height).data };
+      }
+      function bbox({ w, h, d }) {
+        let x0 = w,
+          y0 = h,
+          x1 = 0,
+          y1 = 0;
+        for (let y = 0; y < h; y++)
+          for (let x = 0; x < w; x++)
+            if (d[(y * w + x) * 4 + 3] > 16) {
+              if (x < x0) x0 = x;
+              if (x > x1) x1 = x;
+              if (y < y0) y0 = y;
+              if (y > y1) y1 = y;
+            }
+        return { x0, y0, x1, y1 };
+      }
+      function darkBlobs({ w, h, d }) {
+        // pupils: very dark, opaque pixels; flood-fill components
+        const seen = new Uint8Array(w * h);
+        const out = [];
+        for (let y = 0; y < h; y += 1)
+          for (let x = 0; x < w; x += 1) {
+            const i = y * w + x;
+            if (seen[i]) continue;
+            const r = d[i * 4],
+              gg = d[i * 4 + 1],
+              b = d[i * 4 + 2],
+              a = d[i * 4 + 3];
+            if (!(a > 200 && r < 70 && gg < 50 && b < 90)) continue;
+            const stack = [i];
+            seen[i] = 1;
+            let n = 0,
+              sx = 0,
+              sy = 0,
+              x0 = x,
+              x1 = x,
+              y0 = y,
+              y1 = y;
+            while (stack.length) {
+              const j = stack.pop();
+              const jx = j % w,
+                jy = (j / w) | 0;
+              n++;
+              sx += jx;
+              sy += jy;
+              if (jx < x0) x0 = jx;
+              if (jx > x1) x1 = jx;
+              if (jy < y0) y0 = jy;
+              if (jy > y1) y1 = jy;
+              for (const k of [j - 1, j + 1, j - w, j + w]) {
+                if (k < 0 || k >= w * h || seen[k]) continue;
+                const kr = d[k * 4],
+                  kg = d[k * 4 + 1],
+                  kb = d[k * 4 + 2],
+                  ka = d[k * 4 + 3];
+                if (ka > 200 && kr < 90 && kg < 70 && kb < 120) {
+                  seen[k] = 1;
+                  stack.push(k);
+                }
+              }
+            }
+            if (n > 4000)
+              out.push({ cx: Math.round(sx / n), cy: Math.round(sy / n), n, x0, x1, y0, y1 });
+          }
+        return out;
+      }
+      const result = {};
+      for (const pose of [
+        'neutral',
+        'main',
+        'curious',
+        'surprised',
+        'focused',
+        'confident',
+        'celebrating',
+        'taking-notes',
+        'idea',
+        'happy',
+        'cheering',
+        'review',
+        'achievement',
+        'welcome',
+      ]) {
+        const im = await load(`../../build/assets/mascot/bubo-${pose}.png`);
+        result[pose] = { bbox: bbox(im), dark: darkBlobs(im).slice(0, 8) };
+      }
+      const sym = await load('../../build/assets/brand/bubo-symbol.png');
+      result.symbol = { bbox: bbox(sym), dark: darkBlobs(sym).slice(0, 8) };
+      const logo = await load('../../build/assets/brand/bubo-logo-horizontal.png');
+      result.logo = { bbox: bbox(logo), corner: Array.from(logo.d.slice(0, 4)) };
+      // book colour in main pose: sample a region of the book
+      const main = await load('../../build/assets/mascot/bubo-main.png');
+      const px = (x, y) => Array.from(main.d.slice((y * main.w + x) * 4, (y * main.w + x) * 4 + 4));
+      result.mainBook = [px(450, 800), px(500, 900), px(420, 1000), px(560, 760)];
+      window.poseReport = result;
+      window.ready = true;
+    </script>
+  </body>
+</html>

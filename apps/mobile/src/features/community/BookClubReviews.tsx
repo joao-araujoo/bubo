@@ -16,7 +16,7 @@ export function BookClubReviews({ userId, bookId }: { userId: string; bookId: st
   const matches = clubs.data?.mine.filter((club) => club.book.id === bookId) ?? [];
   return (
     <View style={{ gap: theme.spacing.sm }}>
-      <SectionTitle icon="rate-review" title="Resenhas nos seus clubes" />
+      <SectionTitle title="Resenhas nos seus clubes" />
       {clubs.isPending ? (
         <Text variant="bodySm" color="textMuted">
           Carregando seus clubes…

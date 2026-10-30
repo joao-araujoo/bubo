@@ -5,8 +5,7 @@ homologação em aparelhos e calibração do algoritmo são etapas distintas. Es
 [docs/release.md](docs/release.md) → "Current
 remote state". Como testar cada tela: [docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md).
 
-Última atualização: 2026-10-03 (recordação obrigatória, pergunta Gemini opcional, ciclo de push,
-textos enxutos e autoavaliações após intervalo).
+Última atualização: 2026-10-04 (Replay/Stories locais e configuração opcional para Instagram).
 
 Na fonte atual, **Você → Preferências** reúne os ajustes; **Você → Widgets** mostra os cinco
 modelos. **Você → Minha memória** inclui **Lembrei após um intervalo** (1–6, 7–29 e 30+ dias):
@@ -31,21 +30,22 @@ publicação da API e compilação do app ficam em [docs/release.md](docs/releas
 
 ## 2. Resumo do que falta (por prioridade)
 
-| #   | O que configurar                                  | Sem isso, o que acontece                                                                  | Prioridade              |
-| --- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------- |
-| 1   | Plano **Workers Paid** (Cloudflare)               | Com mais usuários, cadastro/login podem falhar (limite de 10 ms de CPU do plano grátis).  | Antes de usuários reais |
-| 2   | **Banco de produção separado** (branch no Neon)   | Seu ambiente local e a produção escrevem no mesmo banco.                                  | Antes de usuários reais |
-| 3   | **Build nativa do app**                           | Use `npm run build:android` para um APK gratuito com widgets; Expo Go não inclui widgets. | Para testar no celular  |
-| 4   | **E-mail (Resend)**                               | "Esqueci minha senha" responde "serviço indisponível".                                    | Alta                    |
-| 5   | **Canal de suporte e moderação** (e-mail público) | As lojas recusam apps com comunidade sem contato para denúncias.                          | Antes das lojas         |
-| 6   | **Política de Privacidade e Termos de Uso**       | As lojas recusam o app; o cadastro não pede consentimento.                                | Antes das lojas         |
-| 7   | **Contas nas lojas** (Apple e Google)             | Não dá para publicar.                                                                     | Antes das lojas         |
-| 8   | **Chave do Google Books**                         | A busca usa só Open Library e BrasilAPI (o Google recusa por cota sem chave).             | Média                   |
-| 9   | **Capas no R2** (`MEDIA_PUBLIC_URL`)              | As capas vêm direto dos sites de origem, com a capa tipográfica como reserva.             | Média                   |
-| 10  | **Domínio próprio** (opcional)                    | A API fica em `*.workers.dev`.                                                            | Baixa                   |
-| 11  | **Rotacionar credenciais antigas**                | Senhas/chaves que já apareceram em arquivos ou conversas continuam válidas.               | Alta                    |
-| 12  | **Tabelas antigas no Neon** (decisão)             | Nada quebra; o banco só fica com ~40 tabelas vazias que o Bubo não usa.                   | Baixa                   |
-| 13  | **Notificações push** (EAS + Firebase)            | Os avisos ficam só dentro do app; o celular não recebe lembretes nem avisos.              | Antes das lojas         |
+| #   | O que configurar                                    | Sem isso, o que acontece                                                                                      | Prioridade              |
+| --- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 1   | Plano **Workers Paid** (Cloudflare)                 | Com mais usuários, cadastro/login podem falhar (limite de 10 ms de CPU do plano grátis).                      | Antes de usuários reais |
+| 2   | **Banco de produção separado** (branch no Neon)     | Seu ambiente local e a produção escrevem no mesmo banco.                                                      | Antes de usuários reais |
+| 3   | **Build nativa do app**                             | Use `npm run build:android` para um APK gratuito com widgets e exportação de Stories; Expo Go mostra prévias. | Para testar no celular  |
+| 4   | **E-mail (Resend)** — feito em 2026-10-12           | Sem ele, "Esqueci minha senha" responde "serviço indisponível" e o login **não pede código** (só senha).      | Feito                   |
+| 5   | **Canal de suporte e moderação** (e-mail público)   | As lojas recusam apps com comunidade sem contato para denúncias.                                              | Antes das lojas         |
+| 6   | **Política de Privacidade e Termos de Uso**         | As lojas recusam o app; o cadastro não pede consentimento.                                                    | Antes das lojas         |
+| 7   | **Contas nas lojas** (Apple e Google)               | Não dá para publicar.                                                                                         | Antes das lojas         |
+| 8   | **Chave do Google Books**                           | A busca usa só Open Library e BrasilAPI (o Google recusa por cota sem chave).                                 | Média                   |
+| 9   | **Capas no R2** (`MEDIA_PUBLIC_URL`)                | As capas vêm direto dos sites de origem, com a capa tipográfica como reserva.                                 | Média                   |
+| 10  | **Domínio próprio** (opcional)                      | A API fica em `*.workers.dev`.                                                                                | Baixa                   |
+| 11  | **Rotacionar credenciais antigas**                  | Senhas/chaves que já apareceram em arquivos ou conversas continuam válidas.                                   | Alta                    |
+| 12  | **Tabelas antigas no Neon** (decisão)               | Nada quebra; o banco só fica com ~40 tabelas vazias que o Bubo não usa.                                       | Baixa                   |
+| 13  | **Notificações push** (EAS + Firebase)              | Os avisos ficam só dentro do app; o celular não recebe lembretes nem avisos.                                  | Antes das lojas         |
+| 14  | **Instagram Stories direto** (App ID Meta opcional) | Sem App ID/build nativa, use compartilhamento do sistema ou salve a imagem na build nativa.                   | Opcional, seção 3.16    |
 
 `GEMINI_API_KEY` é opcional: a sessão e o checklist funcionam sem IA; a chave habilita uma pergunta
 extra quando o leitor consente (3.15). `CATALOG_CONTACT_EMAIL` também é opcional, mas **recomendado**: com um e-mail de contato o Open
@@ -97,6 +97,9 @@ e só funciona com a API local. Para testar contra a produção, gere um APK loc
    ```
 2. Copie `build/android/bubo-test.apk` para o Android e abra-o, ou conecte/autorize o USB e rode
    `npm run install:android`. O app funciona sem o computador e inclui os widgets.
+   **Importante (2026-10-13, ADR-040):** APKs gerados antes de 12/10 não sabem digitar o código de
+   entrada; a produção agora responde a eles "Atualize o app" em vez de ficar parada. Gere e
+   instale um APK novo para entrar, usar o "Esqueci minha senha" por código e ver a nova Estante.
 3. Leia [docs/build-mobile.md](docs/build-mobile.md) para diagnóstico, configuração e limites.
    Não exige EAS, assinatura paga nem publicação. iPhone físico com estes widgets exige
    Mac/Xcode e App Groups disponíveis na equipe Apple Developer (3.7).
@@ -120,7 +123,41 @@ Modelos, casos estudados e comandos de prévia/diagnóstico: [docs/emails.md](do
    npx wrangler secret put RESEND_API_KEY --env production
    npx wrangler secret put EMAIL_FROM --env production    # ex.: Bubo <nao-responda@seu-dominio.com>
    ```
-4. Teste: no app, "Esqueci minha senha" → o e-mail deve chegar e o link deve abrir o app.
+4. Teste: no app, "Esqueci minha senha" → chega um código de 6 dígitos; digite-o com a senha nova
+   na mesma tela. Depois saia e entre de novo: em um aparelho ainda não lembrado chega o e-mail
+   "… é o seu código de entrada no Bubo".
+
+**2026-10-12 (ADR-038):** com os dois secrets acima, o login passa a pedir um código por e-mail em
+aparelhos novos ("Lembrar este aparelho" vale 30 dias) e "Esqueci minha senha" usa código em vez de
+link. Sem os secrets nada disso é exigido: o login continua só com senha e o app mostra a opção
+como indisponível. A migração `0017` **já está aplicada** no Neon. O e-mail opcional "Sentimos sua
+falta" (7 dias sem ler, 1 a cada 30 dias, 10h locais) só sai com o cron em produção e com o
+leitor consentindo em Configurações → E-mails do Bubo; cada envio traz descadastro em um toque.
+
+**Feito em 2026-10-12:** registros DNS na Hostinger, domínio `verified` no Resend, secrets
+`RESEND_API_KEY` + `EMAIL_FROM` no Worker, `.dev.vars` atualizado (o `dev:api` envia e-mails de
+verdade) e API publicada. No app, saia e entre de novo: o código chega por e-mail.
+
+Se precisar refazer em outra conta ou domínio, nesta ordem:
+
+1. Adicione os quatro registros DNS de [docs/emails-dns.md](docs/emails-dns.md) na zona do
+   domínio. Até lá o domínio fica `failed` no Resend e só o remetente de teste funciona, apenas
+   para o seu próprio e-mail.
+2. Entre no Cloudflare pelo terminal (abre o navegador uma vez):
+   ```powershell
+   cd apps/api
+   npx wrangler login
+   cd ../..
+   ```
+3. `npm run email:activate` verifica o domínio no Resend, grava os dois secrets no Worker e copia
+   as linhas para `apps/api/.dev.vars`. `npm run email:activate -- --check` só mostra o estado.
+4. `npm run deploy:api` publica a API nova (roda `verify` antes).
+5. Para ver todos os modelos na sua caixa de entrada: `npm run email:samples -- --send-to seu@email --name Nome`
+   (com `--test-sender` enquanto o domínio não estiver verificado; só chega no e-mail da conta Resend).
+
+Opcional: um contato público para Configurações → Sobre e para os Termos/Privacidade:
+`EXPO_PUBLIC_SUPPORT_EMAIL=suporte@seu-dominio.com` em `apps/mobile/.env` (é público, vai no
+bundle). Sem ele, as telas apontam para o contato da loja de aplicativos.
 
 ### 3.5 Canal de suporte e moderação (obrigatório para comunidade nas lojas)
 
@@ -321,6 +358,35 @@ campos quando o leitor liga a opção; ela não aprova a sessão nem certifica o
    ausência de chave, quota ou erro deixa a pergunta indisponível e preserva o checklist.
 
 Critérios, fontes e validação humana ainda necessária: [docs/core-validation.md](docs/core-validation.md).
+
+### 3.16 Replay e Stories do Instagram (nova build; App ID opcional)
+
+Na fonte local, **Você → Bubo Replay** mostra o mês/ano a partir das sessões aceitas.
+**Estante → livro → Compartilhar livro** abre a prévia com capa, estilo e nota opcional.
+O Replay não exige nova migração, Gemini ou dados externos para calcular a atividade.
+Esta entrega ainda não publica a API nem substitui o APK instalado.
+
+Para abrir o editor de Stories diretamente:
+
+1. Use o **App ID público real** do aplicativo Bubo no painel Meta for Developers. Copie somente
+   o identificador; não coloque App Secret, token ou senha no app/repositório.
+2. Defina `EXPO_PUBLIC_INSTAGRAM_APP_ID` no `apps/mobile/.env` local antes de compilar.
+   Esse valor é público e opcional. O app funciona sem ele; as alternativas nativas de compartilhar
+   e salvar continuam disponíveis.
+3. Compile uma nova build nativa. No Android: `npm run build:android`, depois instale o APK
+   conforme [docs/build-mobile.md](docs/build-mobile.md). O iPhone requer Xcode e aceite separado.
+   Atualizar somente JavaScript não instala o módulo/configuração nativa.
+4. No aparelho com Instagram instalado, escolha a arte e toque **Instagram Stories**.
+   Confira nitidez, conteúdo e margens no editor. A pessoa decide a publicação no Instagram;
+   o Bubo não publica automaticamente.
+5. Se o envio direto não estiver disponível, use **Compartilhar** ou **Salvar imagem** e selecione
+   a imagem no Instagram. Quando o sistema pedir acesso a fotos para salvar, permitir ou negar
+   deve deixar a prévia e o restante do app utilizáveis.
+
+O **Expo Go** mostra as prévias e informa que a exportação exige uma build nativa. App ID e
+compilação não comprovam que o Instagram recebeu a imagem; teste no Android/iPhone real seguindo
+[docs/TESTAR-TELAS.md](docs/TESTAR-TELAS.md). Detalhes dos dados, privacidade e 1080 × 1920:
+[docs/replay.md](docs/replay.md).
 
 ## 4. Como conferir se está tudo certo
 

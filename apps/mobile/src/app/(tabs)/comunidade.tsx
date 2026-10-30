@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import {
-  BuboLogo,
   BuboTip,
   Button,
   EmptyState,
@@ -26,6 +25,7 @@ import { ClubExploreCard } from '../../features/community/ClubExploreCard';
 import { pagesLabel } from '../../features/community/meta';
 import { PollCard } from '../../features/community/PollCard';
 import { TopicCard } from '../../features/community/TopicCard';
+import { TabHeader } from '../../features/shell/TabHeader';
 import { useClubs, useCommunityFeed, useJoinClub, useSetReaction } from '../../lib/api/queries';
 import { useAuthState } from '../../lib/auth/session';
 import { haptics } from '../../lib/haptics';
@@ -44,56 +44,6 @@ const FILTERS: {
   { id: 'goal', label: 'Com meta semanal', icon: 'speed' },
   { id: 'active', label: 'Mais ativos', icon: 'local-fire-department' },
 ];
-
-function Header({
-  onSearch,
-  onCreate,
-  onFriends,
-}: {
-  onSearch: () => void;
-  onCreate: () => void;
-  onFriends: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: theme.radii.md,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderWidth: theme.sizes.borderWidth,
-          borderColor: theme.colors.borderSoft,
-          backgroundColor: theme.colors.primarySoft,
-        }}
-      >
-        <BuboLogo variant="symbol" height={28} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text variant="title" accessibilityRole="header" numberOfLines={1}>
-          Comunidade
-        </Text>
-      </View>
-      <HeaderButton
-        icon="people"
-        label="Amigos de leitura"
-        shape="square"
-        iconColor="accentText"
-        onPress={onFriends}
-      />
-      <HeaderButton
-        icon="search"
-        label="Buscar clubes"
-        shape="square"
-        iconColor="accentText"
-        onPress={onSearch}
-      />
-      <Button label="Clube" icon="add" size="md" compact onPress={onCreate} />
-    </View>
-  );
-}
 
 /** Stitch "Debate protegido" feed card: what is waiting further in the book, without any text. */
 function ProtectedCard({
@@ -203,10 +153,24 @@ export default function CommunityScreen() {
     <Screen
       header={
         <View style={{ gap: theme.spacing.md }}>
-          <Header
-            onSearch={() => setSegment('discover')}
-            onCreate={create}
-            onFriends={() => router.push('/amigos')}
+          <TabHeader
+            title="Comunidade"
+            actions={
+              <>
+                <HeaderButton
+                  icon="people"
+                  label="Amigos de leitura"
+                  iconColor="accentText"
+                  onPress={() => router.push('/amigos')}
+                />
+                <HeaderButton
+                  icon="group-add"
+                  label="Criar clube"
+                  iconColor="accentText"
+                  onPress={create}
+                />
+              </>
+            }
           />
           <SegmentedTabs
             accessibilityLabel="Seções da comunidade"

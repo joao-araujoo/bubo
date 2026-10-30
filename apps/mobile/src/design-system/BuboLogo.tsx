@@ -2,10 +2,10 @@ import { Image } from 'expo-image';
 
 import { buboBrand } from '../assets/registry';
 
-type Props = { height?: number; variant?: 'horizontal' | 'symbol' };
+type Props = { height?: number; variant?: 'horizontal' | 'symbol'; onLoad?: () => void };
 
 /** Official Bubo logo (horizontal lockup) or symbol. Never recoloured or redrawn. */
-export function BuboLogo({ height = 28, variant = 'horizontal' }: Props) {
+export function BuboLogo({ height = 28, variant = 'horizontal', onLoad }: Props) {
   const asset = variant === 'horizontal' ? buboBrand.logoHorizontal : buboBrand.symbol;
   return (
     <Image
@@ -16,6 +16,7 @@ export function BuboLogo({ height = 28, variant = 'horizontal' }: Props) {
       accessibilityRole="image"
       accessibilityLabel={asset.accessibilityLabel}
       transition={0}
+      onLoad={onLoad}
     />
   );
 }

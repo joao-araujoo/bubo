@@ -146,6 +146,27 @@ export default function SignUpScreen() {
         loading={submitting}
         onPress={submit}
       />
+      <Text variant="bodySm" color="textMuted" align="center">
+        Ao criar a conta, você concorda com os{' '}
+        <Text
+          variant="bodySm"
+          color="accentText"
+          accessibilityRole="link"
+          onPress={() => router.push('/legal/termos')}
+        >
+          Termos de Uso
+        </Text>
+        {' e a '}
+        <Text
+          variant="bodySm"
+          color="accentText"
+          accessibilityRole="link"
+          onPress={() => router.push('/legal/privacidade')}
+        >
+          Política de Privacidade
+        </Text>
+        .
+      </Text>
     </FormScreen>
   );
 }

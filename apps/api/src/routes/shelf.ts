@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 
 import { type AppEnv } from '../env';
 import { parseJsonBody } from '../lib/validation';
+import { getBookCommunity } from '../services/book-community';
 import { entryReviewTotals, listEntryCards, listEntryReviews } from '../services/recall';
 import { listEntrySessions, recordSession } from '../services/sessions';
 import { assessSessionExercise } from '../services/session-assessment';
@@ -58,6 +59,11 @@ export function shelfRoutes(deps: {
       reviews: await listEntryReviews(db, user.id, entry.id),
       reviewTotals: await entryReviewTotals(db, user.id, entry.id),
     });
+  });
+
+  routes.get(API_ROUTES.shelfCommunity, async (c) => {
+    const { user } = c.get('session');
+    return c.json(await getBookCommunity(c.get('db'), user.id, c.req.param('id')));
   });
 
   routes.patch(API_ROUTES.shelfEntry, async (c) => {

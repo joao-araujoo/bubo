@@ -10,6 +10,7 @@ import {
   applyStatusChange,
   coverCandidates,
   hardenCoverUrl,
+  keepsRereading,
   type ReadingStatus,
   READING_STATUSES,
 } from '@bubo/domain';
@@ -50,6 +51,12 @@ export function toShelfEntry(entry: EntryRow, book: BookRow): ShelfEntry {
     currentPage: entry.currentPage,
     startedAt: entry.startedAt?.toISOString() ?? null,
     finishedAt: entry.finishedAt?.toISOString() ?? null,
+    rating: entry.rating,
+    favorite: entry.favorite,
+    owned: entry.owned,
+    wishlist: entry.wishlist,
+    rereading: entry.rereading && keepsRereading(asStatus(entry.status)),
+    addedAt: entry.createdAt.toISOString(),
     book: {
       id: book.id,
       title: book.title,
@@ -313,6 +320,12 @@ export async function updateEntry(
         currentPage: state.currentPage,
         startedAt: state.startedAt,
         finishedAt: state.finishedAt,
+        ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
+        ...(patch.favorite !== undefined ? { favorite: patch.favorite } : {}),
+        ...(patch.owned !== undefined ? { owned: patch.owned } : {}),
+        ...(patch.wishlist !== undefined ? { wishlist: patch.wishlist } : {}),
+        // "Relendo" lives only on a reading/paused book; any other status ends it.
+        rereading: keepsRereading(state.status) && (patch.rereading ?? entry.rereading),
       })
       .where(eq(shelfEntries.id, entry.id))
       .returning();

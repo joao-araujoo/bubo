@@ -25,7 +25,7 @@ export const SearchField = forwardRef<TextInput, Props>(function SearchField(
     onSubmit,
     onScanPress,
     loading = false,
-    placeholder = 'Buscar título, autor ou ISBN…',
+    placeholder = 'Título ou autor',
     autoFocus = false,
   },
   ref,

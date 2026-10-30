@@ -96,6 +96,26 @@ export type ColorTokens = {
   onHeroMuted: string;
   /** Top highlight stripe of the 16 pt progress "tube" (DESIGN.md §4). */
   tubeHighlight: string;
+  /** Book pages (ADR-042): veil over the blurred cover backdrop and its fade into `bg`. */
+  /**
+   * Hoje's book stage (ADR-043): the blurred cover is darkened by `stageVeil`; chips and the
+   * secondary button are glass on it; the progress track is a translucent tube. These read on any
+   * cover colour, in both schemes.
+   */
+  stageVeil: string;
+  stageGlass: string;
+  stageGlassBorder: string;
+  stageTrack: string;
+  /** The stage's primary button: a white face with deep-violet text whatever the scheme. */
+  stageButton: string;
+  onStageButton: string;
+  stageButtonRim: string;
+  /** Coloured day tiles (orange streak, green review): rim, ink and faint marks. */
+  orangeRim: string;
+  onAccentTile: string;
+  tileFaint: string;
+  backdropVeil: string;
+  bgClear: string;
   transparent: string;
 };
 
@@ -143,6 +163,18 @@ export const lightColors: ColorTokens = {
   heroGlowSoft: 'rgba(255, 255, 255, 0.06)',
   onHeroMuted: 'rgba(255, 255, 255, 0.82)',
   tubeHighlight: 'rgba(255, 255, 255, 0.35)',
+  stageVeil: 'rgba(20, 13, 31, 0.42)',
+  stageGlass: 'rgba(255, 255, 255, 0.16)',
+  stageGlassBorder: 'rgba(255, 255, 255, 0.26)',
+  stageTrack: 'rgba(255, 255, 255, 0.24)',
+  stageButton: palette.white,
+  onStageButton: palette.purpleDeep,
+  stageButtonRim: 'rgba(20, 13, 31, 0.38)',
+  orangeRim: '#C2410C',
+  onAccentTile: palette.ink,
+  tileFaint: 'rgba(255, 255, 255, 0.42)',
+  backdropVeil: 'rgba(248, 245, 255, 0.45)',
+  bgClear: 'rgba(248, 245, 255, 0)',
   transparent: palette.transparent,
 };
 
@@ -190,6 +222,18 @@ export const darkColors: ColorTokens = {
   heroGlowSoft: 'rgba(255, 255, 255, 0.05)',
   onHeroMuted: 'rgba(255, 255, 255, 0.78)',
   tubeHighlight: 'rgba(255, 255, 255, 0.22)',
+  stageVeil: 'rgba(10, 6, 16, 0.5)',
+  stageGlass: 'rgba(255, 255, 255, 0.14)',
+  stageGlassBorder: 'rgba(255, 255, 255, 0.22)',
+  stageTrack: 'rgba(255, 255, 255, 0.2)',
+  stageButton: palette.white,
+  onStageButton: palette.purpleDeep,
+  stageButtonRim: 'rgba(0, 0, 0, 0.45)',
+  orangeRim: '#9A3412',
+  onAccentTile: palette.ink,
+  tileFaint: 'rgba(255, 255, 255, 0.4)',
+  backdropVeil: 'rgba(20, 13, 31, 0.5)',
+  bgClear: 'rgba(20, 13, 31, 0)',
   transparent: palette.transparent,
 };
 
@@ -268,3 +312,149 @@ export const coverPalettes: readonly CoverPalette[] = [
   { face: '#8E1B24', spine: '#5E0F16', text: '#FFFFFF', muted: '#F6C9CD', accent: '#FFC53D' },
   { face: '#0F6B4F', spine: '#08432F', text: '#FFFFFF', muted: '#C4EEDD', accent: '#FFE08A' },
 ];
+
+/**
+ * The physical book object (Book3D in the book detail): paper edges, spine shading and the
+ * soft shadow it rests on. A book is the same object in light and dark mode, so the paper tones
+ * are fixed; only the shadow is picked per scheme by the component.
+ */
+export const bookPalette = {
+  /** Fore-edge paper, slightly warm. */
+  paper: '#F7F1E6',
+  /** Darker paper between page stripes. */
+  paperEdge: '#DCD2BF',
+  /** Hinge groove along the spine side of the cover (dark, light, fade). */
+  hingeDark: 'rgba(20, 10, 30, 0.34)',
+  hingeLight: 'rgba(255, 255, 255, 0.16)',
+  hingeFade: 'rgba(20, 10, 30, 0.06)',
+  /** Diagonal gloss across the cover. */
+  gloss: 'rgba(255, 255, 255, 0.18)',
+  /** Shadow colour under the book (opacity applied by the component). */
+  shadowLight: '#3B1680',
+  shadowDark: '#000000',
+  transparent: 'transparent',
+} as const;
+
+/**
+ * The reading flow (ADR-044): the night of the focus timer and of the streak screen, the paper of
+ * the recall card and the printed reading receipt. They are scenes and objects, the same in light
+ * and dark mode, so the values are fixed.
+ */
+export const readingPalette = {
+  night: '#1B1326',
+  nightEnd: '#2A1748',
+  nightSheet: '#241A33',
+  nightText: palette.nightText,
+  nightMuted: palette.nightTextMuted,
+  glass: 'rgba(255, 255, 255, 0.07)',
+  glassBorder: 'rgba(255, 255, 255, 0.14)',
+  sheetHandle: 'rgba(255, 255, 255, 0.18)',
+  /** Quiet actions on the night (links, "Tentar lembrar"). */
+  purpleOnNight: palette.purpleOnDark,
+  scrim: 'rgba(0, 0, 0, 0.5)',
+  /** Warm lamp glow in the corner (stacked, so each layer is faint). */
+  lamp: 'rgba(255, 197, 61, 0.06)',
+  gold: palette.gold,
+  goldRim: palette.goldRim,
+  onGold: '#3D2600',
+  /** One leaf per focused minute: read, being read, still ahead. */
+  leafNow: 'rgba(255, 197, 61, 0.55)',
+  leafAhead: 'rgba(255, 255, 255, 0.1)',
+  /** The bookmark ribbon that grows with the session. */
+  ribbon: palette.purpleLight,
+  ribbonShade: 'rgba(0, 0, 0, 0.15)',
+  flame: palette.orange,
+  flameWash: 'rgba(255, 138, 61, 0.14)',
+  flameBorder: 'rgba(255, 138, 61, 0.35)',
+  flameText: '#FFD2B3',
+  /** Streak calendar: run band, protected day, inactive and future days. */
+  run: 'rgba(255, 138, 61, 0.28)',
+  freeze: '#2DA8E0',
+  freezeWash: 'rgba(45, 168, 224, 0.14)',
+  freezeIcon: '#7FD3F7',
+  freezeText: '#BFE9FB',
+  dayPast: 'rgba(244, 238, 255, 0.65)',
+  dayFuture: 'rgba(244, 238, 255, 0.3)',
+  milestoneNext: 'rgba(255, 197, 61, 0.16)',
+  star: palette.white,
+  /** The recall card: lined paper, red margin, blue handwriting, folder tabs and the stamp. */
+  paper: '#FFFDF6',
+  paperBorder: palette.lineSoft,
+  paperRim: palette.line,
+  paperLine: '#DCE4F7',
+  paperMargin: '#F4B6B6',
+  handInk: '#2B3A67',
+  paperInk: palette.ink,
+  paperMuted: palette.inkMuted,
+  tabAhead: palette.purpleSoft,
+  tabDone: palette.greenSoft,
+  tabDoneInk: palette.greenInk,
+  tabCheck: palette.greenRim,
+  stamp: palette.purple,
+  stampWash: 'rgba(255, 253, 246, 0.6)',
+  bubble: palette.ink,
+  onBubble: palette.white,
+  /** The receipt: violet backdrop, printer slot, mono rows, gold total. */
+  receiptBg: palette.purple,
+  receiptSlot: palette.purpleNight,
+  onReceiptBg: palette.white,
+  onReceiptBgMuted: 'rgba(255, 255, 255, 0.88)',
+  receiptOutline: 'rgba(255, 255, 255, 0.55)',
+  receiptButton: palette.white,
+  onReceiptButton: palette.purpleDeep,
+  receiptButtonRim: palette.purpleNight,
+  receiptDash: '#D9D2E4',
+  receiptTotal: palette.goldSoft,
+  receiptTotalInk: '#7A4A00',
+  receiptStreakInk: '#A83A08',
+  receiptMilestoneInk: palette.purpleDeep,
+  confetti: [
+    palette.gold,
+    palette.white,
+    palette.green,
+    palette.orange,
+    palette.purpleOnDark,
+    '#7FB0FF',
+  ],
+  /** The Estante opening corridor (ADR-046): darkness around the horizon and the two glows. */
+  corridorBg: palette.night,
+  corridorFade: [
+    'rgba(20, 13, 31, 0.2)',
+    'rgba(20, 13, 31, 0.92)',
+    'rgba(20, 13, 31, 0.98)',
+    'rgba(20, 13, 31, 0.92)',
+    'rgba(20, 13, 31, 0.12)',
+    'rgba(20, 13, 31, 0.55)',
+    'rgba(20, 13, 31, 0.96)',
+  ],
+  corridorAmber: 'rgba(255, 170, 60, 0.12)',
+  corridorViolet: 'rgba(124, 58, 237, 0.22)',
+  spineShade: 'rgba(0, 0, 0, 0.25)',
+  onCorridorMuted: palette.purpleOnDark,
+  transparent: 'transparent',
+} as const;
+
+/**
+ * The cozy 3D bookcase (Estante 3D, ADR-037): warm wood, a soft wall and a lamp glow. Wood is
+ * the same object in both schemes; the wall and the glow are picked per scheme by the screen.
+ */
+export const shelfPalette = {
+  wallTopLight: '#F8EEE0',
+  wallBottomLight: '#ECDCC6',
+  wallTopDark: '#2B1C36',
+  wallBottomDark: '#180F22',
+  /** Top face of a board (lit), front face and its lower edge. */
+  woodTop: '#D9A46B',
+  wood: '#B57A45',
+  woodDark: '#8A5630',
+  woodEdge: '#5E3A1E',
+  /** Shadow a board casts on the wall and on the books below it. */
+  boardShadow: 'rgba(60, 30, 10, 0.32)',
+  /** Spine roundness: lit edge and shaded edge. */
+  spineLight: 'rgba(255, 255, 255, 0.16)',
+  spineShade: 'rgba(0, 0, 0, 0.26)',
+  /** Warm lamp glow in the top corner. */
+  lampLight: 'rgba(255, 200, 120, 0.45)',
+  lampDark: 'rgba(255, 170, 80, 0.22)',
+  transparent: 'transparent',
+} as const;

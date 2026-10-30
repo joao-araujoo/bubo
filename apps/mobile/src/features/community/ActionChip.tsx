@@ -35,11 +35,7 @@ export function ActionChip({
           }}
         >
           <Icon name={icon} size={16} color={tone === 'danger' ? 'errorText' : 'textMuted'} />
-          <Text
-            variant="label"
-            color={tone === 'danger' ? 'errorText' : 'textMuted'}
-            style={{ fontSize: 12 }}
-          >
+          <Text variant="labelSm" color={tone === 'danger' ? 'errorText' : 'textMuted'}>
             {label}
           </Text>
         </Raised>

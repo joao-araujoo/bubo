@@ -12,6 +12,7 @@ export * from './notifications';
 export * from './openapi';
 export * from './preferences';
 export * from './recall';
+export * from './replay';
 export * from './session-assessment';
 export * from './shelf';
 export {
@@ -19,6 +20,8 @@ export {
   API_ROUTE_DEFINITIONS,
   apiPath,
   deleteResponseSchema,
+  emailUnsubscribeResponseSchema,
   type ApiRouteDefinition,
+  type EmailUnsubscribeResponse,
 } from './routes';
 export * from './widgets';

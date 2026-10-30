@@ -67,7 +67,7 @@ export function ClubExploreCard({
               <Icon name="lock-outline" size={16} color="textMuted" />
             ) : null}
           </View>
-          <Text variant="bodySm" color="textMuted" numberOfLines={1} style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted" numberOfLines={1}>
             {`Curadoria de ${club.ownerName} • ${membersLabel(club.memberCount)}`}
           </Text>
         </View>

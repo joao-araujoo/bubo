@@ -5,6 +5,8 @@ DATABASE_URL=
 BETTER_AUTH_SECRET=
 # LAN address (http://<your-ip>:8787) so e-mailed links open on a phone.
 BETTER_AUTH_URL=http://localhost:8787
+# Optional: where e-mail pictures load from (mail apps cannot reach a LAN address; ADR-041).
+EMAIL_ART_BASE_URL=https://bubo-api.bubo-api.workers.dev
 GEMINI_API_KEY=
 # Optional locally (reset links are logged in development); required in production.
 RESEND_API_KEY=

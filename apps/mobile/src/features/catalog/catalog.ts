@@ -65,18 +65,23 @@ export const scannerPick = {
   },
 };
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  pt: 'Português',
+  en: 'Inglês',
+  es: 'Espanhol',
+  fr: 'Francês',
+  de: 'Alemão',
+  it: 'Italiano',
+};
+
+/** "Português", "Inglês"… or null when the sources do not say. */
+export function languageLabel(book: Pick<CatalogBook, 'language'>): string | null {
+  if (!book.language) return null;
+  return LANGUAGE_LABELS[book.language.split('-')[0] ?? ''] ?? book.language.toUpperCase();
+}
+
 export function editionLabel(book: CatalogBook): string {
-  const labels: Record<string, string> = {
-    pt: 'Português',
-    en: 'Inglês',
-    es: 'Espanhol',
-    fr: 'Francês',
-    de: 'Alemão',
-    it: 'Italiano',
-  };
-  const language = book.language
-    ? (labels[book.language.split('-')[0] ?? ''] ?? book.language)
-    : 'Idioma não informado';
+  const language = languageLabel(book) ?? 'Idioma não informado';
   const formats: Record<string, string> = { PHYSICAL: 'Impresso', DIGITAL: 'Digital' };
   return [
     language,

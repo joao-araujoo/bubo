@@ -8,6 +8,14 @@ export const APP_BUNDLE_ID = 'com.joaoaraujo.bubo';
 export const API_PREFIX = '/v1';
 export const API_SERVICE_NAME = 'bubo-api';
 
+/**
+ * Sent by the app on every auth request: it can finish a sign-in with the e-mailed login code
+ * (ADR-038/040). Builds without it would wait forever on the code challenge, so the API answers
+ * them with `APP_UPDATE_REQUIRED` instead.
+ */
+export const AUTH_CLIENT_HEADER = 'x-bubo-auth';
+export const AUTH_CLIENT_LOGIN_CODE = 'login-code';
+
 export const APP_ENVS = ['development', 'preview', 'production'] as const;
 export type AppEnv = (typeof APP_ENVS)[number];
 

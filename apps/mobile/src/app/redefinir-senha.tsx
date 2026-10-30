@@ -29,8 +29,8 @@ export default function ResetPasswordScreen() {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Guards redirect to the right place if the reader is already signed in.
-  const leave = () => router.replace('/entrar');
+  // The reset opens a session on this device (ADR-040); the guards pick Hoje or sign-in from '/'.
+  const leave = () => router.replace('/');
 
   if (!token || params.error) {
     return (
@@ -70,7 +70,7 @@ export default function ResetPasswordScreen() {
       brand
       footer={
         done ? (
-          <Button label="Entrar com a nova senha" icon="login" fullWidth onPress={leave} />
+          <Button label="Continuar" icon="arrow-forward" fullWidth onPress={leave} />
         ) : (
           <Button
             label="Salvar nova senha"
@@ -90,12 +90,12 @@ export default function ResetPasswordScreen() {
           Crie uma nova senha
         </Text>
         <Text variant="body" color="textMuted">
-          Depois de salvar, você sai de todos os aparelhos e entra de novo com a nova senha.
+          Depois de salvar, os outros aparelhos são desconectados e você entra por aqui.
         </Text>
       </View>
       {formError ? <InlineMessage tone="error" message={formError} /> : null}
       {done ? (
-        <InlineMessage tone="success" message="Senha atualizada. Agora é só entrar de novo." />
+        <InlineMessage tone="success" message="Senha atualizada. Você já pode continuar." />
       ) : (
         <>
           <TextField

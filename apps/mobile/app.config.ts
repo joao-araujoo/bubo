@@ -6,11 +6,15 @@ import { type ConfigContext, type ExpoConfig } from 'expo/config';
  * `newArchEnabled` flag no longer exists), so it is always on.
  */
 const FONTS = [
-  './assets/fonts/PlusJakartaSans_400Regular.ttf',
-  './assets/fonts/PlusJakartaSans_500Medium.ttf',
-  './assets/fonts/PlusJakartaSans_600SemiBold.ttf',
-  './assets/fonts/PlusJakartaSans_700Bold.ttf',
-  './assets/fonts/PlusJakartaSans_800ExtraBold.ttf',
+  './assets/fonts/Nunito_400Regular.ttf',
+  './assets/fonts/Nunito_500Medium.ttf',
+  './assets/fonts/Nunito_600SemiBold.ttf',
+  './assets/fonts/Nunito_700Bold.ttf',
+  './assets/fonts/Nunito_800ExtraBold.ttf',
+  './assets/fonts/Nunito_900Black.ttf',
+  './assets/fonts/Caveat_500Medium.ttf',
+  './assets/fonts/IBMPlexMono_400Regular.ttf',
+  './assets/fonts/IBMPlexMono_700Bold.ttf',
 ];
 
 /**
@@ -88,6 +92,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       './plugins/with-bubo-widgets.config.cjs',
+      './plugins/with-bubo-stories.config.cjs',
       'expo-router',
       [
         'expo-splash-screen',

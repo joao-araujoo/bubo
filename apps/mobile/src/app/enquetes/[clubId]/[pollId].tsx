@@ -143,7 +143,7 @@ function OptionCard({
                 {selected ? (
                   <Icon name="check" size={17} color="onPrimary" />
                 ) : (
-                  <Text variant="label" color="accentText" style={{ fontSize: 12 }}>
+                  <Text variant="labelSm" color="accentText">
                     {index + 1}
                   </Text>
                 )}
@@ -224,8 +224,8 @@ export default function PollScreen() {
     return () => clearInterval(timer);
   }, [isOpen]);
 
-  const eyebrow = club.data ? club.data.name : 'Clube de leitura';
-  const header = { title: 'Enquete & Resultados', eyebrow, align: 'left' } as const;
+  const clubName = club.data ? club.data.name : 'Clube de leitura';
+  const header = { title: 'Enquete e resultados', subtitle: clubName } as const;
 
   if (detail.isPending) {
     return (
@@ -491,20 +491,16 @@ export default function PollScreen() {
             </Text>
             <Pill label={`Nív. ${argument.author.level}`} />
           </View>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }} numberOfLines={2}>
+          <Text variant="meta" color="textMuted" numberOfLines={2}>
             {argument.votedFor.length > 0 ? 'Votou em: ' : 'Voto alterado'}
             {argument.votedFor.length > 0 ? (
-              <Text
-                variant="bodySm"
-                color="textMuted"
-                style={{ fontSize: 12, fontFamily: fontFamily.bold }}
-              >
+              <Text variant="meta" color="textMuted" style={{ fontFamily: fontFamily.bold }}>
                 {argument.votedFor.join(', ')}
               </Text>
             ) : null}
           </Text>
         </View>
-        <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+        <Text variant="meta" color="textMuted">
           {relativeTime(argument.createdAt)}
         </Text>
       </View>
@@ -652,13 +648,11 @@ export default function PollScreen() {
   return (
     <FormScreen
       {...header}
-      eyebrowDot={poll.isOpen}
       headerRight={
         inviteCode ? (
           <HeaderButton
             icon="share"
             label="Chamar amigos para o clube"
-            shape="square"
             iconColor="accentText"
             onPress={() => void sharePoll()}
           />
@@ -713,7 +707,7 @@ export default function PollScreen() {
               ? [club.data.name, club.data.book.author].filter(Boolean).join(' • ')
               : 'Clube de leitura'}
           </Text>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }} numberOfLines={1}>
+          <Text variant="meta" color="textMuted" numberOfLines={1}>
             {`${poll.spoilerPage > 0 ? `Pág. ${poll.spoilerPage} ancorada` : 'Sem página'} • ${closesLabel(poll.closesAt, poll.isOpen)}`}
           </Text>
         </View>
@@ -760,7 +754,7 @@ export default function PollScreen() {
                   >
                     {poll.question}
                   </Text>
-                  <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                  <Text variant="meta" color="textMuted">
                     {[
                       `Criada por ${poll.isMine ? 'você' : poll.author.name}`,
                       poll.voterCount === 1
@@ -844,7 +838,7 @@ export default function PollScreen() {
                   </Text>
                 </Pressable>
               ) : (
-                <Text variant="bodySm" color="textMuted" style={{ flex: 1, fontSize: 12 }}>
+                <Text variant="meta" color="textMuted" style={{ flex: 1 }}>
                   {poll.resultsVisible || poll.locked
                     ? ''
                     : 'Os resultados aparecem depois do seu voto.'}
@@ -860,12 +854,12 @@ export default function PollScreen() {
                       backgroundColor: theme.colors.success,
                     }}
                   />
-                  <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                  <Text variant="meta" color="textMuted">
                     {secondsAgo < 5 ? 'Atualizado agora' : `Atualizado há ${secondsAgo}s`}
                   </Text>
                 </>
               ) : (
-                <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                <Text variant="meta" color="textMuted">
                   Votação encerrada
                 </Text>
               )}
@@ -880,7 +874,6 @@ export default function PollScreen() {
       ) : null}
 
       <SectionTitle
-        icon="rate-review"
         title={tab === 'live' ? 'Argumentos em destaque' : 'Todos os argumentos'}
         trailing={args.length > 1 ? sortToggle : undefined}
       />

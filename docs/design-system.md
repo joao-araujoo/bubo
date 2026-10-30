@@ -27,12 +27,21 @@ the DEV showcase: Você → "DEV · Design system", development builds only.
 `accentText` is `#7C3AED` in light and `#C4B5FD` in dark, so purple text keeps its contrast on
 dark surfaces.
 
-## Typography (Plus Jakarta Sans)
+## Typography (Nunito, ADR-043)
+
+The app font is Nunito since ADR-043; Plus Jakarta Sans remains only in the native widgets.
+Two accent faces exist only as effects of the reading flow (ADR-044, `accentFontFamily`): Caveat
+for the handwriting on the recall card and IBM Plex Mono for the reading receipt. Never use them
+for interface text.
+Tab screens float above a full-width rounded tab bar (`FloatingTabBar`) and leave its height free
+through `ScreenBottomInset`; `ProgressRing` draws circular progress without SVG.
+`DashedRule` draws dashed rules (ticket stubs, receipt tears) with segments, because Android cannot
+dash a single border side.
 
 | variant      | size/line | weight | use                         |
 | ------------ | --------- | ------ | --------------------------- |
-| `display`    | 30/38     | 800    | celebrations, big numbers   |
-| `heading`    | 24/32     | 800    | screen titles               |
+| `display`    | 30/38     | 900    | celebrations, big numbers   |
+| `heading`    | 24/32     | 900    | screen titles               |
 | `title`      | 20/28     | 700    | card titles                 |
 | `titleSm`    | 18/24     | 700    | compact titles              |
 | `bodyLg`     | 17/26     | 500    | reading-heavy copy          |
@@ -98,6 +107,10 @@ Preferências cognitivas → "Aparência & toque"; it is saved on the device wit
 `BuboMascot animated` opts into a single greeting (no idle loop). `useMotionValue` drives native
 transforms for tactile presses, selection and progress, and opacity for field focus. All honor
 `useReducedMotion` and cancel on unmount. Inputs stay stationary while typing.
+The reading-flow scenes (ADR-044: night timer, recall card, receipt, streak) are the exception
+with gentle ambient loops of whole elements (lamp, ribbon, Bubo breathing or peeking, current
+leaf, flame, stars, confetti; the Revisar seal) through `useAmbientLoop` (`lib/motion`); they stop under reduced motion, and Bubo
+stops peeking while the reader types. Their colours are the fixed `readingPalette`.
 
 TextField uses a 56pt minimum outer height, normalized native padding, centered single-line
 text and a 48pt password toggle. Multiline fields align at the top; errors remain outside the

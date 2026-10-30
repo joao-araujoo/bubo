@@ -2,17 +2,27 @@ import {
   type BookReview,
   type CreateCardRequest,
   type DueCardsResponse,
+  type PracticeCardsResponse,
   type RecallCard,
   type ReviewRequest,
   type ReviewResult,
   bookReviewSchema,
+  PRACTICE_LIGHTNING_MAX,
+  PRACTICE_SLIPPED_MAX,
   dueCardsResponseSchema,
+  practiceCardsResponseSchema,
   recallCardSchema,
 } from '@bubo/contracts';
 import { type Database, type Executor, schema } from '@bubo/database';
-import { addDays, adjustInterval, remainingReviewsToday } from '@bubo/domain';
+import {
+  addDays,
+  adjustInterval,
+  remainingReviewsToday,
+  slippedCardIds,
+  slippedWindowStart,
+} from '@bubo/domain';
 import { type RecallGrade, scheduleNextReview, xpForRecallSession } from '@bubo/scoring';
-import { and, asc, desc, eq, gt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 
 import { AppError } from '../lib/errors';
 import { getPreferences } from './preferences';
@@ -99,6 +109,65 @@ export async function createCard(
     .returning();
   if (!row) throw new AppError('INTERNAL_ERROR', 'Could not create the card.');
   return toCard(row, book.title);
+}
+
+/** Upper bound of review rows read to find lapses (newest first); far above a month of use. */
+const SLIPPED_LOG_SCAN = 2_000;
+
+/**
+ * Practice decks for Revisar (ADR-045): read-only. Cards due today are left to the real review,
+ * so practising can never replace a scheduled retrieval.
+ */
+export async function listPracticeCards(
+  db: Executor,
+  userId: string,
+  today: string,
+): Promise<PracticeCardsResponse> {
+  const logs = await db
+    .select({
+      cardId: reviewLogs.cardId,
+      grade: reviewLogs.grade,
+      reviewedAt: reviewLogs.reviewedAt,
+    })
+    .from(reviewLogs)
+    .where(
+      and(
+        eq(reviewLogs.userId, userId),
+        gte(reviewLogs.localDate, slippedWindowStart(today)),
+        lte(reviewLogs.localDate, today),
+      ),
+    )
+    .orderBy(desc(reviewLogs.reviewedAt))
+    .limit(SLIPPED_LOG_SCAN);
+  const slippedIds = slippedCardIds(logs, SLIPPED_LOG_SCAN);
+  const notDue = gt(recallCards.dueDate, today);
+  const slippedRows =
+    slippedIds.length === 0
+      ? []
+      : await db
+          .select({ card: recallCards, bookTitle: books.title })
+          .from(recallCards)
+          .innerJoin(shelfEntries, eq(shelfEntries.id, recallCards.shelfEntryId))
+          .innerJoin(books, eq(books.id, shelfEntries.bookId))
+          .where(and(eq(recallCards.userId, userId), inArray(recallCards.id, slippedIds), notDue));
+  const order = new Map(slippedIds.map((id, index) => [id, index]));
+  const slipped = slippedRows
+    .sort((a, b) => (order.get(a.card.id) ?? 0) - (order.get(b.card.id) ?? 0))
+    .slice(0, PRACTICE_SLIPPED_MAX)
+    .map((row) => toCard(row.card, row.bookTitle));
+  const lightningRows = await db
+    .select({ card: recallCards, bookTitle: books.title })
+    .from(recallCards)
+    .innerJoin(shelfEntries, eq(shelfEntries.id, recallCards.shelfEntryId))
+    .innerJoin(books, eq(books.id, shelfEntries.bookId))
+    .where(and(eq(recallCards.userId, userId), isNotNull(recallCards.lastReviewedAt), notDue))
+    .orderBy(asc(recallCards.lastReviewedAt), asc(recallCards.createdAt))
+    .limit(PRACTICE_LIGHTNING_MAX);
+  return practiceCardsResponseSchema.parse({
+    today,
+    slipped,
+    lightning: lightningRows.map((row) => toCard(row.card, row.bookTitle)),
+  });
 }
 
 async function findCard(db: Executor, userId: string, cardId: string) {

@@ -80,7 +80,7 @@ export function TopicCard({
             </Text>
             <Pill label={`Nív. ${post.author.level}`} />
           </View>
-          <Text variant="bodySm" color="textMuted" numberOfLines={1} style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted" numberOfLines={1}>
             {subtitle}
           </Text>
         </View>
@@ -136,7 +136,7 @@ export function TopicCard({
           {post.reviewRating !== null ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
               <StarRating value={post.reviewRating} size={14} />
-              <Text variant="label" color="textMuted" style={{ fontSize: 12 }}>
+              <Text variant="labelSm" color="textMuted">
                 {ratingLabel(post.reviewRating)}
               </Text>
             </View>

@@ -53,7 +53,7 @@ export function SpoilerVeil({
         <IconTile icon="shield" size={36} />
         <View style={{ flex: 1, gap: 2 }}>
           <Text variant="label">{where}</Text>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted">
             {`Você ainda está na pág. ${readerPage} · faltam ${pagesLabel(missing)}`}
           </Text>
         </View>

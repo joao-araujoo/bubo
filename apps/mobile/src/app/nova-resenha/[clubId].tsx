@@ -257,7 +257,6 @@ export default function NewBookReviewScreen() {
       </Card>
 
       <SectionTitle
-        icon="psychology"
         title="Como foi a leitura?"
         trailing={
           <Text variant="label" color="accentText">
@@ -299,13 +298,12 @@ export default function NewBookReviewScreen() {
           editable={!busy}
         />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted">
             {wordsLabel(body)}
           </Text>
           <Text
-            variant="label"
+            variant="labelSm"
             color={body.trim().length >= BOOK_REVIEW_MIN ? 'successText' : 'textMuted'}
-            style={{ fontSize: 12 }}
           >
             {body.trim().length >= BOOK_REVIEW_MIN
               ? 'Pronta para publicar'
@@ -396,7 +394,7 @@ export default function NewBookReviewScreen() {
         )}
       </Card>
 
-      <SectionTitle icon="share" title="Onde compartilhar?" />
+      <SectionTitle title="Onde compartilhar?" />
       <Card tone="muted" accessibilityLabel={`Compartilhada no clube ${data.name}`}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
           <IconTile icon="check" size={32} solid />

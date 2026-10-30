@@ -66,7 +66,7 @@ export function StatTile({
           ) : null}
         </View>
         {typeof footer === 'string' ? (
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12, lineHeight: 16 }}>
+          <Text variant="meta" color="textMuted">
             {footer}
           </Text>
         ) : (

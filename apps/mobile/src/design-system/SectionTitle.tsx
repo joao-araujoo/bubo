@@ -1,44 +1,56 @@
-import { type ComponentProps, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type ReactNode } from 'react';
+import { Pressable, View } from 'react-native';
 
 import { useTheme } from '../theme';
-import { Icon } from './Icon';
 import { Text } from './Text';
 
 /**
- * Stitch section heading outside cards ("TÓPICOS RECENTES DA COMUNIDADE", "COLEÇÃO DE MEDALHAS"):
- * purple icon, tracked uppercase title in ink, optional subtitle and a trailing link or pill.
+ * The section heading outside cards, the same on every screen (ADR-047): a sentence-case title,
+ * an optional line of context and, on the right, either a text link ("Ver tudo") or any trailing
+ * element (a count, a pill, a toggle).
  */
 export function SectionTitle({
   title,
-  icon,
   subtitle,
   trailing,
+  link,
+  onLink,
 }: {
   title: string;
-  icon?: ComponentProps<typeof Icon>['name'];
   subtitle?: string;
   trailing?: ReactNode;
+  /** Text link on the right; needs `onLink`. Wins over `trailing`. */
+  link?: string;
+  onLink?: () => void;
 }) {
   const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-      {icon ? <Icon name={icon} size={20} color="accentText" /> : null}
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text
-          variant="caption"
-          accessibilityRole="header"
-          style={{ fontSize: 13, lineHeight: 17, letterSpacing: 0.9 }}
-        >
+      <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+        <Text variant="title" accessibilityRole="header">
           {title}
         </Text>
         {subtitle ? (
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+          <Text variant="bodySm" color="textMuted">
             {subtitle}
           </Text>
         ) : null}
       </View>
-      {trailing}
+      {link && onLink ? (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`${link}: ${title}`}
+          hitSlop={8}
+          onPress={onLink}
+          style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
+        >
+          <Text variant="label" color="accentText">
+            {link}
+          </Text>
+        </Pressable>
+      ) : (
+        trailing
+      )}
     </View>
   );
 }

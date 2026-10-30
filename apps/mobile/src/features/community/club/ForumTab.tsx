@@ -83,13 +83,12 @@ export function ForumTab({ club, userId }: { club: ClubDetail; userId: string })
       {vote.isError ? <InlineMessage tone="error" message="Não foi possível votar agora." /> : null}
 
       <SectionTitle
-        icon="forum"
         title="Tópicos recentes da comunidade"
         trailing={
           <TabChip
             role="radio"
             label={sort === 'recent' ? 'Recentes' : 'Mais debatidos'}
-            icon="swap-vert"
+
             selected
             onPress={() => setSort(sort === 'recent' ? 'debated' : 'recent')}
           />

@@ -3,30 +3,52 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createServer } from 'node:http';
 import {
+  accountDeletedContent,
+  loginCodeContent,
+  passwordResetCodeContent,
   passwordResetContent,
+  readingReturnContent,
   verificationContent,
   passwordChangedContent,
   testEmailContent,
+  type EmailArtLinks,
 } from '../apps/api/src/services/email-templates';
+import { emailArt } from '../apps/api/src/services/email-artwork.generated';
 
 const output = path.resolve('build/emails');
 fs.mkdirSync(output, { recursive: true });
 const reader = { to: 'preview@example.test', name: 'Leitora' };
+// Offline previews: the hosted pictures (ADR-041) inlined as data URIs.
+const art: EmailArtLinks = (name) => `data:image/png;base64,${emailArt[name].png}`;
 const examples = {
-  'boas-vindas': verificationContent({ ...reader, url: 'https://example.test/confirmar-email' }),
-  'recuperar-senha': passwordResetContent({ ...reader, url: 'https://example.test/nova-senha' }),
-  'senha-alterada': passwordChangedContent(reader),
-  'teste-entrega': testEmailContent(reader),
+  'boas-vindas': verificationContent(
+    { ...reader, url: 'https://example.test/confirmar-email' },
+    art,
+  ),
+  'codigo-de-entrada': loginCodeContent({ ...reader, code: '482913' }, art),
+  'codigo-nova-senha': passwordResetCodeContent({ ...reader, code: '735208' }, art),
+  'recuperar-senha-link': passwordResetContent(
+    { ...reader, url: 'https://example.test/nova-senha' },
+    art,
+  ),
+  'senha-alterada': passwordChangedContent(reader, art),
+  'sentimos-sua-falta': readingReturnContent(
+    {
+      ...reader,
+      bookTitle: 'Exemplo de livro',
+      currentPage: 142,
+      totalPages: 320,
+      daysAway: 9,
+      bookUrl: 'bubo:///livro/exemplo',
+      unsubscribeUrl: 'https://example.test/v1/email/unsubscribe?token=exemplo.exemplo',
+    },
+    art,
+  ),
+  'conta-excluida': accountDeletedContent(reader, art),
+  'teste-entrega': testEmailContent(reader, art),
 };
 for (const [name, content] of Object.entries(examples)) {
-  let html = content.html;
-  for (const attachment of content.attachments) {
-    html = html.replaceAll(
-      `cid:${attachment.content_id}`,
-      `data:image/png;base64,${attachment.content}`,
-    );
-  }
-  fs.writeFileSync(path.join(output, `${name}.html`), html);
+  fs.writeFileSync(path.join(output, `${name}.html`), content.html);
   fs.writeFileSync(path.join(output, `${name}.txt`), content.text);
 }
 fs.writeFileSync(

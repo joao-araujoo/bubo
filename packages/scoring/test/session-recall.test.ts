@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { assessRecallWriting, reflectionFromRecall } from '../src/session-recall';
+import {
+  assessRecallWriting,
+  isSubstantialRecallAnswer,
+  mentionsSomethingConcrete,
+  recallAnswersRepeat,
+  reflectionFromRecall,
+} from '../src/session-recall';
 
 const recall = {
   idea: 'Ana decidiu voltar para casa.',
@@ -177,5 +183,38 @@ describe('closed-book writing checklist v1', () => {
     expect(reflectionFromRecall(recall)).toBe(
       `Ideia: ${recall.idea}\nDetalhe: ${recall.detail}\nLigação ou dúvida: ${recall.connection}`,
     );
+  });
+});
+
+describe('per-answer hints of the recall card', () => {
+  it('applies the checklist substance rule to one answer at a time', () => {
+    expect(isSubstantialRecallAnswer(recall.idea)).toBe(true);
+    expect(isSubstantialRecallAnswer('Nessas páginas,')).toBe(false);
+    expect(isSubstantialRecallAnswer('gostei muito do livro')).toBe(false);
+    expect(isSubstantialRecallAnswer('')).toBe(false);
+  });
+
+  it('flags repeated answers the same way as the checklist', () => {
+    expect(recallAnswersRepeat('Ana voltou para casa.', 'ana VOLTOU para casa')).toBe(true);
+    expect(recallAnswersRepeat('Ana voltou para casa.', 'Casa voltou para Ana.')).toBe(false);
+    expect(recallAnswersRepeat('', 'Ana voltou')).toBe(false);
+  });
+
+  it('lights the concrete hint for names and numbers, not for sentence openings', () => {
+    expect(mentionsSomethingConcrete('Ela encontrou Bibiana na fazenda')).toBe(true);
+    expect(mentionsSomethingConcrete('Foram 3 dias de viagem')).toBe(true);
+    expect(mentionsSomethingConcrete('Ela voltou. Depois ficou calada')).toBe(false);
+    expect(mentionsSomethingConcrete('Bibiana foi embora')).toBe(false);
+    expect(mentionsSomethingConcrete('')).toBe(false);
+  });
+
+  it('never changes the checklist result', () => {
+    const plain = {
+      idea: 'ela voltou para casa',
+      detail: 'guardou a carta velha',
+      connection: 'por que fugiu assim?',
+    };
+    expect(assessRecallWriting(plain).passed).toBe(true);
+    expect(mentionsSomethingConcrete(plain.idea)).toBe(false);
   });
 });

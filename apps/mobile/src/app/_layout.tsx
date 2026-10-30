@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Button, EmptyState, Screen } from '../design-system';
 import { BootScreen } from '../features/shell/BootScreen';
+import { RatingPromptHost } from '../features/shelf/RatingPrompt';
 import { useWidgetSync } from '../features/widgets/use-widget-sync';
 import {
   DEFAULT_DEVICE_PREFERENCES,
@@ -46,7 +47,8 @@ function SessionErrorScreen({ onRetry }: { onRetry: () => void }) {
 /**
  * Navigation guards (Expo Router `Stack.Protected`):
  * signed out → (auth) · signed in without onboarding → onboarding · ready → (tabs).
- * `redefinir-senha` stays reachable from the e-mailed deep link in any state.
+ * `redefinir-senha` stays reachable from the e-mailed deep link in any state, and the legal
+ * documents are readable in any state.
  */
 function RootNavigator() {
   const theme = useTheme();
@@ -103,7 +105,10 @@ function RootNavigator() {
           <Stack.Screen name="revisao" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="excluir-conta" />
           <Stack.Screen name="descobrir" />
+          <Stack.Screen name="estante-3d" />
           <Stack.Screen name="estatisticas" />
+          <Stack.Screen name="replay" />
+          <Stack.Screen name="story/[id]" />
           <Stack.Screen name="conquistas" />
           <Stack.Screen name="bloqueados" />
           <Stack.Screen name="clubes/novo" options={{ presentation: 'modal' }} />
@@ -119,7 +124,15 @@ function RootNavigator() {
           <Stack.Screen name="convite/[code]" />
           <Stack.Screen name="amigos" />
           <Stack.Screen name="liga" />
-          <Stack.Screen name="configuracoes" />
+          <Stack.Screen name="sequencia" />
+          <Stack.Screen name="treino" />
+          <Stack.Screen name="prateleira" />
+          <Stack.Screen name="configuracoes/index" />
+          <Stack.Screen name="configuracoes/leitura" />
+          <Stack.Screen name="configuracoes/notificacoes" />
+          <Stack.Screen name="configuracoes/emails" />
+          <Stack.Screen name="configuracoes/aparelho" />
+          <Stack.Screen name="configuracoes/seguranca" />
           <Stack.Screen name="widgets" />
           <Stack.Screen name="notificacoes" />
           <Stack.Screen name="moderacao" />
@@ -144,7 +157,11 @@ function RootNavigator() {
           <Stack.Screen name="scanner-isbn" options={{ presentation: 'fullScreenModal' }} />
         </Stack.Protected>
         <Stack.Screen name="redefinir-senha" />
+        {/* Legal documents are readable before signing up and from Configurações → Sobre. */}
+        <Stack.Screen name="legal/termos" />
+        <Stack.Screen name="legal/privacidade" />
       </Stack>
+      <RatingPromptHost />
     </>
   );
 }

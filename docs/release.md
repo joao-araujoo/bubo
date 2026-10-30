@@ -5,22 +5,61 @@ owner of the Cloudflare, Neon, Resend, Expo and store accounts. Follow the steps
 
 ## Current remote state (keep this updated after every remote change)
 
-Last updated 2026-10-03 (ADR-031 Discover recommendations and catalog burst fix deployed; no migration). Owner-facing checklist in Portuguese:
+Last updated 2026-10-29 (Neon `0018_shelf_marks` applied; API with Redesign 2.0 parts 1–4 deployed, including `GET /v1/recall/practice` and `GET /v1/shelf/:id/community`). Owner-facing checklist in Portuguese:
 [../CONFIGURAR.md](../CONFIGURAR.md).
 
+- **Neon + API deploy 2026-10-29 (ADR-043–047), owner's go-ahead:** `db:migrate:check` found
+  only `0018_shelf_marks.sql` pending (additive: `shelf_entries.favorite/owned/wishlist/rereading`,
+  boolean default false); `db:migrate` applied it and a second check found zero pending.
+  `npm run deploy:api` (verify: 644 tests) published version
+  `47ce4ca7-7d8a-4c7d-9913-8d3196f01601` with the hourly cron. Smoke on production: health 200,
+  ready 200 (database ok); `GET /v1/recall/practice` and `GET /v1/shelf/:id/community` without a
+  session → 401 `UNAUTHORIZED` (routes live and protected). No temporary account was created, so
+  the signed-in paths of Treinos, marks and book community numbers are covered by API tests only;
+  device acceptance with the 2026-10-29 APK is pending.
+- **API deploy 2026-10-13 (ADR-040/041):** `npm run deploy:api` (verify: 597 tests;
+  `db:migrate:check` → 0 pending) published version `c264fd30-77f6-41bd-a385-ccb633f96661`.
+  Smoke on production: health/ready 200; `GET /v1/email/art/logo.19a4906d77.png` and
+  `hero-doubt.5dbe0048d0.png` → 200 `image/png` (6.3 KB / 23.9 KB), `immutable`, CORP
+  `cross-origin`; an unknown name → 404. A temporary account (Gmail plus-address of the owner):
+  sign-up 200; sign-in **without** `x-bubo-auth` → 426 `APP_UPDATE_REQUIRED` and no cookies;
+  sign-in with the header → `twoFactorRedirect` without a session; wrong password → 401;
+  `delete-user` 200 and `/v1/me` 401 afterwards. The welcome and farewell e-mails of that account
+  went to the owner's Gmail in the new frame (visual acceptance pending). The reset → session path
+  is covered by tests only (reading the code needs the inbox). Mobile changes (ADR-040 screens,
+  ADR-042 Estante/search/book pages) need a new APK; builds from before 2026-10-12 can no longer
+  finish a sign-in that needs a code and now show an error instead of hanging.
+- **Neon 2026-10-12:** migration `0017_login_codes_and_email_program` applied after verify
+  (584 tests; additive: `users.two_factor_enabled` default true, `two_factors`,
+  `reader_preferences.email_reading_reminders`, `reader_email_events`); read-only check found
+  zero pending afterwards. The deployed API (`aad13fde…`, 2026-10-04) ignores the new columns.
+- **API deploy 2026-10-12 (ADR-038/039):** after the owner added the four Resend DNS records on
+  Hostinger and ran `npx wrangler login`, `npm run email:activate` verified `bubo.nyoneo.com.br`
+  on Resend (`verified`) and stored `RESEND_API_KEY` + `EMAIL_FROM`
+  (`Bubo <nao-responda@bubo.nyoneo.com.br>`) on the production Worker; `npm run deploy:api`
+  (verify: 584 tests) published version `06a4c5e3-6269-46d2-a29a-c79c1931146e`. Smoke on
+  production: health/ready 200; a temporary account (Gmail plus-address of the owner) got
+  `loginCodeAvailable: true`, sign-in answered `twoFactorRedirect` without a session, `send-otp`
+  200, a wrong code 401 `INVALID_CODE`, reset-code request 200, preferences with
+  `emailReadingReminders: true`, invalid unsubscribe token 400, and the account was deleted
+  (401 afterwards). The welcome, login-code, reset-code and farewell e-mails went to the owner's
+  Gmail from the real sender; a delivery test from the real sender was accepted (`queued`).
+  The hourly cron now also runs the reading-return e-mail.
 - **API URL:** `https://bubo-api.bubo-api.workers.dev` (Worker `bubo-api`, version
-  `f312daaa-2afd-430f-a447-7f08422792fa`, 2026-10-03 ADR-031: `GET /v1/catalog/discover`,
-  catalog queue 5 s / 6 s deadline, short queries answered empty, keyless Google `skipped`;
-  verify 461 tests; migrations through `0015`) with an hourly cron trigger (`0 * * * *`,
-  review reminders). The account's `workers.dev` subdomain `bubo-api` was
-  registered automatically by the first deploy; renaming it changes every Worker URL on the account.
+  `c264fd30-77f6-41bd-a385-ccb633f96661`, 2026-10-13; before it
+  `06a4c5e3-6269-46d2-a29a-c79c1931146e`, 2026-10-12, see above; previous
+  `aad13fde-ff6f-4bb5-bc9f-3eae1baa2e69`, 2026-10-04: ADR-033 search/shelf, ADR-034
+  `GET /v1/me/replay`, ADR-035 shelf `rating`) with an hourly cron trigger (`0 * * * *`,
+  review reminders + reading-return e-mails). The account's `workers.dev` subdomain `bubo-api`
+  was registered automatically by the first deploy; renaming it changes every Worker URL on the
+  account.
 - **Worker secrets:** `DATABASE_URL` (Neon pooled URL from `apps/api/.dev.vars`),
   `BETTER_AUTH_SECRET` (random, stored only in Cloudflare; rotating it signs everyone out),
-  `BETTER_AUTH_URL` = the URL above. **Not set:** `RESEND_API_KEY`/`EMAIL_FROM` (password reset
-  answers 503), `GOOGLE_BOOKS_API_KEY` (Google 429; Open Library/BrasilAPI answer),
-  `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`, `MODERATOR_USER_IDS` (the
-  moderation queue answers 403 to everyone until the owner adds their user id).
-- **Neon:** migrations `0001`–`0015` applied, 0 pending (`0014` and `0015` on 2026-10-03, after verify: 407 tests). Production and the owner's local
+  `BETTER_AUTH_URL` = the URL above, `RESEND_API_KEY` + `EMAIL_FROM` (2026-10-12; sending
+  domain verified). **Not set:** `GOOGLE_BOOKS_API_KEY` (Google 429; Open Library/BrasilAPI
+  answer), `MEDIA_PUBLIC_URL`, `GEMINI_API_KEY`, `CATALOG_CONTACT_EMAIL`, `MODERATOR_USER_IDS`
+  (the moderation queue answers 403 to everyone until the owner adds their user id).
+- **Neon:** migrations `0001`–`0016` applied, 0 pending (`0016_shelf_entry_rating` on 2026-10-04 after verify: 545 tests; additive nullable column; `0014` and `0015` on 2026-10-03). Production and the owner's local
   `dev:api` share this database — split into a `production` branch before real users.
 - **Legacy tables in Neon:** about 40 empty tables that no Bubo migration created (`clubs`,
   `club_members`, `club_polls`, `content_reports`, `posts`, `blocks`, `works`, `editions`, …). They
@@ -98,7 +137,16 @@ Last updated 2026-10-03 (ADR-031 Discover recommendations and catalog burst fix 
   `packageRelease` failed; rerunning Gradle with preserved caches succeeded. No cause was
   reproduced and no device was connected. iOS compilation and Android/iPhone acceptance
   remain pending. See [build-mobile.md](build-mobile.md).
-- **Current Android artifact (2026-10-03; ADR-030):** regenerated after the final concise-copy
+- **Current Android artifact (2026-10-29; ADR-043–047):** `build/android/bubo-test.apk` rebuilt
+  with the Redesign 2.0 parts 1–4 and the header/tab-bar audit, pointing at the production API
+  (`https://bubo-api.bubo-api.workers.dev`). The free toolchain was installed fresh on this
+  machine (`build:android:setup`, Android SDK licences accepted with the owner's go-ahead).
+  `npm run build:android` passed its full verify (644 tests) and the Gradle release build;
+  SHA-256 `cae37662317e3c51fda8bf6177a64b8cc1adf827d0ec54d16466bb85a83e2be1`. No emulator or
+  device here (no hypervisor): screens were previewed on react-native-web only. Migration `0018`
+  and the practice/community routes were deployed right after (API `47ce4ca7…`, see "Current
+  remote state"), so this APK has everything it calls. Device acceptance pending.
+- **Previous Android artifact (2026-10-03; ADR-030):** regenerated after the final concise-copy
   changes, including welcome/sign-in. `npm run build:android` passed its full verify (441 tests)
   and Gradle release build. Test signature, embedded JS, `POST_NOTIFICATIONS` and all five widget
   receivers (including `LeagueWidget`) verified. ARM64/ARMv7; built at 20:20 America/Sao_Paulo;

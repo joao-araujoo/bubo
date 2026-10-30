@@ -30,6 +30,8 @@ export const DEFAULT_PREFERENCES = {
   timeZone: 'America/Sao_Paulo',
   notifyCommunity: true,
   notifyFriends: true,
+  /** Optional reading-return e-mail (ADR-038). Account and security e-mails have no switch. */
+  emailReadingReminders: true,
 };
 
 /** Interval after the reader's rigor. One-day steps (relearning, first review) never change. */

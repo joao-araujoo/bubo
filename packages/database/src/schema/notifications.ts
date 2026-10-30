@@ -29,12 +29,30 @@ export const readerPreferences = pgTable(
     notifyCommunity: boolean('notify_community').notNull().default(true),
     notifyFriends: boolean('notify_friends').notNull().default(true),
     lastReminderDate: date('last_reminder_date', { mode: 'string' }),
+    /** Consent for the optional "reading return" e-mail (0017, ADR-038). */
+    emailReadingReminders: boolean('email_reading_reminders').notNull().default(true),
     updatedAt: updatedAt(),
   },
   (table) => [
     index('reader_preferences_reminder_idx')
       .on(table.reminderHour)
       .where(sql`${table.reviewReminder}`),
+  ],
+);
+
+/** Optional e-mails accepted by the provider (0017): one row per send, ids and kinds only. */
+export const readerEmailEvents = pgTable(
+  'reader_email_events',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('reader_email_events_user_kind_idx').on(table.userId, table.kind, table.createdAt.desc()),
   ],
 );
 

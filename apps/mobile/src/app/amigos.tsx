@@ -82,7 +82,7 @@ function ReadingNowRow({ items }: { items: FriendsFeed['readingNow'] }) {
                 />
               </View>
             </View>
-            <Text variant="label" numberOfLines={1} style={{ fontSize: 12 }}>
+            <Text variant="labelSm" numberOfLines={1}>
               {item.name.split(' ')[0]}
             </Text>
             <Text variant="bodySm" color="accentText" numberOfLines={1} style={{ fontSize: 11 }}>
@@ -310,9 +310,6 @@ export default function FriendsScreen() {
 
   return (
     <FormScreen
-      align="left"
-      eyebrow="Social"
-      eyebrowDot
       title="Feed de amigos"
       headerRight={
         <Pill
@@ -371,7 +368,6 @@ export default function FriendsScreen() {
             {feed.data.readingNow.length ? (
               <>
                 <SectionTitle
-                  icon="auto-stories"
                   title="Lendo agora • círculo ativo"
                   trailing={<Pill tone="success" dot label={String(feed.data.readingNow.length)} />}
                 />
@@ -379,7 +375,6 @@ export default function FriendsScreen() {
               </>
             ) : null}
             <SectionTitle
-              icon="history"
               title="Sessões recentes"
               subtitle="Só livros do catálogo, minutos e páginas. Reflexões são sempre privadas."
             />
@@ -418,19 +413,19 @@ export default function FriendsScreen() {
           <>
             {incoming.length ? (
               <>
-                <SectionTitle icon="mail-outline" title="Pedidos recebidos" />
+                <SectionTitle title="Pedidos recebidos" />
                 {incoming.map(friendRow)}
               </>
             ) : null}
             {accepted.length ? (
               <>
-                <SectionTitle icon="people" title="Seus amigos" />
+                <SectionTitle title="Seus amigos" />
                 {accepted.map(friendRow)}
               </>
             ) : null}
             {outgoing.length ? (
               <>
-                <SectionTitle icon="schedule" title="Pedidos enviados" />
+                <SectionTitle title="Pedidos enviados" />
                 {outgoing.map(friendRow)}
               </>
             ) : null}

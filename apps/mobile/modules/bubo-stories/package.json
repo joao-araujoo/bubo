@@ -1,0 +1,7 @@
+{
+  "name": "bubo-stories",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Bubo Story image handoff and saving",
+  "license": "UNLICENSED"
+}

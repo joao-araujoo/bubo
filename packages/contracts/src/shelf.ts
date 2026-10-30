@@ -8,7 +8,7 @@ import {
 import { z } from 'zod';
 
 import { catalogIdSchema } from './catalog';
-import { newBookSchema, readingStatusSchema, shelfEntrySchema } from './me';
+import { newBookSchema, readingStatusSchema, shelfEntrySchema, shelfRatingSchema } from './me';
 import { recallCardSchema } from './recall';
 import { sessionAssessmentSchema, sessionRecallSchema } from './session-assessment';
 
@@ -34,15 +34,31 @@ export const addBookRequestSchema = z.union([
 export type AddBookRequest = z.input<typeof addBookRequestSchema>;
 export type AddBookInput = z.output<typeof addBookRequestSchema>;
 
-/** PATCH /v1/shelf/:id — change status, current page and/or page count. */
+/** PATCH /v1/shelf/:id — status, current page, page count, the private rating and/or marks. */
 export const updateShelfEntryRequestSchema = z
   .object({
     status: readingStatusSchema.optional(),
     currentPage: pageSchema.optional(),
     totalPages: z.number().int().min(1).max(MAX_BOOK_PAGES).nullable().optional(),
+    /** `null` clears the rating. */
+    rating: shelfRatingSchema.nullable().optional(),
+    /** The reader's own marks (ADR-046). */
+    favorite: z.boolean().optional(),
+    owned: z.boolean().optional(),
+    wishlist: z.boolean().optional(),
+    /** Only kept while the resulting status is reading or paused. */
+    rereading: z.boolean().optional(),
   })
   .refine(
-    (v) => v.status !== undefined || v.currentPage !== undefined || v.totalPages !== undefined,
+    (v) =>
+      v.status !== undefined ||
+      v.currentPage !== undefined ||
+      v.totalPages !== undefined ||
+      v.rating !== undefined ||
+      v.favorite !== undefined ||
+      v.owned !== undefined ||
+      v.wishlist !== undefined ||
+      v.rereading !== undefined,
     {
       message: 'Nothing to update.',
     },
@@ -176,3 +192,43 @@ export const reviewResultSchema = z.object({
   stats: statsResponseSchema,
 });
 export type ReviewResult = z.infer<typeof reviewResultSchema>;
+
+/**
+ * GET /v1/shelf/:id/community — anonymous numbers of this shelf book across Bubo readers (ADR-046).
+ * Never names; each block is null under its privacy floor, and manual books have none.
+ */
+export const bookCommunitySchema = z.object({
+  /** Distinct readers by status (the requester included), or null under the floor. */
+  readers: z
+    .object({
+      finished: z.number().int().nonnegative(),
+      reading: z.number().int().nonnegative(),
+      wantToRead: z.number().int().nonnegative(),
+      abandoned: z.number().int().nonnegative(),
+    })
+    .nullable(),
+  /** From the readers' private 1–5 ratings, only in aggregate and from five ratings on. */
+  ratings: z
+    .object({
+      count: z.number().int().positive(),
+      average: z.number().min(1).max(5),
+      distribution: z.array(
+        z.object({
+          stars: z.number().int().min(1).max(5),
+          percent: z.number().int().min(0).max(100),
+        }),
+      ),
+    })
+    .nullable(),
+  /** Catalog books shelved by readers of this one ("quem leu também leu"). */
+  alsoRead: z.array(
+    z.object({
+      catalogId: z.string(),
+      title: z.string(),
+      author: z.string().nullable(),
+      coverUrls: z.array(z.string()),
+      percent: z.number().int().min(1).max(100),
+    }),
+  ),
+});
+export type BookCommunity = z.infer<typeof bookCommunitySchema>;

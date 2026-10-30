@@ -26,6 +26,11 @@ export const readerPreferencesSchema = z.object({
   notifyCommunity: z.boolean(),
   /** Push for friend requests and accepted friendships. */
   notifyFriends: z.boolean(),
+  /**
+   * Optional "reading return" e-mail after seven days without reading, at most once a month
+   * (ADR-038). Defaults to on so older app versions, which never send it, keep working.
+   */
+  emailReadingReminders: z.boolean().default(true),
 });
 export type ReaderPreferences = z.infer<typeof readerPreferencesSchema>;
 

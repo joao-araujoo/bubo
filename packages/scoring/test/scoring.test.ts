@@ -5,6 +5,7 @@ import {
   MIN_EASE_FACTOR,
   XP_RULES,
   estimateRetention,
+  reviewXpRange,
   scheduleNextReview,
   xpForReadingSession,
   xpForRecallSession,
@@ -59,5 +60,14 @@ describe('XP', () => {
     );
     expect(xpForRecallSession({ attempts: 0, correct: 0, completed: true })).toBe(0);
     expect(xpForRecallSession({ attempts: 2, correct: 9, completed: false })).toBe(2 * 2 + 2 * 3);
+  });
+
+  it('gives the XP range of a review: the same per-card rule the API applies', () => {
+    expect(reviewXpRange(3)).toEqual({
+      min: xpForRecallSession({ attempts: 3, correct: 0, completed: false }),
+      max: xpForRecallSession({ attempts: 3, correct: 3, completed: false }),
+    });
+    expect(reviewXpRange(3)).toEqual({ min: 6, max: 15 });
+    expect(reviewXpRange(-1)).toEqual({ min: 0, max: 0 });
   });
 });

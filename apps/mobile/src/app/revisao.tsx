@@ -1,5 +1,5 @@
-import { type RecallCard, type ReviewResult } from '@bubo/contracts';
-import { toLocalIsoDate } from '@bubo/domain';
+import { type RecallCard, type ReviewResult, type StatsResponse } from '@bubo/contracts';
+import { dailyStamps, toLocalIsoDate } from '@bubo/domain';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -24,9 +24,15 @@ import {
   Text,
   TextField,
 } from '../design-system';
+import { DailyTicket } from '../features/home/sections';
 import { GRADE_OPTIONS } from '../features/recall/grades';
 import { ApiError } from '../lib/api/client';
-import { useDueCards, useRefreshAfterReview, useReviewCard } from '../lib/api/queries';
+import {
+  useDueCards,
+  usePreferences,
+  useRefreshAfterReview,
+  useReviewCard,
+} from '../lib/api/queries';
 import { useAuthState } from '../lib/auth/session';
 import { haptics } from '../lib/haptics';
 import { FadeIn, useReducedMotion } from '../lib/motion';
@@ -96,7 +102,7 @@ function CardStep({
   return (
     <FormScreen
       title="Hora de lembrar"
-      eyebrow={`Lembrança ${index + 1} de ${total}`}
+      subtitle={`Lembrança ${index + 1} de ${total}`}
       footer={
         saved && selected ? (
           <FadeIn key="saved" style={{ gap: theme.spacing.md }}>
@@ -240,14 +246,17 @@ function CardStep({
 function SummaryStep({
   reviewed,
   xp,
-  streakDays,
+  stats,
+  goalMinutes,
 }: {
   reviewed: number;
   xp: number;
-  streakDays: number;
+  stats: StatsResponse | null;
+  goalMinutes: number | null;
 }) {
   const theme = useTheme();
   const router = useRouter();
+  const streakDays = stats?.streakDays ?? 0;
   const reduced = useReducedMotion();
   const progress = useRef(new Animated.Value(0)).current;
   const announced = useRef(false);
@@ -391,6 +400,20 @@ function SummaryStep({
             lembrança espaçada fica mais forte.
           </Text>
         </Animated.View>
+        {stats ? (
+          <Animated.View style={{ alignSelf: 'stretch', opacity: phase(0.6, 0.8) }}>
+            <DailyTicket
+              stamps={dailyStamps({
+                focusedMinutesToday: stats.focusedMinutesToday,
+                goalMinutes,
+                readToday: stats.readToday,
+                reviewedToday: stats.reviewedToday,
+                dueCards: stats.dueCards,
+              })}
+              onPress={() => router.back()}
+            />
+          </Animated.View>
+        ) : null}
       </View>
     </FormScreen>
   );
@@ -407,7 +430,8 @@ export default function ReviewScreen() {
   const [queue, setQueue] = useState<RecallCard[] | null>(null);
   const [index, setIndex] = useState(0);
   const [xp, setXp] = useState(0);
-  const [streakDays, setStreakDays] = useState(0);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const preferences = usePreferences(userId);
 
   // Leaving at any point refreshes Hoje/Revisar counts (each review is already saved).
   const refreshRef = useRef(refresh);
@@ -456,7 +480,14 @@ export default function ReviewScreen() {
     );
   }
   if (index >= queue.length)
-    return <SummaryStep reviewed={queue.length} xp={xp} streakDays={streakDays} />;
+    return (
+      <SummaryStep
+        reviewed={queue.length}
+        xp={xp}
+        stats={stats}
+        goalMinutes={preferences.data?.dailyFocusMinutes ?? null}
+      />
+    );
 
   const card = queue[index];
   if (!card) return null;
@@ -468,7 +499,7 @@ export default function ReviewScreen() {
       total={queue.length}
       onGraded={(result) => {
         setXp((value) => value + result.xpEarned);
-        setStreakDays(result.stats.streakDays);
+        setStats(result.stats);
         setIndex(index + 1);
       }}
     />

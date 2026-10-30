@@ -172,6 +172,8 @@ export async function recordSession(
         currentPage: next.currentPage,
         startedAt: next.startedAt,
         finishedAt: next.finishedAt,
+        // Finishing a re-read ends "Relendo" (ADR-046).
+        ...(next.status === 'finished' ? { rereading: false } : {}),
       })
       .where(and(eq(shelfEntries.id, entry.id), eq(shelfEntries.userId, userId)));
 

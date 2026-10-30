@@ -1,4 +1,6 @@
 import {
+  type ReplayQuery,
+  replayResponseSchema,
   type AssessSessionRequest,
   assessSessionResponseSchema,
   type MarkNotificationsRead,
@@ -55,6 +57,7 @@ import {
   catalogSearchResponseSchema,
   deleteResponseSchema,
   dueCardsResponseSchema,
+  practiceCardsResponseSchema,
   recallCardSchema,
   reviewResultSchema,
   errorResponseSchema,
@@ -63,6 +66,7 @@ import {
   memoryStatsResponseSchema,
   sessionResultSchema,
   shelfEntryDetailSchema,
+  bookCommunitySchema,
   shelfEntrySchema,
   shelfResponseSchema,
   statsResponseSchema,
@@ -204,6 +208,8 @@ export function createApiClient({
       request(API_ROUTES.shelf, shelfEntrySchema, { method: 'POST', body }),
     getShelfEntry: (id: string, signal?: AbortSignal) =>
       request(apiPath(API_ROUTES.shelfEntry, { id }), shelfEntryDetailSchema, { signal }),
+    getBookCommunity: (id: string, signal?: AbortSignal) =>
+      request(apiPath(API_ROUTES.shelfCommunity, { id }), bookCommunitySchema, { signal }),
     updateShelfEntry: (id: string, body: UpdateShelfEntryRequest) =>
       request(apiPath(API_ROUTES.shelfEntry, { id }), shelfEntrySchema, { method: 'PATCH', body }),
     deleteShelfEntry: (id: string) =>
@@ -220,6 +226,15 @@ export function createApiClient({
       request(`${API_ROUTES.stats}?today=${encodeURIComponent(today)}`, statsResponseSchema, {
         signal,
       }),
+    getReplay: (query: ReplayQuery, signal?: AbortSignal) => {
+      const params = new URLSearchParams({
+        kind: query.kind,
+        year: String(query.year),
+        timeZone: query.timeZone,
+      });
+      if (query.kind === 'month' && query.month) params.set('month', String(query.month));
+      return request(`${API_ROUTES.replay}?${params.toString()}`, replayResponseSchema, { signal });
+    },
     getMemoryStats: (query: { today: string; days: number; tz: number }, signal?: AbortSignal) =>
       request(
         `${API_ROUTES.memoryStats}?today=${encodeURIComponent(query.today)}&days=${query.days}&tz=${query.tz}`,
@@ -373,6 +388,12 @@ export function createApiClient({
         {
           signal,
         },
+      ),
+    getPracticeCards: (today: string, signal?: AbortSignal) =>
+      request(
+        `${API_ROUTES.recallPractice}?today=${encodeURIComponent(today)}`,
+        practiceCardsResponseSchema,
+        { signal },
       ),
     createCard: (body: CreateCardRequest) =>
       request(API_ROUTES.recallCards, recallCardSchema, { method: 'POST', body }),

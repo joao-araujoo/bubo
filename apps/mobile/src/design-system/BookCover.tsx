@@ -73,7 +73,7 @@ function CoverFrame({
     // A stalled image must not leave a blank frame forever; try the next real candidate.
     const timer = setTimeout(
       () => setIndex((current) => (current === index ? current + 1 : current)),
-      6_000,
+      4_000,
     );
     return () => clearTimeout(timer);
   }, [source, loadedSource, index]);

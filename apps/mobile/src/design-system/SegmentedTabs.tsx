@@ -64,11 +64,11 @@ export function SegmentedTabs<T extends string>({
             }}
           >
             <Text
-              variant="label"
+              variant="labelSm"
               color={selected ? 'onPrimary' : 'textMuted'}
               align="center"
               numberOfLines={2}
-              style={{ fontSize: 13, lineHeight: 16, flexShrink: 1 }}
+              style={{ flexShrink: 1 }}
             >
               {option.label}
             </Text>

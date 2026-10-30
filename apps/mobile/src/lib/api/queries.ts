@@ -1,4 +1,5 @@
 import {
+  type ReplayQuery,
   type AssessSessionRequest,
   type AddBookRequest,
   type MarkNotificationsRead,
@@ -23,12 +24,15 @@ import {
   type CatalogBookResponse,
   type CatalogSearchResponse,
   type CatalogDiscoverResponse,
+  type ShelfEntryDetail,
   type ShelfResponse,
 } from '@bubo/contracts';
 import { type Genre, MIN_CATALOG_QUERY_LENGTH, toIsbn13, toLocalIsoDate } from '@bubo/domain';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { api, ApiError } from './client';
+import { ratingPrompt } from '../rating-prompt';
 import { cacheAcceptedShelfEntry } from './shelf-cache';
 
 /** Query keys live in one place so invalidation stays predictable. */
@@ -40,7 +44,11 @@ export const queryKeys = {
   me: (userId: string) => ['me', userId] as const,
   shelf: (userId: string) => ['shelf', userId] as const,
   shelfEntry: (userId: string, entryId: string) => ['shelf', userId, entryId] as const,
+  /** Own root: shelf cache helpers patch every ['shelf', userId, …] query as shelf data. */
+  bookCommunity: (userId: string, entryId: string) => ['book-community', userId, entryId] as const,
   stats: (userId: string, today: string) => ['stats', userId, today] as const,
+  replay: (userId: string, query: ReplayQuery) =>
+    ['replay', userId, query.kind, query.year, query.month ?? null, query.timeZone] as const,
   memory: (userId: string, today: string, days: number, tz: number) =>
     ['memory', userId, today, days, tz] as const,
   achievements: (userId: string, today: string) => ['achievements', userId, today] as const,
@@ -58,6 +66,7 @@ export const queryKeys = {
     ['clubs', userId, 'poll', clubId, pollId, reveal] as const,
   invite: (userId: string, code: string) => ['clubs', userId, 'invite', code] as const,
   due: (userId: string, today: string) => ['recall', userId, today] as const,
+  practice: (userId: string, today: string) => ['recall', userId, 'practice', today] as const,
   catalogSearch: (userId: string, q: string) => ['catalog', userId, 'search-v2', q] as const,
   catalogBook: (userId: string, catalogId: string) =>
     ['catalog', userId, 'book', catalogId] as const,
@@ -80,6 +89,8 @@ export function useCatalogSearch(userId: string | undefined, q: string) {
     queryKey: queryKeys.catalogSearch(userId ?? 'anonymous', query),
     queryFn: ({ signal }) => api.searchCatalog(query, signal),
     enabled: Boolean(userId) && query.length >= MIN_CATALOG_QUERY_LENGTH,
+    // While the next query loads, keep the last results on screen (no flash to placeholders).
+    placeholderData: (previous) => previous,
     staleTime: (state) =>
       !state.state.data?.results.length || Object.values(state.state.data.sources).includes('error')
         ? 60_000
@@ -105,6 +116,25 @@ export function useCatalogDiscover(
       state.state.data?.sources.openlibrary === 'error' ? 60_000 : 30 * 60_000,
     retry: (count, error) => count < 2 && error instanceof ApiError && error.retryable,
   });
+}
+
+/**
+ * Warms "Para você" in the background (after the shelf's own covers had a head start) so
+ * Descobrir opens with real shelves instead of placeholders.
+ */
+export function usePrefetchDiscover(userId: string | undefined) {
+  const client = useQueryClient();
+  useEffect(() => {
+    if (!userId) return;
+    const timer = setTimeout(() => {
+      void client.prefetchQuery({
+        queryKey: queryKeys.catalogDiscover(userId, 'for_you'),
+        queryFn: ({ signal }) => api.getCatalogDiscover(null, signal),
+        staleTime: 30 * 60_000,
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [client, userId]);
 }
 
 /** Barcode lookup. isbn must already be a valid ISBN-13 (the scanner validates it). */
@@ -185,11 +215,25 @@ export function useShelf(userId: string | undefined) {
   });
 }
 
+/**
+ * One book with its sessions, cards and reviews. The shelf list already knows the book itself, so
+ * the detail opens instantly from it (`isPlaceholderData`) while the history loads.
+ */
 export function useShelfEntry(userId: string | undefined, entryId: string) {
-  return useQuery({
+  const client = useQueryClient();
+  return useQuery<ShelfEntryDetail>({
     queryKey: queryKeys.shelfEntry(userId ?? 'anonymous', entryId),
     queryFn: ({ signal }) => api.getShelfEntry(entryId, signal),
     enabled: userId !== undefined && entryId !== '',
+    placeholderData: () => {
+      if (!userId) return undefined;
+      const entry = client
+        .getQueryData<ShelfResponse>(queryKeys.shelf(userId))
+        ?.entries.find((item) => item.id === entryId);
+      return entry
+        ? { entry, sessions: [], cards: [], reviews: [], reviewTotals: { total: 0, remembered: 0 } }
+        : undefined;
+    },
   });
 }
 
@@ -247,6 +291,26 @@ export function useDueCards(userId: string | undefined) {
   });
 }
 
+/** Anonymous numbers of a shelf book (ADR-046); quiet on failure, the page works without them. */
+export function useBookCommunity(userId: string | undefined, entryId: string) {
+  return useQuery({
+    queryKey: queryKeys.bookCommunity(userId ?? 'anonymous', entryId),
+    queryFn: ({ signal }) => api.getBookCommunity(entryId, signal),
+    enabled: userId !== undefined && entryId !== '',
+    staleTime: 10 * 60_000,
+  });
+}
+
+/** Practice decks of Revisar (ADR-045): read-only, refreshed with the rest of recall. */
+export function usePracticeCards(userId: string | undefined) {
+  const today = toLocalIsoDate(new Date());
+  return useQuery({
+    queryKey: queryKeys.practice(userId ?? 'anonymous', today),
+    queryFn: ({ signal }) => api.getPracticeCards(today, signal),
+    enabled: userId !== undefined,
+  });
+}
+
 /** Everything that depends on the shelf, sessions or reviews is refreshed together. */
 function useInvalidateReading(userId: string) {
   const queryClient = useQueryClient();
@@ -255,11 +319,13 @@ function useInvalidateReading(userId: string) {
       queryClient.invalidateQueries({ queryKey: ['shelf', userId] }),
       queryClient.invalidateQueries({ queryKey: ['stats', userId] }),
       queryClient.invalidateQueries({ queryKey: ['memory', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['replay', userId] }),
       queryClient.invalidateQueries({ queryKey: ['achievements', userId] }),
       queryClient.invalidateQueries({ queryKey: ['league', userId] }),
       // Reading progress moves the anti-spoiler line in every club.
       queryClient.invalidateQueries({ queryKey: ['clubs', userId] }),
       queryClient.invalidateQueries({ queryKey: ['recall', userId] }),
+      queryClient.invalidateQueries({ queryKey: ['book-community', userId] }),
       // "Já está na estante" on catalog screens.
       queryClient.invalidateQueries({ queryKey: ['catalog', userId, 'book'] }),
       // Recommendations are built from the shelf (and hide what is already on it).
@@ -300,6 +366,7 @@ export function useAddBook(userId: string) {
     onSuccess: (entry) => {
       cacheAcceptedShelfEntry(client, userId, entry);
       void invalidate();
+      ratingPrompt.offer(entry);
     },
   });
 }
@@ -309,9 +376,11 @@ export function useUpdateShelfEntry(userId: string, entryId: string) {
   const invalidate = useInvalidateReading(userId);
   return useMutation({
     mutationFn: (body: UpdateShelfEntryRequest) => api.updateShelfEntry(entryId, body),
-    onSuccess: (entry) => {
+    onSuccess: (entry, body) => {
       cacheAcceptedShelfEntry(client, userId, entry);
       void invalidate();
+      // Only an explicit "Já li" asks; editing pages or the rating itself never does.
+      if (body.status === 'finished') ratingPrompt.offer(entry);
     },
   });
 }
@@ -332,7 +401,11 @@ export function useRecordSession(userId: string) {
   const invalidate = useInvalidateReading(userId);
   return useMutation({
     mutationFn: (body: CreateSessionRequest) => api.recordSession(body),
-    onSuccess: invalidate,
+    onSuccess: async (result) => {
+      await invalidate();
+      // A session that reaches the last page finishes the book.
+      ratingPrompt.offer(result.entry);
+    },
   });
 }
 

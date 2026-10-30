@@ -1,4 +1,4 @@
-import { API_PREFIX } from '@bubo/config';
+import { API_PREFIX, AUTH_CLIENT_HEADER, AUTH_CLIENT_LOGIN_CODE } from '@bubo/config';
 import { API_ROUTES } from '@bubo/contracts';
 import { createDatabase, pingDatabase } from '@bubo/database';
 import { Hono } from 'hono';
@@ -19,9 +19,11 @@ import {
 } from './middleware/session';
 import { catalogRoutes, createCatalogProvider } from './routes/catalog';
 import { communityRoutes } from './routes/community';
+import { emailRoutes } from './routes/email';
 import { notificationRoutes } from './routes/notifications';
 import { readerRoutes } from './routes/me';
 import { recallRoutes } from './routes/recall';
+import { replayRoutes } from './routes/replay';
 import { shelfRoutes } from './routes/shelf';
 import { type DatabasePinger, systemRoutes } from './routes/system';
 import { type FetchLike } from './services/catalog';
@@ -62,7 +64,13 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   app.use('*', requestContext({ sink: deps.logSink }));
-  app.use('*', secureHeaders());
+  // E-mail pictures are embedded by mail clients and webmails on other origins (ADR-041).
+  const emailArtPath = `${API_PREFIX}${API_ROUTES.emailArt.replace(':file', '')}`;
+  const pageHeaders = secureHeaders();
+  const emailArtHeaders = secureHeaders({ crossOriginResourcePolicy: 'cross-origin' });
+  app.use('*', (c, next) =>
+    c.req.path.startsWith(emailArtPath) ? emailArtHeaders(c, next) : pageHeaders(c, next),
+  );
   // Native apps do not need CORS; allow browsers (Expo web, tooling) only in development.
   app.use('*', async (c, next) => {
     const config = c.get('config');
@@ -74,12 +82,18 @@ export function createApp(deps: AppDeps = {}) {
 
   app.route(API_PREFIX, systemRoutes({ pingDatabase: deps.pingDatabase ?? pingDatabase, now }));
 
-  // Better Auth: sign-up, sign-in, sign-out, session, password reset.
+  // Better Auth: sign-up, sign-in, sign-out, session, password reset, login codes.
   const authPath = `${API_PREFIX}${API_ROUTES.auth}/*`;
-  // Better Auth sends the reset e-mail in a background task and always answers 200, so without a
-  // provider the reader would wait for a message that never comes. Refuse up front instead (the
-  // same 503 for every address, so it reveals nothing about which accounts exist).
-  for (const action of ['request-password-reset', 'send-verification-email']) {
+  // Better Auth sends e-mails in a background task and always answers 200, so without a provider
+  // the reader would wait for a message that never comes. Refuse up front instead (the same 503
+  // for every address, so it reveals nothing about which accounts exist).
+  for (const action of [
+    'request-password-reset',
+    'send-verification-email',
+    'email-otp/request-password-reset',
+    'email-otp/send-verification-otp',
+    'two-factor/send-otp',
+  ]) {
     app.post(`${API_PREFIX}${API_ROUTES.auth}/${action}`, async (c, next) => {
       const config = c.get('config');
       const emailReady =
@@ -94,7 +108,34 @@ export function createApp(deps: AppDeps = {}) {
     });
   }
   app.use(authPath, authRedirectGuard, database, auth);
+  // App builds from before login codes ignore the code challenge and wait for a session that never
+  // comes (ADR-040). Tell them to update instead of failing silently; current builds send the
+  // header and get the challenge as usual.
+  app.use(`${API_PREFIX}${API_ROUTES.auth}/sign-in/email`, async (c, next) => {
+    await next();
+    if (c.req.header(AUTH_CLIENT_HEADER)?.includes(AUTH_CLIENT_LOGIN_CODE)) return;
+    if (c.res.status !== 200) return;
+    const body: unknown = await c.res
+      .clone()
+      .json()
+      .catch(() => null);
+    if (!body || typeof body !== 'object' || !('twoFactorRedirect' in body)) return;
+    c.res = new Response(
+      JSON.stringify({
+        code: 'APP_UPDATE_REQUIRED',
+        message: 'Update the app to sign in with the e-mailed code.',
+      }),
+      { status: 426, headers: { 'content-type': 'application/json' } },
+    );
+    // Hono carries the original headers over; the half-started challenge cookie stays behind.
+    c.res.headers.delete('set-cookie');
+  });
   app.on(['GET', 'POST'], authPath, (c) => c.get('auth').handler(c.req.raw));
+
+  // Public one-click opt-out from optional e-mails (signed token, no session; ADR-038) and the
+  // pictures shown inside e-mails (static, no database; ADR-041).
+  app.use(`${API_PREFIX}${API_ROUTES.emailUnsubscribe}`, database);
+  app.route(API_PREFIX, emailRoutes({ now }));
 
   // Session-protected reader routes.
   for (const path of [
@@ -129,6 +170,7 @@ export function createApp(deps: AppDeps = {}) {
   );
   app.route(API_PREFIX, catalogRoutes({ catalog, cache: catalogCache, now }));
   app.route(API_PREFIX, recallRoutes({ now }));
+  app.route(API_PREFIX, replayRoutes({ now }));
   app.route(
     API_PREFIX,
     communityRoutes({ now, pushFetch: deps.pushFetch ?? ((input, init) => fetch(input, init)) }),

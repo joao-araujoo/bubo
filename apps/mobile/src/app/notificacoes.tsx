@@ -192,7 +192,7 @@ function NotificationCard({
             <Text variant="caption" color="accentText" style={{ flex: 1 }}>
               {meta.label}
             </Text>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               {relativeTime(item.createdAt)}
             </Text>
             {item.read ? null : (
@@ -302,7 +302,6 @@ export default function NotificationsScreen() {
 
   return (
     <FormScreen
-      align="left"
       title="Notificações"
       headerRight={
         unread > 0 ? (
@@ -420,7 +419,7 @@ export default function NotificationsScreen() {
               title="Tudo em dia"
               description={
                 filter === 'memory'
-                  ? 'Os lembretes de revisão aparecem aqui quando você os ativa em Preferências.'
+                  ? 'Os lembretes de revisão aparecem aqui quando você os ativa em Configurações → Notificações no celular.'
                   : 'Respostas às suas discussões, pedidos de amizade e novos ciclos dos clubes aparecem aqui.'
               }
               action={
@@ -428,7 +427,7 @@ export default function NotificationsScreen() {
                   label="Preferências de aviso"
                   icon="tune"
                   variant="secondary"
-                  onPress={() => router.push('/configuracoes')}
+                  onPress={() => router.push('/configuracoes/notificacoes')}
                 />
               }
             />

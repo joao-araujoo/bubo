@@ -8,7 +8,6 @@ import {
   Button,
   HeaderButton,
   Icon,
-  LinkButton,
   Pill,
   ProgressBar,
   Raised,
@@ -20,6 +19,7 @@ import {
 import { CATEGORY_META, achievementIcon } from '../../features/achievements/meta';
 import { NotificationBell } from '../../features/notifications/NotificationBell';
 import { GENRE_OPTIONS, GOAL_OPTIONS, HABIT_OPTIONS } from '../../features/onboarding/options';
+import { TabHeader } from '../../features/shell/TabHeader';
 import {
   useAchievements,
   useMemoryStats,
@@ -210,7 +210,6 @@ function RecentAchievements({ data }: { data: AchievementsResponse }) {
   return (
     <Surface>
       <SectionTitle
-        icon="emoji-events"
         title="Conquistas recentes"
         trailing={
           <Pressable
@@ -289,7 +288,7 @@ function AnnualGoal({ finished, goal }: { finished: number; goal: number | null 
         icon="flag"
         title={`Meta anual ${year}`}
         subtitle="Defina quantos livros quer terminar este ano"
-        onPress={() => router.push('/configuracoes')}
+        onPress={() => router.push('/configuracoes/leitura')}
       />
     );
   const percent = Math.min(100, Math.round((finished / goal) * 100));
@@ -338,7 +337,7 @@ function ReadingProfile({ me }: { me: MeResponse }) {
   if (!habit && goals.length === 0 && genres.length === 0) return null;
   return (
     <Surface>
-      <SectionTitle icon="auto-stories" title="Seu jeito de ler" />
+      <SectionTitle title="Seu jeito de ler" />
       {habit ? <Pill tone="primary" icon="schedule" label={habit.title} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
         {goals.map((goal) => (
@@ -355,7 +354,6 @@ function ReadingProfile({ me }: { me: MeResponse }) {
 /** Stitch "Meu perfil": who you are, your level, real numbers, badges, goal and settings. */
 export default function YouScreen() {
   const router = useRouter();
-  const theme = useTheme();
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : undefined;
   const shelf = useShelf(userId);
@@ -401,18 +399,21 @@ export default function YouScreen() {
   return (
     <Screen
       header={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <Text variant="heading" accessibilityRole="header" style={{ flex: 1 }}>
-            Meu Perfil
-          </Text>
-          {userId ? <NotificationBell userId={userId} /> : null}
-          <HeaderButton
-            icon="settings"
-            label="Preferências"
-            iconColor="accentText"
-            onPress={() => router.push('/configuracoes')}
-          />
-        </View>
+        <TabHeader
+          title="Meu perfil"
+          profile={false}
+          actions={
+            <>
+              {userId ? <NotificationBell userId={userId} /> : null}
+              <HeaderButton
+                icon="settings"
+                label="Configurações"
+                iconColor="accentText"
+                onPress={() => router.push('/configuracoes')}
+              />
+            </>
+          }
+        />
       }
     >
       {auth.status === 'ready' ? (
@@ -434,24 +435,21 @@ export default function YouScreen() {
       ) : null}
       {auth.status === 'ready' ? <ReadingProfile me={auth.me} /> : null}
 
-      <SectionTitle icon="tune" title="Sua conta" />
+      <SectionTitle title="Suas leituras" />
+      <ActionRow
+        icon="auto-awesome"
+        title="Bubo Replay"
+        subtitle="Seu mês e seu ano em livros · artes para Stories"
+        onPress={() => router.push('/replay')}
+      />
       <ActionRow
         icon="insights"
         title="Minha memória"
         onPress={() => router.push('/estatisticas')}
       />
+
+      <SectionTitle title="Comunidade" />
       <ActionRow icon="people" title="Amigos de leitura" onPress={() => router.push('/amigos')} />
-      <ActionRow
-        icon="psychology"
-        title="Preferências"
-        onPress={() => router.push('/configuracoes')}
-      />
-      <ActionRow
-        icon="notifications"
-        title="Notificações"
-        onPress={() => router.push('/notificacoes')}
-      />
-      <ActionRow icon="widgets" title="Widgets" onPress={() => router.push('/widgets')} />
       <ActionRow
         icon="block"
         title="Leitores bloqueados"
@@ -460,6 +458,20 @@ export default function YouScreen() {
       {auth.status === 'ready' && auth.me.isModerator ? (
         <ActionRow icon="gavel" title="Moderação geral" onPress={() => router.push('/moderacao')} />
       ) : null}
+
+      <SectionTitle title="Conta" />
+      <ActionRow
+        icon="notifications"
+        title="Notificações"
+        subtitle="Sua caixa de avisos"
+        onPress={() => router.push('/notificacoes')}
+      />
+      <ActionRow
+        icon="settings"
+        title="Configurações"
+        subtitle="Revisões, avisos, e-mails, aparelho e segurança"
+        onPress={() => router.push('/configuracoes')}
+      />
       <Button
         label="Sair da conta"
         variant="secondary"
@@ -467,12 +479,6 @@ export default function YouScreen() {
         icon="logout"
         loading={signingOut}
         onPress={confirmSignOut}
-      />
-      <LinkButton
-        label="Excluir conta"
-        color="error"
-        accessibilityHint="Abre a tela para excluir sua conta e seus dados"
-        onPress={() => router.push('/excluir-conta')}
       />
       {__DEV__ ? (
         <Button

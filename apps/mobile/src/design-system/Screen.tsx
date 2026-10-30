@@ -1,9 +1,15 @@
-import { type ReactNode } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme';
 import { OfflineBanner } from './OfflineBanner';
+
+/**
+ * Extra bottom space a screen must leave free. The tab layout provides the height of the floating
+ * tab bar (ADR-043); screens outside the tabs keep 0.
+ */
+export const ScreenBottomInset = createContext(0);
 
 type Props = {
   children: ReactNode;
@@ -16,9 +22,10 @@ type Props = {
 export function Screen({ children, header, scroll = true }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const bottomInset = useContext(ScreenBottomInset);
   const padding = {
     paddingHorizontal: theme.sizes.gutter,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xxl + bottomInset,
     gap: theme.spacing.lg,
   };
   return (

@@ -125,11 +125,11 @@ export default function TopicScreen() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const isOwner = club.data?.membership === 'owner';
-  const eyebrow = club.data ? club.data.name : 'Clube de leitura';
+  const clubName = club.data ? club.data.name : 'Clube de leitura';
 
   if (topic.isPending) {
     return (
-      <FormScreen title="Debate do clube" eyebrow={eyebrow}>
+      <FormScreen title="Debate do clube" subtitle={clubName}>
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando debate" />
       </FormScreen>
     );
@@ -137,7 +137,7 @@ export default function TopicScreen() {
   if (topic.isError) {
     const gone = topic.error instanceof ApiError && topic.error.code === 'NOT_FOUND';
     return (
-      <FormScreen title="Debate do clube" eyebrow={eyebrow}>
+      <FormScreen title="Debate do clube" subtitle={clubName}>
         <EmptyState
           mascot={gone ? 'notFound' : 'offline'}
           title={gone ? 'Debate indisponível' : 'Não foi possível carregar'}
@@ -368,7 +368,7 @@ export default function TopicScreen() {
             </Text>
             <Pill label={`Nív. ${item.author.level}`} />
           </View>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted">
             {relativeTime(item.createdAt)}
           </Text>
         </View>
@@ -392,8 +392,7 @@ export default function TopicScreen() {
   return (
     <FormScreen
       title={post.isBookReview ? 'Resenha da comunidade' : 'Debate do clube'}
-      eyebrow={eyebrow}
-      eyebrowDot
+      subtitle={clubName}
       footer={
         <>
           {replyError ? <InlineMessage tone="error" message={replyError} /> : null}
@@ -402,7 +401,7 @@ export default function TopicScreen() {
             <Text variant="caption" color="accentText" style={{ flex: 1 }}>
               Sua resposta
             </Text>
-            <Text variant="label" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="labelSm" color="textMuted">
               Página
             </Text>
             <TextInput
@@ -567,7 +566,7 @@ export default function TopicScreen() {
             <Text variant="label" color="accentText" numberOfLines={1} style={{ flex: 1 }}>
               {club.data?.book.title ?? 'Livro do clube'}
             </Text>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               {relativeTime(post.createdAt)}
             </Text>
           </View>
@@ -669,7 +668,6 @@ export default function TopicScreen() {
       {actions(post, 'post')}
 
       <SectionTitle
-        icon="forum"
         title={replies.length === 1 ? '1 resposta' : `${replies.length} respostas`}
         subtitle="Cada resposta tem pelo menos a página do debate"
       />

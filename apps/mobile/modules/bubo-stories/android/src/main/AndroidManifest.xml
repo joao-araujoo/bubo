@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <queries>
+    <package android:name="com.instagram.android" />
+  </queries>
+  <application>
+    <provider
+      android:name="expo.modules.bubostories.BuboStoryFileProvider"
+      android:authorities="${applicationId}.bubo-stories"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/bubo_story_paths" />
+    </provider>
+  </application>
+</manifest>

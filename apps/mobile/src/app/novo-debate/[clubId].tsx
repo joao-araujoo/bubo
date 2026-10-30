@@ -130,7 +130,6 @@ export default function NewTopicScreen() {
     <FormScreen
       leading="close"
       title="Novo tópico de debate"
-      eyebrow="Clube de leitura"
       footer={
         <>
           {error ? <InlineMessage tone="error" message={error} /> : null}
@@ -165,7 +164,7 @@ export default function NewTopicScreen() {
                 .join(' • ') || data.book.title}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+              <Text variant="meta" color="textMuted">
                 Seu progresso atual:
               </Text>
               <Pill label={`Página ${readerPage}`} />
@@ -188,7 +187,7 @@ export default function NewTopicScreen() {
                 {' *'}
               </Text>
             </Text>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               Provocação reflexiva
             </Text>
           </View>
@@ -206,7 +205,7 @@ export default function NewTopicScreen() {
           <Text variant="label" style={{ flex: 1 }}>
             Tipo de discussão
           </Text>
-          <Text variant="bodySm" color="accentText" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="accentText">
             Selecione 1
           </Text>
         </View>
@@ -347,7 +346,7 @@ export default function NewTopicScreen() {
             <Icon name="format-quote" size={22} color="accentText" />
             <View style={{ flex: 1 }}>
               <Text variant="label">Vincular citação do trecho</Text>
-              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+              <Text variant="meta" color="textMuted">
                 Um trecho curto da página, para ancorar o debate
               </Text>
             </View>

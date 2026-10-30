@@ -31,6 +31,8 @@
     "email:assets": "node scripts/email-assets.mjs",
     "email:preview": "tsx scripts/email-preview.ts",
     "email:check": "tsx scripts/email-check.ts",
+    "email:samples": "tsx scripts/email-samples.ts",
+    "email:activate": "node scripts/email-activate.mjs",
     "push:check": "node scripts/push-check.mjs",
     "audit:repo": "node scripts/audit-repo.mjs",
     "doctor": "node scripts/doctor.mjs",

@@ -1,22 +1,16 @@
 import { MIN_CATALOG_QUERY_LENGTH } from '@bubo/domain';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import {
-  Button,
-  FormScreen,
-  HeaderButton,
-  InlineMessage,
-  LinkButton,
-  Text,
-} from '../design-system';
+import { Button, FormScreen, HeaderButton, Icon, InlineMessage, Text } from '../design-system';
+import { useQuickAdd } from '../features/catalog/AddToShelfSheet';
 import { catalogErrorMessage, useDebouncedValue } from '../features/catalog/catalog';
 import { CatalogSearchResults } from '../features/catalog/CatalogSearchResults';
 import { ManualBookForm, type ManualBookFormHandle } from '../features/catalog/ManualBookForm';
 import { SearchField } from '../features/catalog/SearchField';
 import { ShelfStatusPicker, type AddShelfStatus } from '../features/catalog/ShelfStatusPicker';
-import { useAddFromCatalog, useShelfLookup } from '../features/catalog/useAddFromCatalog';
+import { useShelfLookup } from '../features/catalog/useAddFromCatalog';
 import { ApiError } from '../lib/api/client';
 import { useAddBook, useCatalogSearch } from '../lib/api/queries';
 import { useAuthState } from '../lib/auth/session';
@@ -53,7 +47,6 @@ function ManualMode({ userId, initialStatus }: { userId: string; initialStatus: 
 
   return (
     <FormScreen
-      eyebrow="Estante inteligente"
       title="Adicionar manualmente"
       headerRight={
         <HeaderButton
@@ -88,89 +81,101 @@ function ManualMode({ userId, initialStatus }: { userId: string; initialStatus: 
   );
 }
 
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: 'qr-code-scanner' | 'edit-note';
+  label: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => {
+        haptics.press();
+        onPress();
+      }}
+      style={({ pressed }) => ({
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: theme.spacing.xs,
+        minHeight: theme.sizes.touchTarget,
+        paddingHorizontal: theme.spacing.sm,
+        borderRadius: theme.radii.lg,
+        borderWidth: theme.sizes.borderWidth,
+        borderColor: theme.colors.borderSoft,
+        backgroundColor: pressed ? theme.colors.primarySoft : theme.colors.surface,
+      })}
+    >
+      <Icon name={icon} size={20} color="accentText" />
+      <Text variant="label" color="text">
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /** Catalog search first (Google Books + Open Library), with ISBN scan and manual fallbacks. */
 function SearchMode({ userId, initialStatus }: { userId: string; initialStatus: AddShelfStatus }) {
   const theme = useTheme();
   const router = useRouter();
   const [text, setText] = useState('');
-  const [status, setStatus] = useState<AddShelfStatus>(initialStatus);
-  const q = useDebouncedValue(text.trim());
+  const q = useDebouncedValue(text.trim(), 300);
   const results = useCatalogSearch(userId, q);
-  const { addToShelf, pendingId } = useAddFromCatalog(userId, 'stay');
+  const quick = useQuickAdd(userId, initialStatus);
   const entryFor = useShelfLookup(userId);
+  const searching = text.trim().length >= MIN_CATALOG_QUERY_LENGTH;
   const books = q.length >= MIN_CATALOG_QUERY_LENGTH ? (results.data?.results ?? []) : [];
+  const scan = () => router.push({ pathname: '/scanner-isbn', params: { status: initialStatus } });
+  const manual = () => router.setParams({ manual: '1', status: initialStatus });
 
   return (
-    <FormScreen
-      eyebrow="Sua coleção de leituras"
-      title="Adicionar livros"
-      scroll={false}
-      footer={
-        <Button
-          label="Ver minha estante"
-          variant="secondary"
-          icon="menu-book"
-          fullWidth
-          onPress={() => router.replace('/(tabs)/estante')}
-        />
-      }
-    >
+    <FormScreen title="Adicionar livro" scroll={false}>
       <CatalogSearchResults
         books={books}
-        searching={text.trim().length >= MIN_CATALOG_QUERY_LENGTH}
+        searching={searching}
         loading={results.isPending}
-        updating={text.trim() !== q}
+        updating={text.trim() !== q && !results.data}
         error={results.isError ? catalogErrorMessage(results.error) : null}
         partial={Object.values(results.data?.sources ?? {}).includes('error')}
-        pendingId={pendingId}
+        pendingId={quick.pendingId}
         entryFor={entryFor}
         onOpen={(book) =>
-          router.push({ pathname: '/catalogo/[id]', params: { id: book.catalogId, status } })
+          router.push({
+            pathname: '/catalogo/[id]',
+            params: { id: book.catalogId, status: initialStatus },
+          })
         }
         onOpenEntry={(id) => router.push({ pathname: '/livro/[id]', params: { id } })}
-        onAdd={(book) => void addToShelf(book, status)}
+        onAdd={quick.open}
         onRetry={() => void results.refetch()}
-        onManual={() => router.setParams({ manual: '1', status })}
+        onManual={manual}
         header={
           <>
             <SearchField
               value={text}
               onChangeText={setText}
-              onScanPress={() => router.push({ pathname: '/scanner-isbn', params: { status } })}
-              loading={
-                text.trim().length >= MIN_CATALOG_QUERY_LENGTH &&
-                (text.trim() !== q || results.isFetching)
-              }
+              onScanPress={scan}
+              placeholder="Título, autor ou ISBN"
+              loading={searching && (text.trim() !== q || results.isFetching)}
               autoFocus
             />
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-              }}
-            >
-              <LinkButton
-                label="Escanear ISBN"
-                onPress={() => router.push({ pathname: '/scanner-isbn', params: { status } })}
-              />
-              <Text variant="body" color="textMuted">
-                •
-              </Text>
-              <LinkButton
-                label="Adicionar manual"
-                onPress={() => router.setParams({ manual: '1', status })}
-              />
-            </View>
-            <ShelfStatusPicker status={status} onChange={setStatus} disabled={pendingId !== null} />
-            <Text variant="caption" color="textMuted">
-              Confira idioma e edição antes de adicionar. Você pode adicionar vários livros sem sair
-              da busca.
-            </Text>
+            {searching ? null : (
+              <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                <QuickAction icon="qr-code-scanner" label="Ler ISBN" onPress={scan} />
+                <QuickAction icon="edit-note" label="Cadastrar à mão" onPress={manual} />
+              </View>
+            )}
           </>
         }
       />
+      {quick.sheet}
     </FormScreen>
   );
 }

@@ -22,6 +22,8 @@ export type SessionUser = {
   emailVerified: boolean;
   image?: string | null;
   createdAt: Date;
+  /** Present only when the two-factor plugin is registered (e-mail provider configured). */
+  twoFactorEnabled?: boolean | null;
 };
 
 const EMPTY_PROFILE: ReaderProfile = {
@@ -56,6 +58,7 @@ export function toMeResponse(user: SessionUser, profile: ReaderProfile): MeRespo
       emailVerified: user.emailVerified,
       image: user.image ?? null,
       createdAt: user.createdAt.toISOString(),
+      twoFactorEnabled: user.twoFactorEnabled ?? false,
     },
     profile,
     onboardingCompleted: profile.onboardingCompletedAt !== null,

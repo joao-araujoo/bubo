@@ -5,25 +5,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 
 import {
-  BookCover,
-  BuboLogo,
   BuboMascot,
   Button,
   Card,
   EmptyState,
+  FormScreen,
   Icon,
   InlineMessage,
-  Screen,
   Text,
 } from '../design-system';
-import { Raised } from '../design-system/Raised';
-import { authorLine, catalogErrorMessage, useDebouncedValue } from '../features/catalog/catalog';
+import { useQuickAdd } from '../features/catalog/AddToShelfSheet';
+import { catalogErrorMessage, useDebouncedValue } from '../features/catalog/catalog';
 import { CatalogBookRow } from '../features/catalog/CatalogBookRow';
 import { CatalogSearchResults } from '../features/catalog/CatalogSearchResults';
+import { CoverCard, CoverCarouselSkeleton } from '../features/catalog/CoverCard';
 import { prefetchCovers } from '../features/catalog/prefetch';
 import { SearchField } from '../features/catalog/SearchField';
-import { ShelfStatusPicker, type AddShelfStatus } from '../features/catalog/ShelfStatusPicker';
-import { useAddFromCatalog, useShelfLookup } from '../features/catalog/useAddFromCatalog';
+import { useShelfLookup } from '../features/catalog/useAddFromCatalog';
 import { GENRE_OPTIONS } from '../features/onboarding/options';
 import { useCatalogDiscover, useCatalogSearch } from '../lib/api/queries';
 import { useAuthState } from '../lib/auth/session';
@@ -33,46 +31,9 @@ import { useTheme } from '../theme';
 type Topic = 'for_you' | Genre;
 const NO_INTERESTS: readonly Genre[] = [];
 
-const LARGE = { width: 176, height: 240 } as const;
-const COMPACT = { width: 132, height: 192 } as const;
-type CardSize = typeof LARGE | typeof COMPACT;
-
-const ISBN_TIP =
-  'Tem o livro em mãos? Toque em ISBN e aponte para o código de barras da contracapa.';
-
-function Header() {
-  const theme = useTheme();
-  const router = useRouter();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Voltar"
-        onPress={() => router.back()}
-        hitSlop={4}
-      >
-        <Raised
-          faceColor={theme.colors.surface}
-          borderColor={theme.colors.borderSoft}
-          rimColor={theme.colors.cardShadow}
-          radius={theme.radii.lg}
-          depth={3}
-          faceStyle={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <BuboLogo variant="symbol" height={26} />
-        </Raised>
-      </Pressable>
-      <View style={{ flex: 1 }}>
-        <Text variant="heading" accessibilityRole="header">
-          Descobrir livros
-        </Text>
-        <Text variant="caption" color="accentText">
-          Explorar acervo
-        </Text>
-      </View>
-    </View>
-  );
-}
+/** Cover widths: the first shelf is the showcase, the others are denser. */
+const LARGE = 136;
+const COMPACT = 108;
 
 function TopicChip({
   label,
@@ -95,57 +56,44 @@ function TopicChip({
         haptics.selection();
         onPress();
       }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.xs,
+        minHeight: theme.sizes.touchTarget,
+        paddingHorizontal: theme.spacing.lg,
+        borderRadius: theme.radii.pill,
+        borderWidth: theme.sizes.borderWidth,
+        borderColor: selected ? theme.colors.primary : theme.colors.borderSoft,
+        backgroundColor: selected
+          ? theme.colors.primary
+          : pressed
+            ? theme.colors.primarySoft
+            : theme.colors.surface,
+      })}
     >
-      <Raised
-        faceColor={selected ? theme.colors.primary : theme.colors.surface}
-        borderColor={selected ? theme.colors.primary : theme.colors.border}
-        rimColor={selected ? theme.colors.primaryRim : theme.colors.secondaryRim}
-        radius={theme.radii.lg}
-        depth={3}
-        faceStyle={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: theme.spacing.xs,
-          minHeight: 48,
-          paddingHorizontal: theme.spacing.lg,
-        }}
-      >
-        {icon ? <Icon name={icon} size={18} color={selected ? 'onPrimary' : 'accentText'} /> : null}
-        <Text variant="label" color={selected ? 'onPrimary' : 'text'}>
-          {label}
-        </Text>
-      </Raised>
+      {icon ? <Icon name={icon} size={18} color={selected ? 'onPrimary' : 'accentText'} /> : null}
+      <Text variant="label" color={selected ? 'onPrimary' : 'text'}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-function SectionTitle({
-  title,
-  subtitle,
-  trailing,
-}: {
-  title: string;
-  subtitle?: string | null;
-  trailing?: string;
-}) {
+function ShelfTitle({ title, subtitle }: { title: string; subtitle?: string | null }) {
   const theme = useTheme();
   return (
     <View style={{ gap: theme.spacing.xxs }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <View
-          style={{ width: 6, height: 22, borderRadius: 3, backgroundColor: theme.colors.primary }}
+          style={{ width: 5, height: 20, borderRadius: 3, backgroundColor: theme.colors.primary }}
         />
-        <Text variant="title" accessibilityRole="header" style={{ flex: 1 }} numberOfLines={2}>
+        <Text variant="titleSm" accessibilityRole="header" style={{ flex: 1 }} numberOfLines={2}>
           {title}
         </Text>
-        {trailing ? (
-          <Text variant="bodySm" color="textMuted">
-            {trailing}
-          </Text>
-        ) : null}
       </View>
       {subtitle ? (
-        <Text variant="bodySm" color="textMuted" style={{ marginLeft: 6 + theme.spacing.sm }}>
+        <Text variant="bodySm" color="textMuted" style={{ marginLeft: 5 + theme.spacing.sm }}>
           {subtitle}
         </Text>
       ) : null}
@@ -153,136 +101,16 @@ function SectionTitle({
   );
 }
 
-/** Skoob-style shelf card: cover, title, author, why it is here and a "+ Estante" button. */
-function FeaturedCard({
-  item,
-  size,
-  priority,
-  onOpen,
-  onAdd,
-  adding,
-  onShelf,
-  disabled,
-}: {
-  item: DiscoverItem;
-  size: CardSize;
-  priority: boolean;
-  onOpen: () => void;
-  onAdd: () => void;
-  adding: boolean;
-  onShelf: boolean;
-  disabled: boolean;
-}) {
-  const theme = useTheme();
-  const { book } = item;
-  const author = authorLine(book);
-  const note = item.readers ? `${item.readers} leitores no Bubo` : item.reason;
-  return (
-    <View style={{ width: size.width, gap: theme.spacing.sm }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${book.title}${author ? `, de ${author}` : ''}${note ? `. ${note}` : ''}`}
-        accessibilityHint="Abre os detalhes do livro"
-        onPress={() => {
-          haptics.selection();
-          onOpen();
-        }}
-        style={{ gap: theme.spacing.sm }}
-      >
-        <BookCover
-          title={book.title}
-          author={author}
-          coverUrls={book.coverUrls}
-          width={size.width}
-          height={size.height}
-          priority={priority ? 'high' : 'normal'}
-        />
-        <View style={{ gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={2}>
-            {book.title}
-          </Text>
-          <Text variant="bodySm" color="textMuted" numberOfLines={1}>
-            {author ?? 'Autor desconhecido'}
-          </Text>
-          {note ? (
-            <View style={{ flexDirection: 'row', gap: theme.spacing.xxs, marginTop: 2 }}>
-              <Icon name={item.readers ? 'groups' : 'auto-awesome'} size={14} color="accentText" />
-              <Text variant="caption" color="accentText" numberOfLines={2} style={{ flex: 1 }}>
-                {note}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </Pressable>
-      <Button
-        size="md"
-        variant="secondary"
-        icon={onShelf ? 'check' : 'bookmark-add'}
-        label={onShelf ? 'Na estante' : 'Estante'}
-        loading={adding}
-        disabled={disabled && !onShelf}
-        onPress={onAdd}
-      />
-    </View>
-  );
-}
-
-/** Cover-shaped placeholders while a shelf loads (no spinner, no fake books). */
-function ShelfSkeleton({ size }: { size: CardSize }) {
-  const theme = useTheme();
-  const bar = (width: number, height: number) => ({
-    width,
-    height,
-    borderRadius: height / 2,
-    backgroundColor: theme.colors.surfaceMuted,
-  });
-  return (
-    <View
-      accessible
-      accessibilityLabel="Carregando livros"
-      style={{ flexDirection: 'row', gap: theme.spacing.lg, overflow: 'hidden' }}
-    >
-      {[0, 1, 2].map((index) => (
-        <View key={index} style={{ width: size.width, gap: theme.spacing.sm }}>
-          <View
-            style={{
-              width: size.width,
-              height: size.height,
-              borderRadius: theme.radii.md,
-              backgroundColor: theme.colors.surfaceMuted,
-            }}
-          />
-          <View style={bar(size.width * 0.8, 14)} />
-          <View style={bar(size.width * 0.5, 12)} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function BuboTipCard({ text }: { text: string }) {
+function TipCard({ text }: { text: string }) {
   const theme = useTheme();
   return (
     <Card tone="muted">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-        <BuboMascot pose="takingNotes" size={88} />
-        <View
-          style={{
-            flex: 1,
-            gap: theme.spacing.xs,
-            padding: theme.spacing.md,
-            borderRadius: theme.radii.lg,
-            borderWidth: theme.sizes.borderWidth,
-            borderColor: theme.colors.borderSoft,
-            backgroundColor: theme.colors.surface,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-            <Icon name="lightbulb-outline" size={16} color="accentText" />
-            <Text variant="caption" color="accentText">
-              Dica do Bubo
-            </Text>
-          </View>
+        <BuboMascot pose="takingNotes" size={64} />
+        <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+          <Text variant="caption" color="accentDeep">
+            Dica do Bubo
+          </Text>
           <Text variant="bodySm">{text}</Text>
         </View>
       </View>
@@ -290,19 +118,23 @@ function BuboTipCard({ text }: { text: string }) {
   );
 }
 
-/** Descobrir livros: search, Skoob-style recommendation shelves (ADR-031) and ISBN scanner. */
+const noteFor = (item: DiscoverItem) =>
+  item.readers
+    ? `${item.readers} ${item.readers === 1 ? 'leitor' : 'leitores'} no Bubo`
+    : item.reason;
+
+/** Descobrir: Skoob-style search with quick "+", recommendation shelves (ADR-031) and ISBN. */
 export default function DiscoverScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ q?: string }>();
+  const params = useLocalSearchParams<{ q?: string; focus?: string }>();
   const auth = useAuthState();
   const userId = auth.status === 'ready' ? auth.userId : '';
   const interests = auth.status === 'ready' ? auth.me.profile.interests : NO_INTERESTS;
 
   const [text, setText] = useState(params.q ?? '');
   const [topic, setTopic] = useState<Topic>('for_you');
-  const [status, setStatus] = useState<AddShelfStatus>('want_to_read');
-  const typed = useDebouncedValue(text.trim());
+  const typed = useDebouncedValue(text.trim(), 300);
   const searching = text.trim().length >= MIN_CATALOG_QUERY_LENGTH;
 
   const topics = useMemo(
@@ -320,85 +152,54 @@ export default function DiscoverScreen() {
   const discover = useCatalogDiscover(userId, topic === 'for_you' ? null : topic, !searching);
   const sections = useMemo(() => discover.data?.sections ?? [], [discover.data]);
 
-  // Warm the image cache as soon as books arrive, before their cards scroll into view.
-  useEffect(() => {
-    if (books.length) prefetchCovers(books.slice(0, 6), 76);
-  }, [books]);
+  // Warm the image cache as soon as shelves arrive, before their cards scroll into view.
   useEffect(() => {
     sections.forEach((section, index) =>
       prefetchCovers(
-        section.items.slice(0, 8).map((entry) => entry.book),
-        index === 0 ? LARGE.width : COMPACT.width,
+        section.items.slice(0, 6).map((entry) => entry.book),
+        index === 0 ? LARGE : COMPACT,
       ),
     );
   }, [sections]);
 
-  const { addToShelf, pendingId } = useAddFromCatalog(userId, 'stay');
-  const shelfEntryFor = useShelfLookup(userId);
+  const quick = useQuickAdd(userId);
+  const entryFor = useShelfLookup(userId);
 
   const open = (book: CatalogBook) =>
-    router.push({ pathname: '/catalogo/[id]', params: { id: book.catalogId, status } });
-  const scan = () => router.push({ pathname: '/scanner-isbn', params: { status } });
+    router.push({ pathname: '/catalogo/[id]', params: { id: book.catalogId } });
+  const openEntry = (id: string) => router.push({ pathname: '/livro/[id]', params: { id } });
+  const scan = () => router.push({ pathname: '/scanner-isbn', params: { status: 'want_to_read' } });
+  const manual = () =>
+    router.push({ pathname: '/adicionar-livro', params: { manual: '1', status: 'want_to_read' } });
 
-  const rowFor = (book: CatalogBook) => {
-    const entryId = shelfEntryFor(book);
-    return (
-      <CatalogBookRow
-        key={book.catalogId}
-        book={book}
-        onOpen={() => open(book)}
-        badge={entryId ? 'Na estante' : undefined}
-        action={{
-          label: 'Adicionar',
-          icon: 'add',
-          loading: pendingId === book.catalogId,
-          disabled: pendingId !== null,
-          onPress: () => void addToShelf(book),
-        }}
-      />
-    );
-  };
-
-  const shelf = (section: DiscoverSection, size: CardSize, max = 15) => (
+  const carousel = (section: DiscoverSection, width: number, max = 15) => (
     <View style={{ gap: theme.spacing.md }}>
-      <SectionTitle title={section.title} subtitle={section.subtitle} />
+      <ShelfTitle title={section.title} subtitle={section.subtitle} />
       <FlatList
         horizontal
         data={section.items.slice(0, max)}
         keyExtractor={(entry) => entry.book.catalogId}
         showsHorizontalScrollIndicator={false}
         style={{ marginHorizontal: -theme.sizes.gutter }}
-        contentContainerStyle={{ gap: theme.spacing.lg, paddingHorizontal: theme.sizes.gutter }}
+        contentContainerStyle={{ gap: theme.spacing.md, paddingHorizontal: theme.sizes.gutter }}
         initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={3}
         renderItem={({ item, index }) => (
-          <FeaturedCard
-            item={item}
-            size={size}
-            priority={index < 3}
+          <CoverCard
+            book={item.book}
+            width={width}
+            note={noteFor(item)}
+            noteIcon={item.readers ? 'groups' : 'auto-awesome'}
+            priority={index < 3 ? 'high' : 'normal'}
+            entryId={entryFor(item.book)}
+            adding={quick.pendingId === item.book.catalogId}
+            disabled={quick.pendingId !== null}
             onOpen={() => open(item.book)}
-            onAdd={() => {
-              const entryId = shelfEntryFor(item.book);
-              if (entryId) router.push({ pathname: '/livro/[id]', params: { id: entryId } });
-              else void addToShelf(item.book);
-            }}
-            adding={pendingId === item.book.catalogId}
-            onShelf={shelfEntryFor(item.book) !== null}
-            disabled={pendingId !== null}
+            onAdd={() => quick.open(item.book)}
+            onOpenEntry={openEntry}
           />
         )}
-      />
-    </View>
-  );
-
-  const retry = (message: string, onPress: () => void) => (
-    <View style={{ gap: theme.spacing.md }}>
-      <InlineMessage tone="error" message={message} />
-      <Button
-        label="Tentar de novo"
-        icon="refresh"
-        variant="secondary"
-        size="md"
-        onPress={onPress}
       />
     </View>
   );
@@ -410,115 +211,145 @@ export default function DiscoverScreen() {
   const empty = !sections.length || (genreSection !== null && !genreSection.items.length);
 
   return (
-    <Screen header={<Header />} scroll={false}>
-      <SearchField
-        value={text}
-        onChangeText={setText}
-        onScanPress={scan}
-        loading={searching && (text.trim() !== typed || results.isFetching)}
-      />
-      {searching ? (
-        <>
-          <ShelfStatusPicker status={status} onChange={setStatus} disabled={pendingId !== null} />
+    <FormScreen title="Descobrir" scroll={false}>
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: theme.sizes.gutter,
+          paddingTop: theme.spacing.lg,
+          gap: theme.spacing.lg,
+        }}
+      >
+        <SearchField
+          value={text}
+          onChangeText={setText}
+          onScanPress={scan}
+          placeholder="Título, autor ou ISBN"
+          autoFocus={params.focus === '1'}
+          loading={searching && (text.trim() !== typed || results.isFetching)}
+        />
+        {searching ? (
           <CatalogSearchResults
             inset={false}
             books={books}
             searching
             loading={results.isPending}
-            updating={text.trim() !== typed}
+            updating={text.trim() !== typed && !results.data}
             error={results.isError ? catalogErrorMessage(results.error) : null}
             partial={partial}
-            pendingId={pendingId}
-            entryFor={shelfEntryFor}
+            pendingId={quick.pendingId}
+            entryFor={entryFor}
             onOpen={open}
-            onOpenEntry={(id) => router.push({ pathname: '/livro/[id]', params: { id } })}
-            onAdd={(book) => void addToShelf(book, status)}
+            onOpenEntry={openEntry}
+            onAdd={quick.open}
             onRetry={() => void results.refetch()}
-            onManual={() =>
-              router.push({ pathname: '/adicionar-livro', params: { manual: '1', status } })
-            }
+            onManual={manual}
             header={null}
           />
-        </>
-      ) : (
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: theme.spacing.lg }}
-        >
+        ) : (
           <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            accessibilityRole="tablist"
-            style={{ marginHorizontal: -theme.sizes.gutter }}
-            contentContainerStyle={{ gap: theme.spacing.sm, paddingHorizontal: theme.sizes.gutter }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: theme.spacing.xl, paddingBottom: theme.spacing.xxl }}
           >
-            <TopicChip
-              label="Para você"
-              icon="auto-awesome"
-              selected={topic === 'for_you'}
-              onPress={() => setTopic('for_you')}
-            />
-            {topics.map((genre) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              accessibilityRole="tablist"
+              style={{ marginHorizontal: -theme.sizes.gutter }}
+              contentContainerStyle={{
+                gap: theme.spacing.sm,
+                paddingHorizontal: theme.sizes.gutter,
+              }}
+            >
               <TopicChip
-                key={genre.id}
-                label={genre.title}
-                selected={topic === genre.id}
-                onPress={() => setTopic(genre.id)}
+                label="Para você"
+                icon="auto-awesome"
+                selected={topic === 'for_you'}
+                onPress={() => setTopic('for_you')}
               />
-            ))}
-          </ScrollView>
+              {topics.map((genre) => (
+                <TopicChip
+                  key={genre.id}
+                  label={genre.title}
+                  selected={topic === genre.id}
+                  onPress={() => setTopic(genre.id)}
+                />
+              ))}
+            </ScrollView>
 
-          {discover.isPending ? (
-            <>
-              <SectionTitle title={topic === 'for_you' ? 'Para você' : 'Mais lidos'} />
-              <ShelfSkeleton size={LARGE} />
-              <ShelfSkeleton size={COMPACT} />
-            </>
-          ) : discover.isError ? (
-            retry(catalogErrorMessage(discover.error), () => void discover.refetch())
-          ) : (
-            <>
-              {discover.data.sources.openlibrary === 'error' && !sections.length ? (
-                <InlineMessage
-                  tone="info"
-                  message="A biblioteca de livros não respondeu agora. Tente de novo em instantes."
+            {discover.isPending ? (
+              <>
+                <View style={{ gap: theme.spacing.md }}>
+                  <ShelfTitle title={topic === 'for_you' ? 'Para você' : 'Mais lidos'} />
+                  <CoverCarouselSkeleton width={LARGE} />
+                </View>
+                <CoverCarouselSkeleton width={COMPACT} />
+              </>
+            ) : discover.isError && !discover.data ? (
+              <View style={{ gap: theme.spacing.md }}>
+                <InlineMessage tone="error" message={catalogErrorMessage(discover.error)} />
+                <Button
+                  label="Tentar de novo"
+                  icon="refresh"
+                  variant="secondary"
+                  size="md"
+                  onPress={() => void discover.refetch()}
                 />
-              ) : null}
-              {coldStart ? (
-                <BuboTipCard text="Adicione livros à sua estante e o Bubo passa a recomendar leituras parecidas com as suas." />
-              ) : null}
-              {genreSection ? (
-                <>
-                  {shelf(genreSection, LARGE, 8)}
-                  <BuboTipCard text={ISBN_TIP} />
-                  {genreSection.items.length > 8 ? (
-                    <>
-                      <SectionTitle title="Mais nessa prateleira" />
-                      {genreSection.items.slice(8).map((entry) => rowFor(entry.book))}
-                    </>
-                  ) : null}
-                </>
-              ) : (
-                sections.map((section, index) => (
-                  <View key={section.id} style={{ gap: theme.spacing.lg }}>
-                    {shelf(section, index === 0 ? LARGE : COMPACT)}
-                    {index === 0 ? <BuboTipCard text={ISBN_TIP} /> : null}
-                  </View>
-                ))
-              )}
-              {empty ? (
-                <EmptyState
-                  mascot="notFound"
-                  title="Nada por aqui ainda"
-                  description="Não encontramos livros para essa prateleira agora. Tente outro gênero ou busque pelo título."
-                />
-              ) : null}
-            </>
-          )}
-        </ScrollView>
-      )}
-    </Screen>
+              </View>
+            ) : (
+              <>
+                {discover.data?.sources.openlibrary === 'error' && !sections.length ? (
+                  <InlineMessage
+                    tone="info"
+                    message="A biblioteca de livros não respondeu agora. Tente de novo em instantes."
+                  />
+                ) : null}
+                {coldStart ? (
+                  <TipCard text="Adicione livros à sua estante e o Bubo passa a recomendar leituras parecidas com as suas." />
+                ) : null}
+                {genreSection ? (
+                  <>
+                    {carousel(genreSection, LARGE, 10)}
+                    {genreSection.items.length > 10 ? (
+                      <View style={{ gap: theme.spacing.sm }}>
+                        <ShelfTitle title="Mais nessa prateleira" />
+                        {genreSection.items.slice(10).map((entry) => (
+                          <CatalogBookRow
+                            key={entry.book.catalogId}
+                            book={entry.book}
+                            onOpen={() => open(entry.book)}
+                            entryId={entryFor(entry.book)}
+                            onOpenEntry={openEntry}
+                            onAdd={() => quick.open(entry.book)}
+                            adding={quick.pendingId === entry.book.catalogId}
+                            disabled={quick.pendingId !== null}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  sections.map((section, index) => (
+                    <View key={section.id}>{carousel(section, index === 0 ? LARGE : COMPACT)}</View>
+                  ))
+                )}
+                {empty ? (
+                  <EmptyState
+                    mascot="notFound"
+                    title="Nada por aqui ainda"
+                    description="Não encontramos livros para essa prateleira agora. Tente outro gênero ou busque pelo título."
+                  />
+                ) : (
+                  <TipCard text="Tem o livro em mãos? Toque em ISBN na busca e aponte para o código de barras da contracapa." />
+                )}
+              </>
+            )}
+          </ScrollView>
+        )}
+      </View>
+      {quick.sheet}
+    </FormScreen>
   );
 }

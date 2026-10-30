@@ -9,21 +9,36 @@ import { Hono } from 'hono';
 import { type AppEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { parseJsonBody } from '../lib/validation';
-import { createCard, deleteCard, listDueCards, reviewCard } from '../services/recall';
+import {
+  createCard,
+  deleteCard,
+  listDueCards,
+  listPracticeCards,
+  reviewCard,
+} from '../services/recall';
 
 /** Active recall + spaced review (session-protected; scoped to the signed-in reader). */
 export function recallRoutes(deps: { now: () => Date }) {
   const routes = new Hono<AppEnv>();
 
-  routes.get(API_ROUTES.recallDue, async (c) => {
-    const { user } = c.get('session');
-    const query = statsQuerySchema.safeParse({ today: c.req.query('today') });
+  function todayQuery(value: string | undefined) {
+    const query = statsQuerySchema.safeParse({ today: value });
     if (!query.success) {
       throw new AppError('VALIDATION_FAILED', 'Query parameter "today" must be YYYY-MM-DD.', {
         issues: [{ path: 'today', message: 'Must be a calendar date (YYYY-MM-DD).' }],
       });
     }
-    return c.json(await listDueCards(c.get('db'), user.id, query.data.today));
+    return query.data.today;
+  }
+
+  routes.get(API_ROUTES.recallDue, async (c) => {
+    const { user } = c.get('session');
+    return c.json(await listDueCards(c.get('db'), user.id, todayQuery(c.req.query('today'))));
+  });
+
+  routes.get(API_ROUTES.recallPractice, async (c) => {
+    const { user } = c.get('session');
+    return c.json(await listPracticeCards(c.get('db'), user.id, todayQuery(c.req.query('today'))));
   });
 
   routes.post(API_ROUTES.recallCards, async (c) => {

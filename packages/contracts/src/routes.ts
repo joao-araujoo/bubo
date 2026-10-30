@@ -57,6 +57,7 @@ import {
 import { errorResponseSchema } from './errors';
 import { assessSessionRequestSchema, assessSessionResponseSchema } from './session-assessment';
 import { memoryStatsResponseSchema } from './memory';
+import { replayResponseSchema } from './replay';
 import { healthResponseSchema, readyResponseSchema } from './health';
 import {
   meResponseSchema,
@@ -67,6 +68,7 @@ import {
 import {
   createCardRequestSchema,
   dueCardsResponseSchema,
+  practiceCardsResponseSchema,
   recallCardSchema,
   reviewRequestSchema,
 } from './recall';
@@ -75,6 +77,7 @@ import {
   createSessionRequestSchema,
   reviewResultSchema,
   sessionResultSchema,
+  bookCommunitySchema,
   shelfEntryDetailSchema,
   statsResponseSchema,
   updateShelfEntryRequestSchema,
@@ -95,11 +98,14 @@ export const API_ROUTES = {
   memoryStats: '/me/memory',
   achievements: '/me/achievements',
   league: '/me/league',
+  replay: '/me/replay',
   shelf: '/shelf',
   shelfEntry: '/shelf/:id',
+  shelfCommunity: '/shelf/:id/community',
   sessions: '/sessions',
   sessionAssessment: '/sessions/assessment',
   recallDue: '/recall/due',
+  recallPractice: '/recall/practice',
   recallCards: '/recall/cards',
   recallCard: '/recall/cards/:id',
   recallReview: '/recall/cards/:id/review',
@@ -140,8 +146,16 @@ export const API_ROUTES = {
   pushTokenItem: '/me/push-token/:token',
   notifications: '/notifications',
   notificationsRead: '/notifications/read',
+  /** Signed one-click opt-out link carried by every optional e-mail (ADR-038). */
+  emailUnsubscribe: '/email/unsubscribe',
+  /** Small content-hashed PNGs shown inside e-mails, public and cacheable forever (ADR-041). */
+  emailArt: '/email/art/:file',
   /** Better Auth account deletion lives at /v1/auth/delete-user (documented, not in the registry). */
 } as const;
+
+/** POST /v1/email/unsubscribe?token= — the GET form answers an HTML confirmation page instead. */
+export const emailUnsubscribeResponseSchema = z.object({ unsubscribed: z.literal(true) });
+export type EmailUnsubscribeResponse = z.infer<typeof emailUnsubscribeResponseSchema>;
 
 /** Fills `:param` placeholders, e.g. `apiPath(API_ROUTES.shelfEntry, { id })`. */
 export function apiPath(template: string, params: Record<string, string>): string {
@@ -160,11 +174,34 @@ export type ApiRouteDefinition = {
   /** Requires a Better Auth session cookie. */
   auth: boolean;
   requestBody?: z.ZodType;
-  responses: Record<number, { description: string; schema: z.ZodType }>;
+  responses: Record<
+    number,
+    {
+      description: string;
+      schema: z.ZodType;
+      /** Defaults to JSON; `text/html` is a browser page, `image/png` an e-mail picture. */
+      contentType?: 'application/json' | 'text/html' | 'image/png';
+    }
+  >;
 };
 
 /** Registry used to generate the OpenAPI document. Add every new route here. */
 export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
+  {
+    method: 'get',
+    path: API_ROUTES.replay,
+    summary:
+      'Private monthly or annual Replay from accepted reading sessions. Query: kind (month|year), year, month (monthly only), timeZone (IANA). Future periods are rejected.',
+    tags: ['me'],
+    auth: true,
+    responses: {
+      200: {
+        description: 'Reading Replay with explicit history coverage.',
+        schema: replayResponseSchema,
+      },
+      422: { description: 'Invalid or future period/timezone.', schema: errorResponseSchema },
+    },
+  },
   {
     method: 'get',
     path: API_ROUTES.memoryStats,
@@ -266,7 +303,7 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
   {
     method: 'patch',
     path: API_ROUTES.shelfEntry,
-    summary: 'Change status, current page or page count.',
+    summary: 'Change status, current page, page count, the private rating or the reader marks.',
     tags: ['shelf'],
     auth: true,
     requestBody: updateShelfEntryRequestSchema,
@@ -279,6 +316,15 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     tags: ['shelf'],
     auth: true,
     responses: { 200: { description: 'Removed.', schema: deleteResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.shelfCommunity,
+    summary:
+      'Anonymous numbers of this shelf book across Bubo readers: readers by status, ratings in aggregate (5+), books also read. Never names.',
+    tags: ['shelf'],
+    auth: true,
+    responses: { 200: { description: 'Community numbers.', schema: bookCommunitySchema } },
   },
   {
     method: 'post',
@@ -318,6 +364,15 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     tags: ['recall'],
     auth: true,
     responses: { 200: { description: 'Due cards.', schema: dueCardsResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.recallPractice,
+    summary:
+      'Practice decks: cards that slipped and the 60-second round. Practising never grades, reschedules or awards XP. Query: today=YYYY-MM-DD.',
+    tags: ['recall'],
+    auth: true,
+    responses: { 200: { description: 'Practice decks.', schema: practiceCardsResponseSchema } },
   },
   {
     method: 'post',
@@ -816,5 +871,40 @@ export const API_ROUTE_DEFINITIONS: ApiRouteDefinition[] = [
     auth: true,
     requestBody: markNotificationsReadSchema,
     responses: { 200: { description: 'Inbox.', schema: notificationsResponseSchema } },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.emailUnsubscribe,
+    summary:
+      'Opt out of optional Bubo e-mails from a signed link (query: token). Answers a small HTML page.',
+    tags: ['email'],
+    auth: false,
+    responses: {
+      200: { description: 'Confirmation page.', schema: z.string(), contentType: 'text/html' },
+      400: { description: 'Invalid or tampered token.', schema: errorResponseSchema },
+    },
+  },
+  {
+    method: 'post',
+    path: API_ROUTES.emailUnsubscribe,
+    summary: 'One-click opt-out (RFC 8058 List-Unsubscribe-Post). Query: token.',
+    tags: ['email'],
+    auth: false,
+    responses: {
+      200: { description: 'Opted out.', schema: emailUnsubscribeResponseSchema },
+      400: { description: 'Invalid or tampered token.', schema: errorResponseSchema },
+    },
+  },
+  {
+    method: 'get',
+    path: API_ROUTES.emailArt,
+    summary:
+      'E-mail picture by content-hashed file name (Bubo pose in soft circles, logo). Public; cached for a year.',
+    tags: ['email'],
+    auth: false,
+    responses: {
+      200: { description: 'PNG bytes.', schema: z.string(), contentType: 'image/png' },
+      404: { description: 'Unknown file.', schema: errorResponseSchema },
+    },
   },
 ];

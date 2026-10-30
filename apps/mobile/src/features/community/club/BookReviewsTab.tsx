@@ -41,7 +41,6 @@ export function BookReviewsTab({ club, userId }: { club: ClubDetail; userId: str
   return (
     <>
       <SectionTitle
-        icon="rate-review"
         title="Resenhas do clube"
         subtitle="Só para membros. Quem ainda não chegou à página vê o véu."
       />

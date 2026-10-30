@@ -44,6 +44,17 @@ export const serverEnvSchema = z
     CATALOG_CONTACT_EMAIL: optionalString.pipe(z.email().optional()),
     /** Explicit user ids allowed to review reported community content; empty disables access. */
     MODERATOR_USER_IDS: optionalString,
+    /**
+     * Public https origin that serves `/v1/email/art/*` (ADR-041). Optional: defaults to
+     * `BETTER_AUTH_URL`. Local `dev:api` sets the production API here, because mail clients cannot
+     * reach a LAN address and the content-hashed files are identical everywhere.
+     */
+    EMAIL_ART_BASE_URL: optionalUrl.pipe(
+      z
+        .string()
+        .regex(/^https:\/\/[^/?#]+\/?$/, 'Use an https origin, e.g. https://api.example.com')
+        .optional(),
+    ),
     MEDIA_PUBLIC_URL: optionalUrl.pipe(
       z
         .string()
@@ -85,6 +96,11 @@ export type ServerEnv = z.infer<typeof serverEnvSchema>;
  */
 export const publicEnvSchema = z.object({
   EXPO_PUBLIC_API_URL: z.url().default('http://localhost:8787'),
+  /** Public contact shown in Sobre and the legal documents; empty hides the "Fale conosco" row. */
+  EXPO_PUBLIC_SUPPORT_EMAIL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.email().optional(),
+  ),
 });
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;

@@ -24,6 +24,7 @@ export async function getPreferences(db: Executor, userId: string): Promise<Read
           timeZone: row.timeZone,
           notifyCommunity: row.notifyCommunity,
           notifyFriends: row.notifyFriends,
+          emailReadingReminders: row.emailReadingReminders,
         }
       : DEFAULT_PREFERENCES,
   );

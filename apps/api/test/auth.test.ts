@@ -1,9 +1,12 @@
 import { errorResponseSchema, meResponseSchema, shelfResponseSchema } from '@bubo/contracts';
+import { schema } from '@bubo/database';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createPgliteDatabase, PGLITE_DATABASE_URL } from '../dev/pglite';
 import { createApp } from '../src/app';
 import { type PasswordResetEmail } from '../src/services/email';
+import { silentEmailSender } from './email-recorder';
 import { createBindings, createLogCollector } from './helpers';
 
 const SECRET = 'test-secret-with-at-least-thirty-two-characters';
@@ -20,10 +23,7 @@ beforeAll(async () => {
     pingDatabase: database.ping,
     logSink: logs.sink,
     emailSender: () => ({
-      canDeliver: false,
-      sendVerification: async () => undefined,
-      sendPasswordChanged: async () => undefined,
-      sendTest: async () => undefined,
+      ...silentEmailSender(),
       async sendPasswordReset(message) {
         sentEmails.push(message);
       },
@@ -132,6 +132,13 @@ describe('sign-up, session and onboarding', () => {
     const me = meResponseSchema.parse(await response.json());
     expect(me.user.email).toBe(email);
     expect(me.onboardingCompleted).toBe(false);
+    // No e-mail provider here: codes are not offered, but the account is ready for them (0017).
+    expect(me.loginCodeAvailable).toBe(false);
+    const [row] = await database.db
+      .select({ twoFactorEnabled: schema.users.twoFactorEnabled })
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+    expect(row?.twoFactorEnabled).toBe(true);
     expect(me.profile).toEqual({
       readingHabit: null,
       goals: [],

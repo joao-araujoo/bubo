@@ -29,3 +29,15 @@ export function xpForRecallSession({ attempts, correct, completed }: RecallSessi
     (completed && tries > 0 ? XP_RULES.reviewSessionCompleted : 0)
   );
 }
+
+/**
+ * XP a review of `cards` due cards can earn: every attempt counts, remembering adds more. Shown
+ * as a range because the grade is the reader's own (ADR-045).
+ */
+export function reviewXpRange(cards: number): { min: number; max: number } {
+  const count = wholeNonNegative(cards);
+  return {
+    min: count * XP_RULES.perRecallAttempt,
+    max: count * (XP_RULES.perRecallAttempt + XP_RULES.perCorrectRecall),
+  };
+}

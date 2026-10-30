@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>bench</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1080" height="1920"></canvas>
+    <script type="module">
+      const c = document.getElementById('c');
+      const g = c.getContext('2d');
+      const gl = new OffscreenCanvas(1080, 1920).getContext('webgl2', { antialias: true });
+      const info = {
+        webgl2: Boolean(gl),
+        renderer: gl
+          ? gl.getParameter(
+              gl.getExtension('WEBGL_debug_renderer_info')?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER,
+            )
+          : null,
+      };
+      function draw(t) {
+        g.fillStyle = '#F8F5FF';
+        g.fillRect(0, 0, 1080, 1920);
+        for (let i = 0; i < 400; i++) {
+          g.fillStyle = `hsl(${(i * 7 + t * 100) % 360} 70% 60%)`;
+          g.beginPath();
+          g.roundRect((i * 37) % 1000, (i * 91) % 1800, 80, 60, 16);
+          g.fill();
+        }
+        g.font = '800 120px sans-serif';
+        g.fillStyle = '#21152F';
+        g.fillText('Feche o livro.', 80, 900 + t * 10);
+      }
+      const t0 = performance.now();
+      for (let i = 0; i < 20; i++) draw(i);
+      info.draw20 = performance.now() - t0;
+      const t1 = performance.now();
+      let sum = 0;
+      for (let i = 0; i < 10; i++) {
+        draw(i);
+        const d = g.getImageData(0, 0, 1080, 1920).data;
+        sum += d[i * 100];
+      }
+      info.drawRead10 = performance.now() - t1;
+      const acc = new Uint16Array(1080 * 1920 * 4);
+      const t2 = performance.now();
+      for (let k = 0; k < 4; k++) {
+        draw(k);
+        const d = g.getImageData(0, 0, 1080, 1920).data;
+        for (let i = 0; i < d.length; i++) acc[i] += d[i];
+      }
+      const img = g.createImageData(1080, 1920);
+      for (let i = 0; i < acc.length; i++) img.data[i] = (acc[i] + 2) >> 2;
+      g.putImageData(img, 0, 0);
+      info.blur4 = performance.now() - t2;
+      info.sum = sum;
+      window.benchInfo = info;
+      window.ready = true;
+    </script>
+  </body>
+</html>

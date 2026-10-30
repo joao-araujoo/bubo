@@ -107,7 +107,7 @@ export default function WidgetsScreen() {
         />
       ) : null}
 
-      <SectionTitle icon="local-fire-department" title="Sequência (compacto)" />
+      <SectionTitle title="Sequência (compacto)" />
       <Card>
         <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' }}>
           <StreakWidgetPreview snapshot={snapshot} now={now} />
@@ -121,7 +121,7 @@ export default function WidgetsScreen() {
         {addButton('streak')}
       </Card>
 
-      <SectionTitle icon="date-range" title="Sequência da semana" />
+      <SectionTitle title="Sequência da semana" />
       <Card>
         <WeekWidgetPreview snapshot={snapshot} now={now} />
         <Text variant="bodySm" color="textMuted">
@@ -130,13 +130,13 @@ export default function WidgetsScreen() {
         {addButton('rhythm')}
       </Card>
 
-      <SectionTitle icon="calendar-month" title="Calendário de leitura" />
+      <SectionTitle title="Calendário de leitura" />
       <Card>
         <CalendarWidgetPreview snapshot={snapshot} now={now} />
         {addButton('calendar')}
       </Card>
 
-      <SectionTitle icon="menu-book" title="Continuar leitura" />
+      <SectionTitle title="Continuar leitura" />
       <Card>
         <ReadingWidgetPreview
           snapshot={snapshot}
@@ -146,7 +146,7 @@ export default function WidgetsScreen() {
         {addButton('reading')}
       </Card>
 
-      <SectionTitle icon="emoji-events" title="Liga semanal" />
+      <SectionTitle title="Liga semanal" />
       <Card>
         <LeagueWidgetPreview snapshot={snapshot} now={now} />
         <Text variant="bodySm" color="textMuted">
@@ -157,14 +157,14 @@ export default function WidgetsScreen() {
 
       {fresh ? (
         <>
-          <SectionTitle icon="schedule" title="O Bubo ao longo do dia" />
+          <SectionTitle title="O Bubo ao longo do dia" />
           <Card>
             <MoodTimeline snapshot={snapshot} />
           </Card>
         </>
       ) : null}
 
-      <SectionTitle icon="tune" title="Preferências" />
+      <SectionTitle title="Preferências" />
       <Card>
         <Toggle
           title="Atualizar meus widgets"

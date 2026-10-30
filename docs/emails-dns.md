@@ -30,10 +30,13 @@ Na consulta pública inicial, esses quatro nomes ainda não existiam. Preserve o
 atuais da startup, especialmente os MX/TXT do domínio principal. Este conjunto configura
 somente o envio do Bubo e os retornos técnicos de entrega, não uma caixa de email.
 
-O proprietário adiou esta configuração; nenhum registro foi alterado nesta sessão.
-Depois de salvar, no Resend abra **Domains → bubo.nyoneo.com.br → Verify DNS Records**.
-A propagação pode levar tempo; só ative o remetente quando o domínio estiver `verified`.
-Não compre domínio/plano nem ative cobranças por excedente.
+**Concluído em 2026-10-12.** O dono adicionou os quatro registros na Hostinger; Google DNS,
+Cloudflare DNS e o nameserver `apollo.dns-parking.com` responderam os valores exatos; o Resend
+passou de `failed` para `pending` e `verified` em cerca de um minuto após o pedido de verificação.
+`npm run email:activate` fez o pedido, esperou, gravou `RESEND_API_KEY` e `EMAIL_FROM` no Worker
+e atualizou `apps/api/.dev.vars`. Para repetir em outra conta ou domínio: salve os registros,
+faça `npx wrangler login` em `apps/api` e rode `npm run email:activate` (`--check` só mostra o
+estado). Não compre domínio/plano nem ative cobranças por excedente.
 
 Remetente preparado: `Bubo <nao-responda@bubo.nyoneo.com.br>`. Depois da verificação,
 atualize `EMAIL_FROM` nos arquivos locais privados e configure `RESEND_API_KEY` + `EMAIL_FROM`

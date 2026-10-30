@@ -94,7 +94,7 @@ function ShareTile({
           }}
         >
           <IconTile icon={icon} tone={tone} size={34} round />
-          <Text variant="label" style={{ fontSize: 12 }} numberOfLines={1}>
+          <Text variant="labelSm" numberOfLines={1}>
             {label}
           </Text>
         </Raised>
@@ -120,7 +120,7 @@ export default function InviteScreen() {
   const [copied, setCopied] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
-  const header = { title: 'Convidar Membros', eyebrow: 'Convite do clube', align: 'left' } as const;
+  const header = { title: 'Convidar membros' } as const;
 
   if (club.isPending) {
     return (
@@ -309,7 +309,7 @@ export default function InviteScreen() {
               Link do Convite
             </Text>
             <Icon name="shield" size={14} color="successText" />
-            <Text variant="label" color="successText" style={{ fontSize: 12, marginLeft: 4 }}>
+            <Text variant="labelSm" color="successText" style={{ marginLeft: 4 }}>
               Blindagem Ativa
             </Text>
           </View>

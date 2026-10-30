@@ -55,10 +55,10 @@ function MemberRow({ member }: { member: ClubMember }) {
           {member.role === 'owner' ? <Pill caps label="Criador" /> : null}
           {member.isYou ? <Pill caps tone="primarySolid" label="Você" /> : null}
         </View>
-        <Text variant="bodySm" color="textMuted" numberOfLines={1} style={{ fontSize: 12 }}>
+        <Text variant="meta" color="textMuted" numberOfLines={1}>
           {`Nível ${member.level} • ${member.levelTitle}`}
         </Text>
-        <Text variant="label" color="accentText" style={{ fontSize: 12 }}>
+        <Text variant="labelSm" color="accentText">
           {member.percent !== null
             ? `Pág. ${member.page} (${member.percent}%)`
             : `Pág. ${member.page}`}
@@ -128,7 +128,7 @@ export function MembersTab({ club, userId }: { club: ClubDetail; userId: string 
             <Text variant="bodyStrong" numberOfLines={2}>
               {club.name}
             </Text>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               {`${membersLabel(data.stats.memberCount)} • ${club.book.title}`}
             </Text>
           </View>
@@ -140,7 +140,7 @@ export function MembersTab({ club, userId }: { club: ClubDetail; userId: string 
               size="sm"
               accessibilityLabel={`Média do clube: ${data.averagePercent}%`}
             />
-            <Text variant="label" color="accentText" align="right" style={{ fontSize: 12 }}>
+            <Text variant="labelSm" color="accentText" align="right">
               {`${data.averagePercent}% méd.`}
             </Text>
           </View>
@@ -196,7 +196,7 @@ export function MembersTab({ club, userId }: { club: ClubDetail; userId: string 
             <Icon name="bar-chart" size={20} color="accentText" />
             <View style={{ flex: 1 }}>
               <Text variant="bodyStrong">Distribuição por página da obra</Text>
-              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+              <Text variant="meta" color="textMuted">
                 {`Onde os ${data.stats.memberCount} leitores estão agora`}
               </Text>
             </View>
@@ -226,7 +226,7 @@ export function MembersTab({ club, userId }: { club: ClubDetail; userId: string 
                       ? `Págs. ${bucket.from}–${bucket.to} (você: p. ${data.readerPage})`
                       : `Págs. ${bucket.from}–${bucket.to}`}
                   </Text>
-                  <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+                  <Text variant="meta" color="textMuted">
                     {`${bucket.count} ${bucket.count === 1 ? 'membro' : 'membros'} (${share}%)`}
                   </Text>
                 </View>
@@ -242,11 +242,7 @@ export function MembersTab({ club, userId }: { club: ClubDetail; userId: string 
         </Card>
       ) : null}
 
-      <SectionTitle
-        icon="groups"
-        title="Quadro de membros"
-        subtitle="Ordenado pela página no livro"
-      />
+      <SectionTitle title="Quadro de membros" subtitle="Ordenado pela página no livro" />
       <TextField
         label="Buscar membro"
         hideLabel
@@ -307,7 +303,7 @@ export function MembersTab({ club, userId }: { club: ClubDetail; userId: string 
           message="Não foi possível enviar. Essa pessoa pode não estar recebendo pedidos."
         />
       ) : null}
-      <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+      <Text variant="meta" color="textMuted">
         A página de cada membro vem da estante dele e só aparece para quem está no clube.
       </Text>
     </>

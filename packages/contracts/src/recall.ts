@@ -65,3 +65,19 @@ export const dueCardsResponseSchema = z.object({
   reviewedToday: z.number().int().nonnegative(),
 });
 export type DueCardsResponse = z.infer<typeof dueCardsResponseSchema>;
+
+export const PRACTICE_SLIPPED_MAX = 20;
+export const PRACTICE_LIGHTNING_MAX = 40;
+
+/**
+ * GET /v1/recall/practice?today=YYYY-MM-DD — practice decks of Revisar (ADR-045). Practising never
+ * grades, reschedules or awards XP; cards due today stay in the real review.
+ */
+export const practiceCardsResponseSchema = z.object({
+  today: localDateSchema,
+  /** The latest graded attempt (last 30 days) was a lapse; newest first, not due today. */
+  slipped: z.array(recallCardSchema).max(PRACTICE_SLIPPED_MAX),
+  /** Cards reviewed at least once and not due today, least recently reviewed first. */
+  lightning: z.array(recallCardSchema).max(PRACTICE_LIGHTNING_MAX),
+});
+export type PracticeCardsResponse = z.infer<typeof practiceCardsResponseSchema>;

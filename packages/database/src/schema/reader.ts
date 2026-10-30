@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 import { users } from './auth';
 
@@ -83,6 +92,14 @@ export const shelfEntries = pgTable(
     totalPages: integer('total_pages'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    /** The reader's private 1–5 rating (0016, CHECK in SQL). Null until they rate the book. */
+    rating: smallint('rating'),
+    /** The reader's own marks (0018, ADR-046): private, independent of the status. */
+    favorite: boolean('favorite').notNull().default(false),
+    owned: boolean('owned').notNull().default(false),
+    wishlist: boolean('wishlist').notNull().default(false),
+    /** "Relendo": only while the status is reading or paused. */
+    rereading: boolean('rereading').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

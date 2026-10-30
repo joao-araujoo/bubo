@@ -50,7 +50,7 @@ export default function ModerationScreen() {
 
   if (!userId)
     return (
-      <FormScreen align="left" eyebrow="Comunidade" title="Moderação">
+      <FormScreen title="Moderação">
         <EmptyState
           mascot="notFound"
           title="Acesso restrito"
@@ -106,15 +106,11 @@ export default function ModerationScreen() {
 
   return (
     <FormScreen
-      align="left"
-      eyebrow="Comunidade"
-      eyebrowDot
       title="Moderação geral"
       headerRight={
         <HeaderButton
           icon="refresh"
           label="Atualizar fila"
-          shape="square"
           iconColor="accentText"
           onPress={() => void queue.refetch()}
         />

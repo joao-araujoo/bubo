@@ -46,14 +46,14 @@ export default function ClubScreen() {
 
   if (club.isPending) {
     return (
-      <FormScreen title="Clube de leitura" align="left">
+      <FormScreen title="Clube de leitura">
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando clube" />
       </FormScreen>
     );
   }
   if (club.isError) {
     return (
-      <FormScreen title="Clube de leitura" align="left">
+      <FormScreen title="Clube de leitura">
         <EmptyState
           mascot="notFound"
           title="Clube não encontrado"
@@ -129,20 +129,17 @@ export default function ClubScreen() {
       <HeaderButton
         icon="person-add"
         label="Convidar membros"
-        shape="square"
         iconColor="accentText"
         onPress={invite}
       />
-      <HeaderButton icon="more-vert" label="Opções do clube" shape="square" onPress={menu} />
+      <HeaderButton icon="more-vert" label="Opções do clube" onPress={menu} />
     </>
   ) : null;
 
   if (showProfile && tab !== 'diretrizes') {
     return (
       <FormScreen
-        align="left"
-        eyebrow="Clube de leitura"
-        eyebrowDot
+        subtitle="Clube de leitura"
         title={data.name}
         headerRight={headerRight}
         footer={
@@ -179,14 +176,12 @@ export default function ClubScreen() {
   if (!member) {
     return (
       <FormScreen
-        align="left"
-        eyebrow="Clube de leitura"
+        subtitle={data.name}
         title="Diretrizes & blindagem"
         headerRight={
           <HeaderButton
             icon="info-outline"
             label="Voltar ao perfil do clube"
-            shape="square"
             iconColor="accentText"
             onPress={() => setTab('forum')}
           />
@@ -232,9 +227,7 @@ export default function ClubScreen() {
 
   return (
     <FormScreen
-      align="left"
-      eyebrow="Clube de leitura"
-      eyebrowDot
+      subtitle="Clube de leitura"
       title={data.name}
       headerRight={headerRight}
       floating={floating}

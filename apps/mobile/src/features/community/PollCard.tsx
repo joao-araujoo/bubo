@@ -136,12 +136,7 @@ export function PollCard({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <Pill caps icon="how-to-vote" label={poll.isOpen ? 'Enquete ativa' : 'Enquete encerrada'} />
-        <Text
-          variant="bodySm"
-          color="textMuted"
-          style={{ flex: 1, fontSize: 12 }}
-          numberOfLines={1}
-        >
+        <Text variant="meta" color="textMuted" style={{ flex: 1 }} numberOfLines={1}>
           {`• ${closesLabel(poll.closesAt, poll.isOpen)}`}
         </Text>
         <Pill tone="success" label={votesLabel(poll.voterCount)} />
@@ -155,7 +150,7 @@ export function PollCard({
             <Text variant="bodyStrong" style={{ fontSize: 16, lineHeight: 22 }}>
               {poll.question}
             </Text>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               {[
                 clubName,
                 `Criada por ${poll.isMine ? 'você' : poll.author.name}`,
@@ -203,12 +198,12 @@ export function PollCard({
         {voted ? (
           <>
             <Icon name="insights" size={16} color="accentText" />
-            <Text variant="bodySm" color="accentText" style={{ flex: 1, fontSize: 12 }}>
+            <Text variant="meta" color="accentText" style={{ flex: 1 }}>
               Seu voto foi computado
             </Text>
           </>
         ) : (
-          <Text variant="bodySm" color="textMuted" style={{ flex: 1, fontSize: 12 }}>
+          <Text variant="meta" color="textMuted" style={{ flex: 1 }}>
             {poll.isOpen
               ? poll.multiple
                 ? 'Abra para escolher suas respostas'

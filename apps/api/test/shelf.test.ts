@@ -230,6 +230,34 @@ describe('shelf CRUD', () => {
     expect((await h.call(path, { method: 'PATCH', cookie, json: {} })).status).toBe(422);
   });
 
+  it('saves, keeps and clears the private rating', async () => {
+    const { cookie } = await h.signUp();
+    const entry = shelfEntrySchema.parse(
+      (await addBook(cookie, { title: 'Torto Arado', totalPages: 260 })).body,
+    );
+    expect(entry.rating).toBeNull();
+    const path = `/v1/shelf/${entry.id}`;
+    const patch = async (json: unknown) => h.call(path, { method: 'PATCH', cookie, json });
+
+    const rated = shelfEntrySchema.parse(
+      await (await patch({ status: 'finished', rating: 5 })).json(),
+    );
+    expect(rated).toMatchObject({ status: 'finished', rating: 5 });
+    // Other edits never touch the rating.
+    const moved = shelfEntrySchema.parse(await (await patch({ status: 'reading' })).json());
+    expect(moved.rating).toBe(5);
+    const listed = (await (await h.call('/v1/shelf', { cookie })).json()) as {
+      entries: { id: string; rating: number | null }[];
+    };
+    expect(listed.entries.find((e) => e.id === entry.id)?.rating).toBe(5);
+
+    expect((await patch({ rating: 0 })).status).toBe(422);
+    expect((await patch({ rating: 6 })).status).toBe(422);
+    expect((await patch({ rating: 3.5 })).status).toBe(422);
+    const cleared = shelfEntrySchema.parse(await (await patch({ rating: null })).json());
+    expect(cleared.rating).toBeNull();
+  });
+
   it('removes a book and its sessions', async () => {
     const { cookie } = await h.signUp();
     const entry = shelfEntrySchema.parse(

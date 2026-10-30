@@ -2,7 +2,7 @@ import { type CatalogBook } from '@bubo/contracts';
 import { type ReactNode, useEffect } from 'react';
 import { FlatList, View } from 'react-native';
 
-import { Button, EmptyState, InlineMessage, Text } from '../../design-system';
+import { Button, EmptyState, InlineMessage, LinkButton, Text } from '../../design-system';
 import { useTheme } from '../../theme';
 import { CatalogBookRow } from './CatalogBookRow';
 import { prefetchCovers } from './prefetch';
@@ -19,37 +19,72 @@ type Props = {
   entryFor: (book: CatalogBook) => string | null;
   onOpen: (book: CatalogBook) => void;
   onOpenEntry: (id: string) => void;
+  /** Opens the "Adicionar à estante" sheet for this book. */
   onAdd: (book: CatalogBook) => void;
   onRetry: () => void;
   onManual: () => void;
   inset?: boolean;
 };
 
+/** Row-shaped placeholders while the first results arrive (no spinner, no fake books). */
+export function SearchSkeleton() {
+  const theme = useTheme();
+  const bar = (width: `${number}%`, height: number) => ({
+    width,
+    height,
+    borderRadius: height / 2,
+    backgroundColor: theme.colors.surfaceMuted,
+  });
+  return (
+    <View accessible accessibilityLabel="Buscando livros" style={{ gap: theme.spacing.sm }}>
+      {[0, 1, 2, 3].map((index) => (
+        <View
+          key={index}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.md,
+            padding: theme.spacing.sm,
+            borderRadius: theme.radii.lg,
+            borderWidth: 1,
+            borderColor: theme.colors.borderSoft,
+            backgroundColor: theme.colors.surface,
+          }}
+        >
+          <View
+            style={{
+              width: 60,
+              height: 90,
+              borderRadius: theme.radii.sm,
+              backgroundColor: theme.colors.surfaceMuted,
+            }}
+          />
+          <View style={{ flex: 1, gap: theme.spacing.sm }}>
+            <View style={bar('85%', 14)} />
+            <View style={bar('55%', 12)} />
+            <View style={bar('40%', 10)} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** Render only the visible results; keep search controls reachable while covers load. */
 export function CatalogSearchResults(props: Props) {
   const theme = useTheme();
   useEffect(() => {
-    prefetchCovers(props.books.slice(0, 6), 76);
+    prefetchCovers(props.books.slice(0, 8), 60);
   }, [props.books]);
+  const showResults = props.searching && !props.updating;
   const empty = !props.searching ? (
     <EmptyState
       mascot="recallPrompt"
-      title="Qual livro você quer adicionar?"
-      description="Digite pelo menos 3 caracteres do título ou autor, ou busque pelo ISBN."
+      title="Qual livro você procura?"
+      description="Digite pelo menos 3 letras do título ou do autor, ou leia o código de barras (ISBN)."
     />
   ) : props.loading || props.updating ? (
-    <View accessible accessibilityLabel="Buscando livros" style={{ gap: theme.spacing.md }}>
-      {[0, 1, 2].map((index) => (
-        <View
-          key={index}
-          style={{
-            height: 150,
-            borderRadius: theme.radii.lg,
-            backgroundColor: theme.colors.surfaceMuted,
-          }}
-        />
-      ))}
-    </View>
+    <SearchSkeleton />
   ) : props.error ? (
     <View style={{ gap: theme.spacing.md }}>
       <InlineMessage tone="error" message={props.error} />
@@ -73,24 +108,24 @@ export function CatalogSearchResults(props: Props) {
   );
   return (
     <FlatList
-      data={props.searching && !props.updating ? props.books : []}
+      data={showResults ? props.books : []}
       keyExtractor={(book) => book.catalogId}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       showsVerticalScrollIndicator={false}
-      initialNumToRender={4}
-      maxToRenderPerBatch={4}
-      windowSize={5}
+      initialNumToRender={7}
+      maxToRenderPerBatch={6}
+      windowSize={7}
       contentContainerStyle={{
         padding: props.inset === false ? 0 : theme.sizes.gutter,
         paddingBottom: theme.spacing.xxl,
-        gap: theme.spacing.md,
+        gap: theme.spacing.sm,
       }}
       ListHeaderComponent={
-        <View style={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.sm }}>
+        <View style={{ gap: theme.spacing.md, paddingBottom: theme.spacing.xs }}>
           {props.header}
-          {props.searching && !props.updating && !props.loading ? (
-            <Text variant="bodySm" color="textMuted" accessibilityLiveRegion="polite">
+          {showResults && !props.loading && props.books.length ? (
+            <Text variant="label" color="textMuted" accessibilityLiveRegion="polite">
               {props.books.length}{' '}
               {props.books.length === 1 ? 'livro encontrado' : 'livros encontrados'}
             </Text>
@@ -107,24 +142,28 @@ export function CatalogSearchResults(props: Props) {
         </View>
       }
       ListEmptyComponent={empty}
-      renderItem={({ item, index }) => {
-        const entryId = props.entryFor(item);
-        return (
-          <CatalogBookRow
-            book={item}
-            priority={index < 3 ? 'high' : 'normal'}
-            onOpen={() => props.onOpen(item)}
-            action={{
-              label: entryId ? 'Abrir estante' : 'Adicionar',
-              icon: entryId ? 'check' : 'bookmark-add',
-              variant: entryId ? 'secondary' : 'primary',
-              loading: props.pendingId === item.catalogId,
-              disabled: props.pendingId !== null,
-              onPress: () => (entryId ? props.onOpenEntry(entryId) : props.onAdd(item)),
-            }}
-          />
-        );
-      }}
+      ListFooterComponent={
+        showResults && props.books.length ? (
+          <View style={{ alignItems: 'center', paddingTop: theme.spacing.md }}>
+            <Text variant="bodySm" color="textMuted">
+              Não achou o seu livro?
+            </Text>
+            <LinkButton label="Adicionar manualmente" onPress={props.onManual} />
+          </View>
+        ) : null
+      }
+      renderItem={({ item, index }) => (
+        <CatalogBookRow
+          book={item}
+          priority={index < 4 ? 'high' : 'normal'}
+          onOpen={() => props.onOpen(item)}
+          entryId={props.entryFor(item)}
+          onOpenEntry={props.onOpenEntry}
+          onAdd={() => props.onAdd(item)}
+          adding={props.pendingId === item.catalogId}
+          disabled={props.pendingId !== null}
+        />
+      )}
     />
   );
 }

@@ -141,6 +141,7 @@ describe('GET /v1/openapi.json', () => {
     const doc = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
     expect(doc.openapi).toBe('3.0.3');
     expect(Object.keys(doc.paths)).toEqual([
+      '/v1/me/replay',
       '/v1/me/memory',
       '/v1/me/achievements',
       '/v1/me/league',
@@ -151,9 +152,11 @@ describe('GET /v1/openapi.json', () => {
       '/v1/me/stats',
       '/v1/shelf',
       '/v1/shelf/{id}',
+      '/v1/shelf/{id}/community',
       '/v1/sessions',
       '/v1/sessions/assessment',
       '/v1/recall/due',
+      '/v1/recall/practice',
       '/v1/recall/cards',
       '/v1/recall/cards/{id}',
       '/v1/recall/cards/{id}/review',
@@ -194,6 +197,8 @@ describe('GET /v1/openapi.json', () => {
       '/v1/me/push-token/{token}',
       '/v1/notifications',
       '/v1/notifications/read',
+      '/v1/email/unsubscribe',
+      '/v1/email/art/{file}',
     ]);
   });
 });

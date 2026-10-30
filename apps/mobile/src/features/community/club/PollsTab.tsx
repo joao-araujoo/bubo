@@ -76,11 +76,9 @@ export function PollsTab({ club, userId }: { club: ClubDetail; userId: string })
         />
       ) : (
         <>
-          {openPolls.length > 0 ? (
-            <SectionTitle icon="how-to-vote" title="Enquetes abertas" />
-          ) : null}
+          {openPolls.length > 0 ? <SectionTitle title="Enquetes abertas" /> : null}
           {openPolls.map(card)}
-          {closed.length > 0 ? <SectionTitle icon="history" title="Encerradas" /> : null}
+          {closed.length > 0 ? <SectionTitle title="Encerradas" /> : null}
           {closed.map(card)}
         </>
       )}

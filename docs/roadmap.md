@@ -1,5 +1,30 @@
 # Roadmap
 
+## Código de entrada, emails do Bubo e configurações por assunto — 2026-10-12 (ADR-038/039)
+
+- **Login mais seguro:** com provedor de email configurado, a senha certa em um aparelho não
+  lembrado leva à tela `codigo` (6 dígitos por email, 10 minutos, uso único, 5 tentativas,
+  limites por IP). "Lembrar este aparelho" vale 30 dias e sobrevive ao sair da conta. O leitor
+  liga/desliga o código em Configurações → Conta e segurança, com senha. Sem Resend (dev ou
+  produção sem secrets), o login segue só com senha e o app mostra a opção como indisponível.
+- **Nova senha por código:** "Esqueci minha senha" envia um código e o leitor cria a senha na
+  mesma tela, sem depender de deep link. O link antigo continua válido para builds anteriores.
+  Alterar senha e sair dos outros aparelhos entraram em Conta e segurança; senha alterada e conta
+  excluída avisam por email.
+- **Emails redesenhados** (moldura única, mascote grande, uma manchete, um botão ou um código,
+  rodapé com o motivo) e **programa de emails** com consentimento: "Sentimos sua falta" sai às 10h
+  locais após 7 dias sem ler, no máximo 1 a cada 30 dias, com descadastro em um toque e registro
+  em `reader_email_events`. Resumo semanal, sequência em risco e novo aparelho ficam propostos.
+- **Configurações por assunto:** hub Você → Configurações com Revisões e leitura, Notificações no
+  celular, E-mails do Bubo, Aparência e toque, Widgets, Conta e segurança e Sobre (Termos de Uso,
+  Política de Privacidade, contato opcional `EXPO_PUBLIC_SUPPORT_EMAIL`, versão). Cadastro mostra
+  a frase de consentimento com links.
+- `npm run verify` verde (584 testes); em 2026-10-12 a migração `0017` foi aplicada no Neon, o
+  domínio do Resend foi verificado, os secrets de e-mail entraram no Worker e a API foi publicada
+  (`06a4c5e3…`) com smoke em produção; os modelos chegaram ao Gmail do dono. Aceite visual no
+  aparelho e nos clientes de e-mail pendente. Ver [emails.md](emails.md), [release.md](release.md),
+  ADR-038 e ADR-039.
+
 ## Retomar leitura e Hoje adaptativo — 2026-10-04 (ADR-032)
 
 - Recorte das ideias **01–03 e 06** do [checklist](ideias-futuras.md): consolidar sessão
@@ -211,8 +236,9 @@
   Mobile search/shelf are virtualized, saves apply API-accepted state before refreshes, and
   Estante has local search, status filters/counts, ordering and quick actions. Adding supports
   **Já li** directly, including ISBN/manual entry, without creating reading activity. Local code
-  only; device acceptance and publication of this slice remain pending. Stories and monthly/annual
-  Replay are already planned in future ideas **21–23**, still backlog without scheduled dates.
+  only; device acceptance and publication of this slice remain pending. Future ideas **21–23**
+  now have a local implementation of recorded-reading Replay and book Stories (ADR-034); native
+  delivery and acceptance remain pending, as detailed in [replay.md](replay.md).
 
 - Done: server-side catalog lookup (Open Library / Google Books / BrasilAPI ISBN, cached), Discover, first-book and
   add-book search, manual fallback, and ISBN scanner (`expo-camera`). See ADR-016.
@@ -481,6 +507,32 @@
 - **API:** `/v1/me/stats` adds `monthActiveDates` (default `[]`). No migration.
 - **App:** `widgets` rebuilt with faithful previews and today's mood timeline.
 - **Pending:** launcher/WidgetKit device acceptance, Swift compilation (no macOS here).
+
+## Future ideas 21–23 — Replay and Stories (2026-10-04, ADR-034)
+
+- **Local implementation:** authenticated `GET /v1/me/replay`, monthly/yearly session-derived
+  metrics, reading-only sequence, books/authors and annual monthly evolution. Period membership
+  uses accepted session end instants in the requested IANA zone. Manual **Já li** declarations
+  never create Replay activity; partial history and unavailable dimensions are explicit.
+  Server `generatedAt` dates the current-period art as `até DD/MM`. Replay is not persisted,
+  refetches on mount and has an honest paused/offline state; ranking ties use non-exclusive copy.
+- **App:** Você → Bubo Replay, manual chapters with short reduced-motion-aware fades and a
+  complete report. Book detail → Compartilhar livro with Papel/Noite/Violeta, real cover and
+  metadata, the saved private rating (ADR-035, switchable), canonical logo and 1080 × 1920 PNG
+  output.
+- **Privacy/native:** no private writing, new public feed or automatic publication. Local native
+  capture, sharing/saving and Instagram handoff; direct Instagram needs installed Instagram,
+  a real public Meta App ID and a new native build. Expo Go supports previews with honest
+  availability copy. `react-native-view-shot` 5.1.0 captures the PNG; no migration or remote
+  change is required.
+- **Validation:** `npm run verify` passed (541 tests; format/lint/types/assets/audit green).
+  Android prebuild, module Kotlin compilation, merged manifest and release JS bundle checked
+  locally; full debug APK assembled and installed in the emulator. The emulator visual/export run
+  was interrupted and not completed; code re-reviewed and verify re-run on 2026-10-04. Physical-device acceptance, Swift compilation, Instagram delivery and
+  visual/accessibility acceptance remain pending. No deployment, remote change or
+  git operation in this slice. Sources, criteria and owner setup: [replay.md](replay.md).
+- **Still separate:** genres, quotations, Pontes and memory highlights depend on their own
+  sources; future ideas 24–28 and Task 06's calibrated retention model remain open.
 
 ## Later (see [screens.md](screens.md) for the full list)
 

@@ -23,7 +23,7 @@ export default function BlockedReadersScreen() {
   const unblock = useUnblockUser(userId);
 
   return (
-    <FormScreen title="Leitores bloqueados" eyebrow="Comunidade">
+    <FormScreen title="Leitores bloqueados">
       {blocks.isPending ? (
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando" />
       ) : blocks.isError ? (

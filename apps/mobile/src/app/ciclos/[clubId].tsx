@@ -208,7 +208,7 @@ function ClosedCycleCard({ cycle, club }: { cycle: Cycle; club: ClubDetail }) {
             label={`Ciclo #${cycle.number} concluído • ${monthRange(cycle.startedAt, end)}`}
           />
         </View>
-        <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+        <Text variant="meta" color="textMuted">
           {(() => {
             const weeks = cycleWeeks(new Date(cycle.startedAt), new Date(end));
             return weeks === 1 ? '1 semana' : `${weeks} semanas`;
@@ -273,7 +273,7 @@ function StartCycleCard({ club, userId }: { club: ClubDetail; userId: string }) 
 
   return (
     <Card>
-      <SectionTitle icon="add-circle-outline" title="Abrir o próximo ciclo" />
+      <SectionTitle title="Abrir o próximo ciclo" />
       <Text variant="bodySm" color="textMuted">
         Os membros de agora participam. O progresso vem das sessões de leitura deste livro durante o
         ciclo.
@@ -329,9 +329,7 @@ export default function ClubCyclesScreen() {
   const [year, setYear] = useState<number | null>(null);
 
   const frame = (children: ReactNode) => (
-    <FormScreen align="left" eyebrow="Histórico do clube" title="Ciclos & leituras anteriores">
-      {children}
-    </FormScreen>
+    <FormScreen title="Ciclos e leituras anteriores">{children}</FormScreen>
   );
   if (club.isPending || cycles.isPending)
     return frame(
@@ -389,7 +387,7 @@ export default function ClubCyclesScreen() {
     );
 
   return (
-    <FormScreen align="left" eyebrow="Histórico do clube" title="Ciclos & leituras anteriores">
+    <FormScreen title="Ciclos e leituras anteriores">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <View
           style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.success }}
@@ -506,7 +504,6 @@ export default function ClubCyclesScreen() {
       ) : null}
 
       <SectionTitle
-        icon="history"
         title="Linha do tempo de ciclos concluídos"
         trailing={
           closed.length ? (

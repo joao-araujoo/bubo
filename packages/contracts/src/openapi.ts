@@ -31,7 +31,9 @@ export function buildOpenApiDocument(
     for (const [status, response] of Object.entries(route.responses)) {
       responses[status] = {
         description: response.description,
-        content: { 'application/json': { schema: toSchema(response.schema) } },
+        content: {
+          [response.contentType ?? 'application/json']: { schema: toSchema(response.schema) },
+        },
       };
     }
     responses.default = {

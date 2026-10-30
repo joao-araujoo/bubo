@@ -114,3 +114,38 @@ export function MascotGreeting({ children }: { children: ReactNode }) {
     </Animated.View>
   );
 }
+
+/**
+ * A 0 → 1 → 0 native loop for gentle ambient motion of whole elements (reading scenes, Revisar
+ * seal), still at `rest` under reduced motion or when paused.
+ */
+export function useAmbientLoop(duration: number, active = true, rest = 0) {
+  const reduced = useReducedMotion();
+  const value = useRef(new Animated.Value(rest)).current;
+  useEffect(() => {
+    if (reduced || !active) {
+      value.setValue(rest);
+      return;
+    }
+    const half = Math.round(duration / 2);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, {
+          toValue: 1,
+          duration: half,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(value, {
+          toValue: 0,
+          duration: half,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [value, duration, active, reduced, rest]);
+  return value;
+}

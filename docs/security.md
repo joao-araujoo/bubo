@@ -21,6 +21,22 @@
   - Passwords are 8–128 characters and hashed with scrypt.
   - Sessions last 30 days in a `SameSite=Lax` cookie. It's `Secure` in production.
   - On the device, the cookie lives in SecureStore (keychain/keystore).
+- **Login code (ADR-038):** with an e-mail provider configured, a correct password on an
+  untrusted device answers `twoFactorRedirect` and no session; the reader types a six-digit code
+  e-mailed by the API (hashed at rest, 10 minutes, single use, 5 attempts, 3 sends/min and
+  10 verifications/min per IP). "Lembrar este aparelho" sets a signed, account-bound 30-day
+  `trust_device` cookie that the app preserves across sign-out. Without a provider the code is
+  not enforced and `/v1/me` says so (`loginCodeAvailable: false`). Readers may turn the code off
+  with their password.
+- **Password change and reset by code:** `/change-password` re-checks the current password,
+  revokes the other sessions and e-mails a notice; `/email-otp/reset-password` has the same code
+  rules, revokes every session and e-mails the notice. Only `forget-password` codes are ever
+  e-mailed: there is no passwordless sign-in. Deleting the account e-mails a confirmation.
+- **A reset signs that device in (ADR-040):** the reset code (or link) already proves control of
+  the e-mail, the same factor as the login code, and the reader has just chosen the password, so
+  the successful reset response carries a fresh session for that device only. Failed resets never
+  set a cookie. The `x-bubo-auth` header only lets old builds show an error instead of hanging;
+  it never skips the login code.
 - **CSRF and origin:** cookie-authenticated auth calls must come from a trusted origin: `bubo://`,
   or `exp://` in development only. The check is enforced even in tests.
 - **Open-redirect protection:** `authRedirectGuard` blocks any `callbackURL` or `redirectTo`
@@ -44,7 +60,14 @@
 - **Email verification (ADR-025):** optional on signup, signed one-hour link; guarded callbacks.
   Manual resends limited to 3/min/IP. Unconfigured production returns 503 uniformly. Security
   notification failures cannot prevent password-reset session revocation. Email logs omit auth
-  links and recipients; Resend idempotency headers contain event hashes, never tokens.
+  links, codes and recipients; Resend idempotency headers contain event hashes, never tokens.
+- **Optional e-mails (ADR-038):** need the reader's consent (`email_reading_reminders`), carry an
+  HMAC-signed one-click opt-out link (`/v1/email/unsubscribe`, public, 20/min per IP, no personal
+  data in the token) and are logged by id and kind only.
+- **E-mail pictures (ADR-041):** no attachments; `/v1/email/art/:file` is public and static (an
+  allow-list of content-hashed names embedded in the Worker, 404 otherwise, no database, no
+  per-reader URL, so opening an e-mail tracks nobody). It alone answers
+  `Cross-Origin-Resource-Policy: cross-origin` so webmails can embed the images.
 - **Production config:** `/v1/ready` stays 503 unless all of these are set:
   - `DATABASE_URL`
   - `BETTER_AUTH_SECRET`
@@ -90,10 +113,12 @@
 
 ## Before production (known gaps)
 
-- Verify the Resend domain and configure the sender before enabling public email delivery.
-  Optional signup verification is implemented (ADR-025); requiring it remains an owner decision.
-- Terms of Use and Privacy Policy. The sign-up consent checkbox from Stitch was left out because
-  the documents don't exist yet.
+- The Resend domain is verified and the sender configured (2026-10-12). Optional signup
+  verification is implemented (ADR-025); requiring it remains an owner decision.
+- Terms of Use and Privacy Policy exist in the app (ADR-039, `legal/termos` and
+  `legal/privacidade`, linked from sign-up and Configurações → Sobre). They must be revised when a
+  data practice changes, and the owner still has to decide the public contact
+  (`EXPO_PUBLIC_SUPPORT_EMAIL`).
 - The Workers Paid plan: scrypt hashing exceeds the Free plan's 10 ms CPU limit.
 - Data export (LGPD portability). Account deletion is done.
 

@@ -60,3 +60,26 @@ it('answers verification requests with 503 for every address when delivery is un
     expect(response.status).toBe(503);
   }
 });
+
+it('answers code requests with 503 and signs in without a code when delivery is unconfigured', async () => {
+  const { email, cookie } = await signUp();
+  for (const path of [
+    '/v1/auth/email-otp/request-password-reset',
+    '/v1/auth/two-factor/send-otp',
+  ]) {
+    const response = await h.call(path, { method: 'POST', json: { email } });
+    expect(response.status).toBe(503);
+  }
+  const me = (await (await h.call('/v1/me', { cookie })).json()) as {
+    loginCodeAvailable: boolean;
+    user: { twoFactorEnabled: boolean };
+  };
+  expect(me.loginCodeAvailable).toBe(false);
+  expect(me.user.twoFactorEnabled).toBe(false);
+  const signIn = await h.call('/v1/auth/sign-in/email', {
+    method: 'POST',
+    json: { email, password: 'senha-forte-123' },
+  });
+  expect(signIn.status).toBe(200);
+  expect(await signIn.json()).not.toHaveProperty('twoFactorRedirect');
+});

@@ -48,6 +48,9 @@ describe('applyMigrations (PGlite)', () => {
       '0013_reader_preferences_notifications.sql',
       '0014_session_recall_assessment.sql',
       '0015_reader_push_receipts.sql',
+      '0016_shelf_entry_rating.sql',
+      '0017_login_codes_and_email_program.sql',
+      '0018_shelf_marks.sql',
     ]);
   });
 

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { type TextInput, View } from 'react-native';
 
@@ -11,8 +11,8 @@ import {
   Text,
   TextField,
 } from '../../design-system';
-import { authErrorMessage, fieldErrors, signInSchema } from '../../features/auth/messages';
-import { authClient } from '../../lib/auth/client';
+import { fieldErrors, signInSchema } from '../../features/auth/messages';
+import { signInWithPassword } from '../../features/auth/sign-in';
 import { haptics } from '../../lib/haptics';
 import { useTheme } from '../../theme';
 
@@ -20,7 +20,8 @@ export default function SignInScreen() {
   const theme = useTheme();
   const router = useRouter();
   const passwordRef = useRef<TextInput>(null);
-  const [email, setEmail] = useState('');
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -36,15 +37,19 @@ export default function SignInScreen() {
     }
     setErrors({});
     setSubmitting(true);
-    const { error } = await authClient.signIn.email(parsed.data);
+    const outcome = await signInWithPassword(parsed.data.email, parsed.data.password);
     setSubmitting(false);
-    if (error) {
-      setFormError(authErrorMessage(error));
+    if (outcome.kind === 'error') {
+      setFormError(outcome.message);
       haptics.error();
       return;
     }
     haptics.success();
-    // The session change flips the navigation guard (onboarding or Hoje).
+    // Untrusted device: the password was right, now a code goes to the reader's e-mail (ADR-038).
+    if (outcome.kind === 'code') {
+      router.push({ pathname: '/codigo', params: { email: parsed.data.email } });
+    }
+    // Otherwise the session change flips the navigation guard (onboarding or Hoje).
   }
 
   return (

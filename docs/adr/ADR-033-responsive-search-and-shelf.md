@@ -57,6 +57,8 @@ replace an installed APK.
 
 ## Planned sharing features
 
-The existing [future-ideas checklist](../ideias-futuras.md) already includes **21 Bubo Replay
-mensal**, **22 Cards para compartilhar nos Stories**, and **23 Bubo Replay anual**. They remain
-unchecked backlog items without a delivery date. This change does not implement them.
+At the acceptance of this ADR, the existing [future-ideas checklist](../ideias-futuras.md) included
+**21 Bubo Replay mensal**, **22 Cards para compartilhar nos Stories**, and **23 Bubo Replay anual**
+as unchecked backlog items. This catalog/shelf change did not implement them. The subsequent
+[ADR-034](ADR-034-replay-and-book-stories.md) adds their local recorded-reading/Stories slice,
+with native delivery and device acceptance tracked separately.

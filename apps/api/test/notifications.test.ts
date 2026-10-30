@@ -120,6 +120,7 @@ describe('preferences', () => {
       timeZone: 'America/Sao_Paulo',
       notifyCommunity: true,
       notifyFriends: true,
+      emailReadingReminders: true,
     });
     for (const bad of [
       { timeZone: 'Mars/Olympus' },
@@ -469,9 +470,9 @@ describe('review reminder cron', () => {
         },
       });
     // 08:00 in São Paulo: not yet.
-    expect(await run('2026-10-01T11:00:00Z')).toEqual({ sent: 0, reminders: 0 });
+    expect(await run('2026-10-01T11:00:00Z')).toEqual({ sent: 0, reminders: 0, emails: 0 });
     // 09:00 in São Paulo: one reminder for the reader with a due card, none for the other.
-    expect(await run('2026-10-01T12:00:00Z')).toEqual({ sent: 1, reminders: 1 });
+    expect(await run('2026-10-01T12:00:00Z')).toEqual({ sent: 1, reminders: 1, emails: 0 });
     expect(sent[0]).toMatchObject({
       to: a.token,
       channelId: 'lembretes',
@@ -480,9 +481,9 @@ describe('review reminder cron', () => {
     expect((await inbox(a)).items[0]).toMatchObject({ kind: 'review_due', count: 1 });
     expect((await inbox(quiet)).items).toEqual([]);
     // Same local day again: nothing new.
-    expect(await run('2026-10-01T12:30:00Z')).toEqual({ sent: 0, reminders: 0 });
+    expect(await run('2026-10-01T12:30:00Z')).toEqual({ sent: 0, reminders: 0, emails: 0 });
     // Reminders off: nothing the next day either.
     await savePreferences(a, { reviewReminder: false });
-    expect(await run('2026-10-02T12:00:00Z')).toEqual({ sent: 0, reminders: 0 });
+    expect(await run('2026-10-02T12:00:00Z')).toEqual({ sent: 0, reminders: 0, emails: 0 });
   });
 });

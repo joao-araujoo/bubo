@@ -44,7 +44,7 @@ export default function LeagueScreen() {
   const days = data ? (data.daysLeft === 1 ? 'Último dia' : `${data.daysLeft} dias restantes`) : '';
 
   return (
-    <FormScreen align="left" eyebrow="Amigos" eyebrowDot title="Liga semanal">
+    <FormScreen title="Liga semanal">
       {league.isPending ? (
         <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando a liga" />
       ) : league.isError || !data ? (

@@ -123,7 +123,6 @@ export default function NewPollScreen() {
     <FormScreen
       leading="close"
       title="Nova enquete"
-      eyebrow="Clube de leitura"
       footer={
         <>
           {error ? <InlineMessage tone="error" message={error} /> : null}
@@ -157,9 +156,9 @@ export default function NewPollScreen() {
                 .filter(Boolean)
                 .join(' • ') || data.book.title}
             </Text>
-            <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+            <Text variant="meta" color="textMuted">
               Seu progresso:{' '}
-              <Text variant="bodySm" color="accentText" style={{ fontSize: 12 }}>
+              <Text variant="meta" color="accentText">
                 {`Página ${readerPage}`}
               </Text>
             </Text>

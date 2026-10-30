@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type EmailLink } from '../src/services/email-templates';
 import { type PasswordChangedEmail } from '../src/services/email';
+import { silentEmailSender } from './email-recorder';
 import { createHarness } from './harness';
 
 let h: Awaited<ReturnType<typeof createHarness>>;
@@ -13,6 +14,7 @@ let counter = 0;
 beforeAll(async () => {
   h = await createHarness({
     emailSender: () => ({
+      ...silentEmailSender(),
       canDeliver: true,
       async sendVerification(message) {
         if (rejectVerification) throw new Error('provider down');
@@ -25,7 +27,6 @@ beforeAll(async () => {
         if (rejectChange) throw new Error('provider down');
         changes.push(message);
       },
-      sendTest: async () => undefined,
     }),
   });
 }, 60_000);

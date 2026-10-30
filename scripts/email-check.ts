@@ -5,6 +5,7 @@ import { parseEnv } from 'node:util';
 import { z } from 'zod';
 import { createEmailSender } from '../apps/api/src/services/email';
 import { createLogger } from '../apps/api/src/lib/logger';
+import { emailArtBase } from './lib/email-art-base';
 
 const domainList = z.object({ data: z.array(z.object({ name: z.string(), status: z.string() })) });
 const emailStatus = z.object({ id: z.string(), last_event: z.string().nullable().optional() });
@@ -54,6 +55,7 @@ async function main() {
         APP_ENV: 'preview',
         RESEND_API_KEY: key,
         EMAIL_FROM: testing ? 'Bubo <onboarding@resend.dev>' : sender,
+        BETTER_AUTH_URL: emailArtBase(values, arg('--art-base')),
       },
       logger: createLogger({ service: 'bubo-email-check' }),
     }).sendTest({ to: recipient, name: arg('--name') ?? '', eventId: crypto.randomUUID() });

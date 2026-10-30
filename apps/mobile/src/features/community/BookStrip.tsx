@@ -39,12 +39,7 @@ export function BookStrip({ club }: { club: ClubDetail }) {
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
           <Icon name="group" size={15} color="accentText" />
-          <Text
-            variant="bodySm"
-            color="accentText"
-            numberOfLines={2}
-            style={{ flex: 1, fontSize: 12 }}
-          >
+          <Text variant="meta" color="accentText" numberOfLines={2} style={{ flex: 1 }}>
             {`${membersLabel(club.memberCount)} • ${topicsLabel(club.topicCount)}`}
           </Text>
         </View>
@@ -69,9 +64,7 @@ export function BookStrip({ club }: { club: ClubDetail }) {
               Anti-spoiler
             </Text>
           </View>
-          <Text variant="label" style={{ fontSize: 12 }}>
-            {`Pág. ${club.readerPage} sua`}
-          </Text>
+          <Text variant="labelSm">{`Pág. ${club.readerPage} sua`}</Text>
         </View>
       ) : null}
     </View>

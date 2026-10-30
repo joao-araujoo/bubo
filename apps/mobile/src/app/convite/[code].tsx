@@ -28,7 +28,7 @@ export default function InviteLinkScreen() {
   const join = useJoinByCode(userId);
   const [showGuidelines, setShowGuidelines] = useState(false);
 
-  const header = { title: 'Convite do clube', eyebrow: 'Clube de leitura', align: 'left' } as const;
+  const header = { title: 'Convite do clube' } as const;
 
   if (!code) {
     return (
@@ -112,7 +112,7 @@ export default function InviteLinkScreen() {
 
   if (showGuidelines) {
     return (
-      <FormScreen {...header} title="Diretrizes & blindagem" eyebrow={club.name} footer={footer}>
+      <FormScreen {...header} title="Diretrizes & blindagem" subtitle={club.name} footer={footer}>
         <Button
           label="Voltar ao convite"
           icon="arrow-back"
@@ -126,7 +126,7 @@ export default function InviteLinkScreen() {
   }
 
   return (
-    <FormScreen {...header} eyebrowDot footer={footer}>
+    <FormScreen {...header} footer={footer}>
       <ClubProfile
         club={club}
         joining={join.isPending}

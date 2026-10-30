@@ -7,6 +7,7 @@ import {
 } from '@bubo/contracts';
 import { Hono } from 'hono';
 
+import { hasLoginCodes } from '../auth/auth';
 import { type AppEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { parseJsonBody } from '../lib/validation';
@@ -82,6 +83,8 @@ export function readerRoutes(deps: { catalog: CatalogProvider }) {
     return c.json({
       ...toMeResponse(user, profile),
       isModerator: config.ok && isModerator(user.id, config.env.MODERATOR_USER_IDS),
+      // The two-factor plugin is registered only when codes can actually be e-mailed (ADR-038).
+      loginCodeAvailable: hasLoginCodes(c.get('auth')),
     });
   });
 

@@ -68,6 +68,12 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.worker } },
   },
   {
+    // Launch film (motion/bubo-launch): browser modules rendered frame by frame in Chromium; its
+    // Node scripts also hand functions to the page (puppeteer evaluate).
+    files: ['motion/**/src/**/*.js', 'motion/**/scripts/**/*.mjs'],
+    languageOptions: { globals: { ...globals.browser } },
+  },
+  {
     // The API logger is the single sanctioned console sink (structured JSON logs for Workers).
     files: ['apps/api/src/lib/logger.ts'],
     rules: { 'no-console': 'off' },

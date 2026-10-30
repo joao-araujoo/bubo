@@ -104,7 +104,7 @@ function FieldLabel({
         ) : null}
       </Text>
       {hint ? (
-        <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+        <Text variant="meta" color="textMuted">
           {hint}
         </Text>
       ) : null}
@@ -160,7 +160,7 @@ function AccessCard({
               color={selected ? 'accentText' : 'textMuted'}
             />
           </View>
-          <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+          <Text variant="meta" color="textMuted">
             {description}
           </Text>
         </Raised>
@@ -232,7 +232,6 @@ export default function NewClubScreen() {
     <FormScreen
       leading="close"
       title="Criar novo clube"
-      eyebrow="Comunidade"
       footer={
         <>
           {error ? <InlineMessage tone="error" message={error} /> : null}
@@ -364,7 +363,7 @@ export default function NewClubScreen() {
               <Text variant="bodyStrong" numberOfLines={2}>
                 {chosen.book.title}
               </Text>
-              <Text variant="bodySm" color="textMuted" style={{ fontSize: 12 }}>
+              <Text variant="meta" color="textMuted">
                 {bookLine(chosen)}
               </Text>
             </View>

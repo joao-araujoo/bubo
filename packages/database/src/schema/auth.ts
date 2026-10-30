@@ -20,9 +20,31 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  /** E-mailed login code on untrusted devices (0017, ADR-038). On for every account by default. */
+  twoFactorEnabled: boolean('two_factor_enabled').notNull().default(true),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/**
+ * Better Auth two-factor plugin model (0017). Bubo only uses the e-mail OTP method, which keeps no
+ * secret or backup codes, but the plugin reads this table for lockout bookkeeping.
+ */
+export const twoFactors = pgTable(
+  'two_factors',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    secret: text('secret').notNull(),
+    backupCodes: text('backup_codes').notNull(),
+    verified: boolean('verified').notNull().default(true),
+    failedVerificationCount: integer('failed_verification_count').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  },
+  (table) => [index('two_factors_user_id_idx').on(table.userId)],
+);
 
 export const sessions = pgTable(
   'sessions',
